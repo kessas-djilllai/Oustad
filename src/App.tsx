@@ -25,7 +25,8 @@ import {
   Globe,
   FileText,
   PlayCircle,
-  PenTool
+  PenTool,
+  Unlock
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -47,6 +48,7 @@ export default function App() {
 
 function StudentLayout() {
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -77,7 +79,10 @@ function StudentLayout() {
               <Bell size={20} />
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
             </button>
-            <button className="w-10 h-10 md:hidden rounded-2xl glass glass-hover flex items-center justify-center text-slate-600 transition-all">
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="w-10 h-10 rounded-2xl glass glass-hover flex items-center justify-center text-slate-600 transition-all"
+            >
               <Menu size={20} />
             </button>
             <button 
@@ -92,8 +97,80 @@ function StudentLayout() {
         <StudentPortal loading={loading} />
 
       </div>
+
+      {/* Sidebar Drawer */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <>
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSidebarOpen(false)}
+              className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 bottom-0 w-64 glass !bg-white/95 !backdrop-blur-2xl z-50 p-6 flex flex-col border-l border-white/50 shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                    ب
+                  </div>
+                  <h2 className="font-bold text-lg text-slate-800">القائمة</h2>
+                </div>
+                <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-2">
+                <SidebarItem icon={<BookOpen size={18} />} title="الرئيسية" active />
+                <SidebarItem icon={<Calendar size={18} />} title="جدول المراجعة" />
+                <SidebarItem icon={<Target size={18} />} title="الإمتحانات" badge="2" />
+                <SidebarItem icon={<MessageCircle size={18} />} title="المجتمع" />
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 space-y-2">
+                <SidebarItem icon={<Settings size={18} />} title="الإعدادات" />
+                <button 
+                  onClick={() => navigate('/admin/login')}
+                  className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-slate-600 hover:bg-slate-100 md:hidden"
+                >
+                  <Unlock size={18} />
+                  <span>دخول الإدارة</span>
+                </button>
+                <div className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-red-500 hover:bg-red-50 cursor-pointer">
+                  <LogOut size={18} />
+                  <span>تسجيل الخروج</span>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
+}
+
+function SidebarItem({ icon, title, active, badge }: { icon: React.ReactNode, title: string, active?: boolean, badge?: string }) {
+  return (
+    <div className={`flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-all ${active ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'}`}>
+      <div className="flex items-center gap-3 font-bold text-sm">
+        {icon}
+        <span>{title}</span>
+      </div>
+      {badge && (
+        <span className="bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
+          {badge}
+        </span>
+      )}
+    </div>
+  )
 }
 
 const SUBJECTS_DATA = [
