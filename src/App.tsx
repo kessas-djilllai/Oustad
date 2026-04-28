@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "../supabase";
 import { 
   BookOpen, 
   Target, 
@@ -200,8 +201,44 @@ const SUBJECTS_DATA = [
 
 function StudentPortal({ loading }: { loading: boolean }) {
   const [view, setView] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises' }>({ type: 'dashboard' });
+  const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
+  const [dbLoading, setDbLoading] = useState(false);
 
-  if (loading) {
+  useEffect(() => {
+    // Example of how you would fetch from Supabase if keys are provided
+    async function fetchData() {
+      if (!supabase) return; // Fallback to SUBJECTS_DATA if not configured
+      
+      try {
+        setDbLoading(true);
+        // This expects you to have run supabase-schema.sql in your Supabase project
+        const { data: dbSubjects, error } = await supabase.from('subjects').select('*, units(*, lessons(*), exercises(*))');
+        
+        if (error) throw error;
+        if (dbSubjects && dbSubjects.length > 0) {
+          // Format the data to match our UI state format
+          const formattedSubjects = dbSubjects.map((sub: any) => ({
+            ...sub,
+            icon: Calculator, // In a real app, map icon_name to actual Lucide component
+            units: sub.units?.sort((a: any, b: any) => a.unit_order - b.unit_order).map((u: any) => ({
+              ...u,
+              lessons: u.lessons?.sort((a: any, b: any) => a.lesson_order - b.lesson_order) || [],
+              exercises: u.exercises?.sort((a: any, b: any) => a.exercise_order - b.exercise_order) || [],
+            })) || []
+          }));
+          setSubjects(formattedSubjects);
+        }
+      } catch (err) {
+        console.error("Error fetching from Supabase:", err);
+      } finally {
+        setDbLoading(false);
+      }
+    }
+
+    fetchData();
+  }, []);
+
+  if (loading || dbLoading) {
     return (
       <div className="grid grid-cols-1 gap-6 auto-rows-[120px]">
         <div className="col-span-1 rounded-3xl bg-slate-200 animate-pulse h-full min-h-[200px]" />
@@ -219,7 +256,7 @@ function StudentPortal({ loading }: { loading: boolean }) {
          exit={{ opacity: 0, x: 10 }}
          transition={{ duration: 0.2 }}
       >
-        {view.type === 'dashboard' && <DashboardView onSubjectClick={(s) => setView({ type: 'subject', subject: s })} />}
+        {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s) => setView({ type: 'subject', subject: s })} />}
         {view.type === 'subject' && <SubjectUnitsView subject={view.subject} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'unit', subject: view.subject, unit: u })} />}
         {view.type === 'unit' && <UnitDetailsView subject={view.subject} unit={view.unit} onBack={() => setView({ type: 'subject', subject: view.subject })} onSelectType={(t) => setView({ type: 'list', subject: view.subject, unit: view.unit, listType: t })} />}
         {view.type === 'list' && <ContentListView subject={view.subject} unit={view.unit} listType={view.listType!} onBack={() => setView({ type: 'unit', subject: view.subject, unit: view.unit })} />}
@@ -228,7 +265,7 @@ function StudentPortal({ loading }: { loading: boolean }) {
   );
 }
 
-function DashboardView({ onSubjectClick }: { onSubjectClick: (s: any) => void }) {
+function DashboardView({ subjects, onSubjectClick }: { subjects: any[], onSubjectClick: (s: any) => void }) {
   return (
     <div className="space-y-4 md:space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
@@ -277,7 +314,7 @@ function DashboardView({ onSubjectClick }: { onSubjectClick: (s: any) => void })
           <span className="text-[10px] md:text-sm font-bold text-slate-500 bg-slate-100 px-2 md:px-3 py-1 rounded-lg md:rounded-xl">علوم تجريبية</span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-          {SUBJECTS_DATA.map((sub) => (
+          {subjects.map((sub) => (
             <motion.div 
               key={sub.id} 
               whileHover={{ scale: 1.02 }}
