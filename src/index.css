@@ -23,3 +23,9 @@ body {
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 8px 32px -1px rgba(0, 0, 0, 0.08);
 }
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
