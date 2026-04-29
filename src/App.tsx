@@ -136,6 +136,10 @@ function StudentLayout() {
 
               <div className="border-t border-slate-100 pt-4 space-y-2">
                 <SidebarItem icon={<Settings size={18} />} title="الإعدادات" />
+                <div onClick={() => navigate('/admin')} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-emerald-600 hover:bg-emerald-50 cursor-pointer">
+                  <Target size={18} />
+                  <span>لوحة التحكم (للتجريب)</span>
+                </div>
                 <div className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-red-500 hover:bg-red-50 cursor-pointer">
                   <LogOut size={18} />
                   <span>تسجيل الخروج</span>
@@ -305,10 +309,10 @@ function StudentPortal({ loading }: { loading: boolean }) {
          exit={{ opacity: 0, x: 10 }}
          transition={{ duration: 0.2 }}
       >
-        {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s) => setView({ type: 'subject', subject: s })} />}
-        {view.type === 'subject' && <SubjectUnitsView subject={view.subject} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'unit', subject: view.subject, unit: u })} />}
-        {view.type === 'unit' && <UnitDetailsView subject={view.subject} unit={view.unit} onBack={() => setView({ type: 'subject', subject: view.subject })} onSelectType={(t) => setView({ type: 'list', subject: view.subject, unit: view.unit, listType: t })} />}
-        {view.type === 'list' && <ContentListView subject={view.subject} unit={view.unit} listType={view.listType!} onBack={() => setView({ type: 'unit', subject: view.subject, unit: view.unit })} onSelectItem={(item) => {
+        {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s) => setView({ type: 'subject_type', subject: s })} />}
+        {view.type === 'subject_type' && <SubjectTypeView subject={view.subject} onBack={() => setView({ type: 'dashboard' })} onSelectType={(t) => setView({ type: 'subject_units', subject: view.subject, listType: t })} />}
+        {view.type === 'subject_units' && <SubjectUnitsView subject={view.subject} listType={view.listType} onBack={() => setView({ type: 'subject_type', subject: view.subject })} onUnitClick={(u) => setView({ type: 'list', subject: view.subject, unit: u, listType: view.listType })} />}
+        {view.type === 'list' && <ContentListView subject={view.subject} unit={view.unit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: view.subject, listType: view.listType })} onSelectItem={(item) => {
           if (view.listType === 'exercises') {
             setView({ type: 'solve_exercise', subject: view.subject, unit: view.unit, exercise: item });
           }
@@ -399,7 +403,7 @@ function DashboardView({ subjects, onSubjectClick }: { subjects: any[], onSubjec
   )
 }
 
-function SubjectUnitsView({ subject, onBack, onUnitClick }: { subject: any, onBack: () => void, onUnitClick: (u: any) => void }) {
+function SubjectTypeView({ subject, onBack, onSelectType }: { subject: any, onBack: () => void, onSelectType: (t: 'lessons' | 'exercises') => void }) {
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
@@ -409,7 +413,57 @@ function SubjectUnitsView({ subject, onBack, onUnitClick }: { subject: any, onBa
         <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl ${subject.bg} ${subject.color} flex items-center justify-center shadow-sm`}>
            <subject.icon size={16} className="md:w-5 md:h-5" />
         </div>
-        <h2 className="font-bold text-base md:text-xl text-slate-800">{subject.name} - الوحدات</h2>
+        <div>
+          <h2 className="font-bold text-base md:text-xl text-slate-800">{subject.name}</h2>
+          <p className="text-[10px] md:text-xs text-slate-500 font-medium">اختر نوع المحتوى</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-6">
+        <motion.div 
+           whileHover={{ scale: 1.02 }}
+           onClick={() => onSelectType('lessons')}
+           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-blue-50/50 transition-all border-2 border-transparent hover:border-blue-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
+        >
+           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 transition-transform shadow-sm">
+             <PlayCircle size={28} className="md:w-10 md:h-10" />
+           </div>
+           <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-blue-700 transition-colors">الدروس</h3>
+           <p className="text-[10px] md:text-sm text-slate-500 leading-tight">مشاهدة الدروس والملخصات</p>
+        </motion.div>
+
+        <motion.div 
+           whileHover={{ scale: 1.02 }}
+           onClick={() => onSelectType('exercises')}
+           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 transition-all border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
+        >
+           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 transition-transform shadow-sm">
+             <PenTool size={28} className="md:w-10 md:h-10" />
+           </div>
+           <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-emerald-700 transition-colors">التمارين</h3>
+           <p className="text-[10px] md:text-sm text-slate-500 leading-tight">حل تمارين تطبيقية مع التصحيح</p>
+        </motion.div>
+      </div>
+    </div>
+  )
+}
+
+function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject: any, listType?: 'lessons' | 'exercises', onBack: () => void, onUnitClick: (u: any) => void }) {
+  const isLessons = listType === 'lessons';
+
+  return (
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
+        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
+          <ChevronRight size={18} className="md:w-5 md:h-5" />
+        </button>
+        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl ${isLessons ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'} flex items-center justify-center shadow-sm`}>
+           {isLessons ? <PlayCircle size={16} className="md:w-5 md:h-5"/> : <PenTool size={16} className="md:w-5 md:h-5"/>}
+        </div>
+        <div>
+          <h2 className="font-bold text-base md:text-xl text-slate-800">{subject.name} - الوحدات</h2>
+          <p className="text-[10px] md:text-xs text-slate-500 font-medium">حدد الوحدة لفتح {isLessons ? 'الدروس' : 'التمارين'}</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
@@ -541,6 +595,9 @@ function ContentListView({ subject, unit, listType, onBack, onSelectItem }: { su
 function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject: any, unit: any, exercise: any, onBack: () => void }) {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [isRevealed, setIsRevealed] = useState(false);
+  const [score, setScore] = useState(0);
+  const [isFinished, setIsFinished] = useState(false);
 
   const getQuestions = () => {
     if (exercise?.content) {
@@ -562,7 +619,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
             text: "في سياق تطور العالم الثالث بعد الحرب العالمية الثانية، أي من الأحداث التالية يُعتبر التطبيق العملي الأول لمبادئ التضامن الأفرو-آسيوي التي مهدت لظهور حركة عدم الانحياز؟",
             options: [
               { id: 'a', text: "تأسيس منظمة الأمم المتحدة عام 1945.", label: "أ" },
-              { id: 'b', text: "انعقاد مؤتمر باندونغ بإندونيسيا عام 1955.", label: "ب" },
+              { id: 'b', text: "انعقاد مؤتمر باندونغ بإندونيسيا عام 1955.", label: "ب", isCorrect: true },
               { id: 'c', text: "الإعلان عن مشروع مارشال الاقتصادي عام 1947.", label: "ج" },
             ]
           },
@@ -571,7 +628,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
             text: "ما هو الهدف الرئيسي من تأسيس حركة عدم الانحياز؟",
             options: [
               { id: 'a', text: "التحالف مع المعسكر الشرقي.", label: "أ" },
-              { id: 'b', text: "الاستقلال والابتعاد عن صراعات الحرب الباردة.", label: "ب" },
+              { id: 'b', text: "الاستقلال والابتعاد عن صراعات الحرب الباردة.", label: "ب", isCorrect: true },
               { id: 'c', text: "بناء قوة عسكرية موحدة أفريقية أسيوية.", label: "ج" },
             ]
           }
@@ -583,7 +640,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
             id: 1,
             text: "ما هي مشتقة الدالة الأسية f(x) = e^(2x) ؟",
             options: [
-              { id: 'a', text: "f'(x) = 2e^(2x)", label: "أ" },
+              { id: 'a', text: "f'(x) = 2e^(2x)", label: "أ", isCorrect: true },
               { id: 'b', text: "f'(x) = e^(2x)", label: "ب" },
               { id: 'c', text: "f'(x) = 2xe^(2x)", label: "ج" },
             ]
@@ -593,7 +650,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
             text: "النهاية الشهيرة للدالة (e^x - 1)/x لما يؤول x إلى الصفر هي:",
             options: [
               { id: 'a', text: "0", label: "أ" },
-              { id: 'b', text: "1", label: "ب" },
+              { id: 'b', text: "1", label: "ب", isCorrect: true },
               { id: 'c', text: "+∞", label: "ج" },
             ]
           }
@@ -628,15 +685,41 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
   const questions = getQuestions();
   const progress = ((currentQuestion + 1) / questions.length) * 100;
 
+  const handleOptionClick = (idx: number) => {
+    if (isRevealed) return;
+    setSelectedOption(idx);
+    setIsRevealed(true);
+    if (currentQ.options[idx].isCorrect) {
+      setScore(s => s + 1);
+    }
+  };
+
   const handleNext = () => {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
       setSelectedOption(null);
+      setIsRevealed(false);
     } else {
-      alert("انتهى التمرين!");
-      onBack();
+      setIsFinished(true);
     }
   };
+
+  if (isFinished) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="glass rounded-[2rem] p-8 text-center shadow-sm">
+           <div className="w-24 h-24 mx-auto bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-6">
+             <Target size={48} />
+           </div>
+           <h2 className="text-2xl font-bold text-slate-800 mb-2">أحسنت! لقد أنهيت التمرين</h2>
+           <p className="text-slate-500 mb-8">نتيجتك هي {score} من {questions.length}</p>
+           <button onClick={onBack} className="px-8 py-3 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-colors">
+             العودة للقائمة
+           </button>
+        </div>
+      </div>
+    );
+  }
 
   const currentQ = questions[currentQuestion];
 
@@ -666,33 +749,63 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
         </div>
 
         <div className="space-y-4">
-          {currentQ.options.map((option, idx) => (
-            <button
-              key={option.id}
-              onClick={() => setSelectedOption(idx)}
-              className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-right font-bold ${
-                selectedOption === idx 
-                  ? 'border-emerald-500 bg-emerald-50 text-emerald-800' 
-                  : 'border-slate-100 bg-white text-slate-700 hover:border-slate-200'
-              }`}
-            >
-              <span>{option.text}</span>
-              <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${
-                selectedOption === idx ? 'bg-emerald-200 text-emerald-800' : 'bg-emerald-50 text-emerald-600'
-              }`}>
-                {option.label}
-              </span>
-            </button>
-          ))}
+          {currentQ.options.map((option, idx) => {
+            let btnClass = 'border-slate-100 bg-white text-slate-700 hover:border-slate-200';
+            let labelClass = 'bg-emerald-50 text-emerald-600';
+            
+            if (isRevealed) {
+              if (option.isCorrect) {
+                btnClass = 'border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20';
+                labelClass = 'bg-emerald-200 text-emerald-800';
+              } else if (selectedOption === idx && !option.isCorrect) {
+                btnClass = 'border-red-500 bg-red-50 text-red-800 ring-2 ring-red-500/20';
+                labelClass = 'bg-red-200 text-red-800';
+              }
+            } else if (selectedOption === idx) {
+              btnClass = 'border-emerald-500 bg-emerald-50 text-emerald-800';
+              labelClass = 'bg-emerald-200 text-emerald-800';
+            }
+
+            return (
+              <button
+                key={option.id}
+                onClick={() => handleOptionClick(idx)}
+                disabled={isRevealed}
+                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-right font-bold disabled:cursor-default ${btnClass}`}
+              >
+                <span>{option.text}</span>
+                <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-colors ${labelClass}`}>
+                  {option.label}
+                </span>
+              </button>
+            );
+          })}
         </div>
+
+        {isRevealed && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className={`mt-6 p-4 rounded-xl border flex items-center gap-3 font-bold ${
+              currentQ.options[selectedOption!]?.isCorrect 
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}
+          >
+            {currentQ.options[selectedOption!]?.isCorrect ? (
+              <>مؤشر صحيح! إجابة ممتازة 🎉</>
+            ) : (
+              <>إجابة خاطئة. حاول التركيز أكثر في المرة القادمة.</>
+            )}
+          </motion.div>
+        )}
 
         <div className="mt-8 flex justify-end">
           <button
             onClick={handleNext}
-            disabled={selectedOption === null}
-            className="px-8 py-3 bg-emerald-500 text-white font-bold rounded-xl disabled:opacity-50 hover:bg-emerald-600 transition-colors shadow-sm"
+            disabled={!isRevealed}
+            className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-sm"
           >
-            {currentQuestion < questions.length - 1 ? 'التالي' : 'إنهاء'}
+            {currentQuestion < questions.length - 1 ? 'السؤال التالي' : 'عرض النتيجة'}
           </button>
         </div>
       </div>

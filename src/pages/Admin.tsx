@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -27,18 +27,18 @@ import { motion } from "motion/react";
 function StatCard({ title, value, trend, icon }: { title: string, value: string, trend: string, icon: React.ReactNode }) {
   const isPositive = trend.startsWith('+');
   return (
-    <div className="glass rounded-2xl p-4 md:p-5 flex flex-col justify-between">
-      <div className="flex justify-between items-start mb-4">
-        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+    <div className="glass rounded-2xl p-4 md:p-5 flex flex-col justify-between aspect-square md:aspect-auto md:h-32">
+      <div className="flex justify-between items-start mb-2 md:mb-4">
+        <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
           {icon}
         </div>
-        <span className={`text-xs font-bold px-2 py-1 rounded-lg ${isPositive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+        <span className={`text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg ${isPositive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
           {trend}
         </span>
       </div>
       <div>
-        <h4 className="text-xs text-slate-500 font-bold mb-1">{title}</h4>
-        <div className="text-2xl font-black text-slate-800">{value}</div>
+        <h4 className="text-[10px] md:text-xs text-slate-500 font-bold mb-1">{title}</h4>
+        <div className="text-xl md:text-2xl font-black text-slate-800">{value}</div>
       </div>
     </div>
   )
@@ -356,28 +356,33 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
           />
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex flex-col md:flex-row gap-4 mt-8">
           <button 
             type="button" 
             onClick={generateWithAI}
             disabled={isGenerating || !selectedSubjectId || !selectedUnitId || !title}
-            className="w-full bg-blue-50 text-blue-600 font-bold rounded-xl py-3.5 mt-6 hover:bg-blue-100 transition-all flex items-center justify-center gap-2 border border-blue-200 disabled:opacity-50"
+            className="flex-1 relative group overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl py-3.5 hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 disabled:opacity-50"
           >
+            <div className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
             {isGenerating ? (
-               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full" />
+               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
             ) : (
-               <>توليد الأسئلة بالذكاء الاصطناعي <Wand2 size={18} /></>
+               <>
+                 <Wand2 size={18} className="animate-pulse" /> 
+                 توليد التمرين الذكي
+               </>
             )}
           </button>
+          
           <button 
             type="submit" 
             disabled={isSubmitting}
-            className="w-full bg-emerald-600 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70"
+            className="flex-1 relative group overflow-hidden bg-slate-800 text-white font-bold rounded-xl py-3.5 hover:bg-slate-900 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70"
           >
             {isSubmitting ? (
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
             ) : (
-              <>حفظ التمرين <Save size={18} /></>
+              <>حفظ في القاعدة <Save size={18} /></>
             )}
           </button>
         </div>
@@ -571,41 +576,121 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
 function AdminSettings({ onBack }: { onBack: () => void }) {
   const [apiKey, setApiKey] = useState('');
   const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
+  const [availableModels, setAvailableModels] = useState<{id: string, name: string}[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [isValidated, setIsValidated] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   
-  // Available models based on Gemini AI spec
-  const AVAILABLE_MODELS = [
-    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (سريع، مجاني)', recommended: true },
-    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro (احترافي، دقيق)' },
-    { id: 'gemini-3.1-flash-lite-preview', name: 'Gemini Flash Lite (خفيف جداً)' }
-  ];
-
   useEffect(() => {
-    // Load from DB or local storage
     async function loadSettings() {
-      const savedKey = localStorage.getItem('admin_api_key') || '';
       const savedModel = localStorage.getItem('admin_ai_model') || 'gemini-3-flash-preview';
-      setApiKey(savedKey);
+      let currentKey = localStorage.getItem('admin_api_key') || '';
+      
       setSelectedModel(savedModel);
 
-      // Optionally try DB
       if (supabase) {
         try {
           const { data } = await supabase.from('admin_settings').select('*').limit(1).single();
           if (data && data.api_key) {
-            setApiKey(data.api_key);
-            setSelectedModel(data.ai_model || 'gemini-3-flash-preview');
+            currentKey = data.api_key;
+            setSelectedModel(data.ai_model || savedModel);
           }
-        } catch (e) {
-          // ignore DB error
-        }
+        } catch (e) { }
+      }
+      
+      setApiKey(currentKey);
+      
+      if (currentKey) {
+          // Trigger real validation instead of assuming it's valid
+          validateAndFetchModels(currentKey, savedModel);
       }
     }
     loadSettings();
   }, []);
 
+  const validationIdRef = useRef(0);
+
+  const validateAndFetchModels = async (keyToTest?: string | React.MouseEvent, modelToSelect?: string) => {
+      const isClickEvent = keyToTest && typeof keyToTest === 'object' && 'preventDefault' in keyToTest;
+      const key = (typeof keyToTest === 'string' && !isClickEvent) ? keyToTest : apiKey;
+      
+      if (!key) return;
+      if (key.length < 15) {
+          setValidationError('مفتاح API غير مكتمل أو قصير جداً. يرجى التأكد من نسخه بالكامل.');
+          setIsValidated(false);
+          return;
+      }
+
+      const currentValidationId = ++validationIdRef.current;
+      setIsValidating(true);
+      setValidationError(null);
+
+      try {
+          const validateWithXHR = (): Promise<any> => {
+              return new Promise((resolve, reject) => {
+                  const xhr = new XMLHttpRequest();
+                  xhr.open("GET", `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`, true);
+                  xhr.onreadystatechange = () => {
+                      if (xhr.readyState === 4) {
+                          if (xhr.status >= 200 && xhr.status < 300) {
+                              try { resolve(JSON.parse(xhr.responseText)); } catch(e) { reject(new Error("استجابة غير صالحة من الخادم.")); }
+                          } else {
+                              try { 
+                                  const err = JSON.parse(xhr.responseText); 
+                                  reject(new Error(err.error?.message || `خطأ ${xhr.status}: يرجى التأكد من صلاحية المفتاح`)); 
+                              } catch(e) { reject(new Error(`خطأ ${xhr.status}: يرجى التأكد من أن مفتاح API صحيح.`)); }
+                          }
+                      }
+                  };
+                  xhr.onerror = () => reject(new Error("مشكلة في الاتصال بالانترنت أو بالخادم."));
+                  xhr.send();
+              });
+          };
+
+          const data = await validateWithXHR();
+          
+          if (validationIdRef.current !== currentValidationId) return; // تم إلغاء الطلب أو تغيير المفتاح
+          
+          const models = [];
+          if (data.models && Array.isArray(data.models)) {
+              for (const m of data.models) {
+                  if (m.name.startsWith('models/gemini')) {
+                      models.push({ id: m.name.replace('models/', ''), name: m.displayName || m.name.replace('models/', '') });
+                  }
+              }
+          }
+
+          if (models.length > 0) {
+             setAvailableModels(models);
+             setIsValidated(true);
+             const targetModel = typeof modelToSelect === 'string' ? modelToSelect : selectedModel;
+             if (!models.find(m => m.id === targetModel)) {
+                 setSelectedModel(models[0].id);
+             } else if (typeof modelToSelect === 'string') {
+                 setSelectedModel(modelToSelect);
+             }
+          } else {
+             setValidationError('تم التحقق ولكن لم يتم العثور على نماذج تدعم Gemini ضمن هذا المفتاح.');
+             setIsValidated(false);
+          }
+      } catch (e: any) {
+          if (validationIdRef.current !== currentValidationId) return;
+          setValidationError(e.message || String(e));
+          setIsValidated(false);
+      } finally {
+          if (validationIdRef.current === currentValidationId) {
+             setIsValidating(false);
+          }
+      }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidated) {
+        alert("الرجاء التحقق من المفتاح أولاً");
+        return;
+    }
     setIsSaving(true);
     try {
       localStorage.setItem('admin_api_key', apiKey);
@@ -624,54 +709,67 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="glass rounded-[2rem] p-6 max-w-2xl mx-auto">
+    <div className="bg-white rounded-[2rem] p-6 max-w-2xl mx-auto shadow-sm border border-slate-100">
       <div className="flex items-center gap-4 mb-8">
-        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
           <ChevronRight size={20} />
         </button>
-        <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center shadow-sm">
+        <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
            <Cpu size={24} />
         </div>
         <div>
           <h2 className="font-bold text-xl text-slate-800">إعدادات الذكاء الاصطناعي</h2>
-          <p className="text-xs text-slate-500 font-medium">قم بربط مفتاح Gemini API وتحديد النموذج المستخدم.</p>
+          <p className="text-xs text-slate-500 font-bold mt-1">قم بربط مفتاح Gemini API لجلب النماذج.</p>
         </div>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6">
+      <div className="space-y-6">
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-2">مفتاح API الخاص بـ Gemini</label>
-          <input 
-            type="password" 
-            value={apiKey} 
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="AIzaSy..."
-            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500/50 font-mono text-left transition-all"
-            dir="ltr"
-            required
-          />
+          <div className="flex gap-2">
+              <input 
+                type="password" 
+                value={apiKey} 
+                onChange={(e) => { setApiKey(e.target.value); setIsValidated(false); setValidationError(null); }}
+                placeholder="AIzaSy..."
+                className={`flex-1 bg-slate-50 border ${validationError ? 'border-red-400 focus:ring-red-500/50' : 'border-slate-200 focus:ring-blue-500/50'} rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 font-mono text-left transition-all`}
+                dir="ltr"
+              />
+              <button 
+                  onClick={validateAndFetchModels}
+                  disabled={isValidating || !apiKey}
+                  className="bg-blue-600 text-white font-bold rounded-xl px-6 py-3 hover:bg-blue-700 transition-all shadow-sm disabled:opacity-50"
+              >
+                  {isValidating ? 'جاري التحقق...' : 'التحقق'}
+              </button>
+          </div>
+          {validationError && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mt-3 p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-600 flex items-start gap-2">
+                 <span className="mt-0.5">⚠️</span>
+                 <p className="leading-relaxed">{validationError}</p>
+              </motion.div>
+          )}
         </div>
 
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-2">نموذج التوليد المستخدم (Model)</label>
-          <select 
-            value={selectedModel} 
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500/50 transition-all"
-            required
-          >
-            {AVAILABLE_MODELS.map(m => (
-              <option key={m.id} value={m.id}>
-                {m.name} {m.recommended && '(يوصى به)'}
-              </option>
-            ))}
-          </select>
-        </div>
+        {isValidated && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
+            <label className="block text-sm font-bold text-slate-700 mb-2">نموذج التوليد المستخدم (Model)</label>
+            <select 
+              value={selectedModel} 
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-bold text-slate-700"
+            >
+              {availableModels.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          </motion.div>
+        )}
 
         <button 
-          type="submit" 
-          disabled={isSaving}
-          className="w-full bg-slate-800 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-slate-900 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70"
+          onClick={handleSave}
+          disabled={isSaving || !isValidated}
+          className="w-full bg-emerald-600 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
         >
           {isSaving ? (
             <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
@@ -679,7 +777,7 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
             <>حفظ الإعدادات <Save size={18} /></>
           )}
         </button>
-      </form>
+      </div>
     </div>
   )
 }
@@ -687,6 +785,7 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
 function AdminDashboard({ setView }: { setView: (v: string) => void }) {
   const [stats, setStats] = useState({ subjects: 0, units: 0, lessons: 0, exercises: 0 });
   const [dbLoading, setDbLoading] = useState(false);
+  const [recentItems, setRecentItems] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchStats() {
@@ -699,7 +798,18 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
           supabase.from('lessons').select('*', { count: 'exact', head: true }),
           supabase.from('exercises').select('*', { count: 'exact', head: true })
         ]);
-        
+
+        const [recentL, recentE] = await Promise.all([
+           supabase.from('lessons').select('id, title, created_at, unit_id').order('created_at', { ascending: false }).limit(3),
+           supabase.from('exercises').select('id, title, created_at, unit_id').order('created_at', { ascending: false }).limit(3)
+        ]);
+
+        const combined = [
+          ...(recentL.data || []).map(l => ({ ...l, type: 'lesson' })),
+          ...(recentE.data || []).map(e => ({ ...e, type: 'exercise' }))
+        ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5);
+
+        setRecentItems(combined);
         setStats({
           subjects: subRes.count || 0,
           units: unitRes.count || 0,
@@ -767,18 +877,13 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
     );
   }
 
-  if (view === 'add_lesson') return <AdminAddLesson onBack={() => setView('dashboard')} />;
-  if (view === 'add_exercise') return <AdminAddExercise onBack={() => setView('dashboard')} />;
-  if (view === 'manage_subjects') return <AdminAddSubject onBack={() => setView('dashboard')} />;
-  if (view === 'manage_units') return <AdminAddUnit onBack={() => setView('dashboard')} />;
-
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="إجمالي المواد" value={stats.subjects.toString() || "3"} trend="+1" icon={<BookOpen size={20} className="text-blue-500"/>} />
-        <StatCard title="إجمالي الوحدات" value={stats.units.toString() || "12"} trend="+2" icon={<Target size={20} className="text-indigo-500"/>} />
-        <StatCard title="الدروس المضافة" value={stats.lessons.toString() || "48"} trend="+5" icon={<PlayCircle size={20} className="text-emerald-500"/>} />
-        <StatCard title="التمارين المتوفرة" value={stats.exercises.toString() || "124"} trend="+12" icon={<PenTool size={20} className="text-orange-500"/>} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <StatCard title="إجمالي المواد" value={stats.subjects.toString() || "0"} trend="+1" icon={<BookOpen size={20} className="text-blue-500"/>} />
+        <StatCard title="إجمالي الوحدات" value={stats.units.toString() || "0"} trend="+2" icon={<Target size={20} className="text-indigo-500"/>} />
+        <StatCard title="الدروس المضافة" value={stats.lessons.toString() || "0"} trend="+5" icon={<PlayCircle size={20} className="text-emerald-500"/>} />
+        <StatCard title="التمارين المتوفرة" value={stats.exercises.toString() || "0"} trend="+12" icon={<PenTool size={20} className="text-orange-500"/>} />
       </div>
 
       {/* Main Admin Area */}
@@ -799,24 +904,27 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
                 </tr>
               </thead>
               <tbody className="text-slate-700">
-                <tr className="border-b border-slate-100/50 last:border-0">
-                  <td className="py-4 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center"><PlayCircle size={14}/></div>
-                    <span className="font-bold">استمرارية دالة</span>
-                  </td>
-                  <td className="py-4">درس جديد</td>
-                  <td className="py-4">منذ ساعتين</td>
-                  <td className="py-4"><span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold">منشور</span></td>
-                </tr>
-                 <tr className="border-b border-slate-100/50 last:border-0">
-                  <td className="py-4 flex items-center gap-3">
-                     <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center"><PenTool size={14}/></div>
-                    <span className="font-bold">تمرين شامل: أسية</span>
-                  </td>
-                  <td className="py-4">تمرين جديد</td>
-                  <td className="py-4">منذ 5 ساعات</td>
-                  <td className="py-4"><span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold">منشور</span></td>
-                </tr>
+                {recentItems.length > 0 ? (
+                  recentItems.map((item, idx) => (
+                    <tr key={item.id || idx} className="border-b border-slate-100/50 last:border-0">
+                      <td className="py-4 flex items-center gap-3">
+                        {item.type === 'lesson' ? (
+                          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center"><PlayCircle size={14}/></div>
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center"><PenTool size={14}/></div>
+                        )}
+                        <span className="font-bold max-w-xs truncate">{item.title}</span>
+                      </td>
+                      <td className="py-4">{item.type === 'lesson' ? 'درس جديد' : 'تمرين جديد'}</td>
+                      <td className="py-4 text-xs">{new Date(item.created_at).toLocaleDateString('ar-DZ')}</td>
+                      <td className="py-4"><span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold">منشور</span></td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-slate-500 font-bold">لا توجد تحديثات أخيرة.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -887,11 +995,16 @@ export function AdminLayout() {
       </div>
 
       {/* Sidebar Menu */}
-      <div className={`fixed inset-y-0 right-0 w-64 bg-white border-l border-slate-200 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <div className="h-full flex flex-col pt-6 pb-6 px-4">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="font-bold text-xl text-slate-800">أدوات الإدارة</h2>
-            <button onClick={closeSidebar} className="md:hidden p-2 text-slate-400 hover:text-slate-600 bg-slate-50 rounded-lg">
+      <div className={`fixed inset-y-0 right-0 w-64 glass border-l border-slate-200/50 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'} shadow-lg md:shadow-none`}>
+        <div className="h-full flex flex-col pt-6 pb-6 px-4 bg-white/40 backdrop-blur-md">
+          <div className="flex justify-between items-center mb-8 px-2">
+            <h2 className="font-black text-xl text-slate-800 tracking-tight flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-slate-800 text-white flex items-center justify-center shadow-md">
+                 A
+              </span>
+              أدوات الإدارة
+            </h2>
+            <button onClick={closeSidebar} className="md:hidden p-2 text-slate-400 hover:text-slate-600 bg-white/50 rounded-lg">
                <X size={20} />
             </button>
           </div>
@@ -899,46 +1012,46 @@ export function AdminLayout() {
           <nav className="flex-1 space-y-2">
             <button 
               onClick={() => { setView('dashboard'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'dashboard' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'dashboard' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-600 hover:bg-white/60'}`}
             >
                <BookOpen size={18} /> لوحة الإحصائيات
             </button>
             <button 
               onClick={() => { setView('manage_subjects'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_subjects' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_subjects' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
                <BookOpen size={18} /> إضافة مادة
             </button>
             <button 
               onClick={() => { setView('manage_units'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_units' ? 'bg-purple-100 text-purple-700' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_units' ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
                <Target size={18} /> إضافة وحدة
             </button>
             <button 
               onClick={() => { setView('add_lesson'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_lesson' ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_lesson' ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
                <PlayCircle size={18} /> إضافة درس
             </button>
             <button 
               onClick={() => { setView('add_exercise'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_exercise' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_exercise' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <PenTool size={18} /> إضافة تمرين متقدم ذكاء اصطناعي
+               <PenTool size={18} /> إضافة تمرين (ذكاء اصطناعي)
             </button>
           </nav>
           
-          <div className="pt-4 border-t border-slate-100 space-y-2 mt-auto">
+          <div className="pt-4 border-t border-slate-200/50 space-y-2 mt-auto">
              <button 
               onClick={() => { setView('settings'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'settings' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'settings' ? 'bg-slate-200 text-slate-800 shadow-sm' : 'text-slate-500 hover:bg-white/60'}`}
             >
                <Cpu size={18} /> إعدادات الذكاء الاصطناعي
             </button>
             <button 
               onClick={() => navigate('/')}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm text-slate-500 hover:bg-slate-50"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm text-slate-500 hover:bg-white/60"
             >
                <ChevronRight size={18} /> عرض الواجهة
             </button>
