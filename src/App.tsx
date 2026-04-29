@@ -191,7 +191,7 @@ const SUBJECTS_DATA = [
 ];
 
 function StudentPortal({ loading }: { loading: boolean }) {
-  const [view, setView] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises' }>({ type: 'dashboard' });
+  const [view, setView] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any }>({ type: 'dashboard' });
   const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
   const [dbLoading, setDbLoading] = useState(false);
 
@@ -308,7 +308,12 @@ function StudentPortal({ loading }: { loading: boolean }) {
         {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s) => setView({ type: 'subject', subject: s })} />}
         {view.type === 'subject' && <SubjectUnitsView subject={view.subject} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'unit', subject: view.subject, unit: u })} />}
         {view.type === 'unit' && <UnitDetailsView subject={view.subject} unit={view.unit} onBack={() => setView({ type: 'subject', subject: view.subject })} onSelectType={(t) => setView({ type: 'list', subject: view.subject, unit: view.unit, listType: t })} />}
-        {view.type === 'list' && <ContentListView subject={view.subject} unit={view.unit} listType={view.listType!} onBack={() => setView({ type: 'unit', subject: view.subject, unit: view.unit })} />}
+        {view.type === 'list' && <ContentListView subject={view.subject} unit={view.unit} listType={view.listType!} onBack={() => setView({ type: 'unit', subject: view.subject, unit: view.unit })} onSelectItem={(item) => {
+          if (view.listType === 'exercises') {
+            setView({ type: 'solve_exercise', subject: view.subject, unit: view.unit, exercise: item });
+          }
+        }} />}
+        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={view.subject} unit={view.unit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: view.subject, unit: view.unit, listType: 'exercises' })} />}
       </motion.div>
     </AnimatePresence>
   );
@@ -477,7 +482,7 @@ function UnitDetailsView({ subject, unit, onBack, onSelectType }: { subject: any
   )
 }
 
-function ContentListView({ subject, unit, listType, onBack }: { subject: any, unit: any, listType: 'lessons' | 'exercises', onBack: () => void }) {
+function ContentListView({ subject, unit, listType, onBack, onSelectItem }: { subject: any, unit: any, listType: 'lessons' | 'exercises', onBack: () => void, onSelectItem?: (item: any) => void }) {
   const items = listType === 'lessons' ? unit.lessons : unit.exercises;
   const isLessons = listType === 'lessons';
 
@@ -517,7 +522,10 @@ function ContentListView({ subject, unit, listType, onBack }: { subject: any, un
                     </p>
                   </div>
                 </div>
-                <button className={`px-4 py-2 md:px-6 md:py-2.5 rounded-xl text-[10px] md:text-sm font-bold text-white transition-all shadow-sm w-full sm:w-auto flex justify-center items-center gap-1.5 md:gap-2 ${isLessons ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-md' : 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-md'}`}>
+                <button 
+                  onClick={() => onSelectItem && onSelectItem(item)}
+                  className={`px-4 py-2 md:px-6 md:py-2.5 rounded-xl text-[10px] md:text-sm font-bold text-white transition-all shadow-sm w-full sm:w-auto flex justify-center items-center gap-1.5 md:gap-2 ${isLessons ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-md' : 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-md'}`}
+                >
                   {isLessons ? 'شاهد الدرس' : 'ابدأ الحل'}
                   <ChevronLeft size={14} className="opacity-70 md:w-4 md:h-4" />
                 </button>
@@ -528,5 +536,105 @@ function ContentListView({ subject, unit, listType, onBack }: { subject: any, un
       </div>
     </div>
   )
+}
+
+function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject: any, unit: any, exercise: any, onBack: () => void }) {
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+
+  // Mock questions based on the screenshot
+  const questions = [
+    {
+      id: 1,
+      text: "في سياق تطور العالم الثالث بعد الحرب العالمية الثانية، أي من الأحداث التالية يُعتبر التطبيق العملي الأول لمبادئ التضامن الأفرو-آسيوي التي مهدت لظهور حركة عدم الانحياز؟",
+      options: [
+        { id: 'a', text: "تأسيس منظمة الأمم المتحدة عام 1945.", label: "أ" },
+        { id: 'b', text: "انعقاد مؤتمر باندونغ بإندونيسيا عام 1955.", label: "ب" },
+        { id: 'c', text: "الإعلان عن مشروع مارشال الاقتصادي عام 1947.", label: "ج" },
+      ]
+    },
+    {
+      id: 2,
+      text: "ما هو الهدف الرئيسي من تأسيس حركة عدم الانحياز؟",
+      options: [
+        { id: 'a', text: "التحالف مع المعسكر الشرقي.", label: "أ" },
+        { id: 'b', text: "الاستقلال والابتعاد عن صراعات الحرب الباردة.", label: "ب" },
+        { id: 'c', text: "بناء قوة عسكرية موحدة أفريقية أسيوية.", label: "ج" },
+      ]
+    }
+  ];
+
+  const progress = ((currentQuestion + 1) / questions.length) * 100;
+
+  const handleNext = () => {
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(prev => prev + 1);
+      setSelectedOption(null);
+    } else {
+      alert("انتهى التمرين!");
+      onBack();
+    }
+  };
+
+  const currentQ = questions[currentQuestion];
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={onBack} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50">
+          <ChevronRight size={20} />
+        </button>
+        <div className="flex items-center gap-2">
+           <span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">{subject?.name}</span>
+           <span className="px-4 py-1.5 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">{unit?.name}</span>
+        </div>
+      </div>
+
+      <div className="glass rounded-[2rem] p-6 shadow-sm">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="font-bold text-slate-800 text-sm md:text-base">السؤال {currentQuestion + 1} من {questions.length}</h3>
+          <span className="text-emerald-500 font-bold text-sm">{Math.round(progress)}%</span>
+        </div>
+        <div className="w-full bg-slate-100 rounded-full h-2 mb-8 overflow-hidden">
+          <div className="bg-emerald-500 h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+        </div>
+
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 font-bold text-slate-800 text-lg md:text-xl text-center leading-relaxed">
+          {currentQ.text}
+        </div>
+
+        <div className="space-y-4">
+          {currentQ.options.map((option, idx) => (
+            <button
+              key={option.id}
+              onClick={() => setSelectedOption(idx)}
+              className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-right font-bold ${
+                selectedOption === idx 
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-800' 
+                  : 'border-slate-100 bg-white text-slate-700 hover:border-slate-200'
+              }`}
+            >
+              <span>{option.text}</span>
+              <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${
+                selectedOption === idx ? 'bg-emerald-200 text-emerald-800' : 'bg-emerald-50 text-emerald-600'
+              }`}>
+                {option.label}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-8 flex justify-end">
+          <button
+            onClick={handleNext}
+            disabled={selectedOption === null}
+            className="px-8 py-3 bg-emerald-500 text-white font-bold rounded-xl disabled:opacity-50 hover:bg-emerald-600 transition-colors shadow-sm"
+          >
+            {currentQuestion < questions.length - 1 ? 'التالي' : 'إنهاء'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 

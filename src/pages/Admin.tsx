@@ -167,8 +167,309 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
   )
 }
 
+function AdminAddExercise({ onBack }: { onBack: () => void }) {
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [units, setUnits] = useState<any[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [title, setTitle] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    async function fetchSubjects() {
+      if (!supabase) return;
+      const { data } = await supabase.from('subjects').select('*');
+      if (data) setSubjects(data);
+    }
+    fetchSubjects();
+  }, []);
+
+  useEffect(() => {
+    async function fetchUnits() {
+      if (!supabase || !selectedSubjectId) {
+        setUnits([]);
+        return;
+      }
+      const { data } = await supabase.from('units').select('*').eq('subject_id', selectedSubjectId);
+      if (data) setUnits(data);
+    }
+    fetchUnits();
+  }, [selectedSubjectId]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || !selectedUnitId || !title) {
+       alert('الرجاء التأكد من تعبئة جميع الحقول وإعداد قاعدة البيانات (Supabase).');
+       return;
+    }
+    setIsSubmitting(true);
+    try {
+      const exercise_id = 'e_' + Math.random().toString(36).substr(2, 9);
+      const { error } = await supabase.from('exercises').insert([{
+        id: exercise_id,
+        unit_id: selectedUnitId,
+        title: title,
+        exercise_order: 99
+      }]);
+      if (!error) {
+        alert('تمت إضافة التمرين بنجاح!');
+        onBack();
+      } else {
+        alert('حدث خطأ أثناء الإضافة: ' + error.message);
+      }
+    } catch (err: any) {
+      alert('حدث خطأ غير متوقع: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="glass rounded-[2rem] p-6 max-w-2xl mx-auto">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
+          <ChevronRight size={20} />
+        </button>
+        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+           <PenTool size={24} />
+        </div>
+        <div>
+          <h2 className="font-bold text-xl text-slate-800">إضافة تمرين جديد</h2>
+          <p className="text-xs text-slate-500 font-medium">قم بإضافة تمرين تفاعلي للوحدة المحددة.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">اختر المادة</label>
+          <select 
+            value={selectedSubjectId} 
+            onChange={(e) => { setSelectedSubjectId(e.target.value); setSelectedUnitId(''); }}
+            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+            required
+          >
+            <option value="">-- يرجى الاختيار --</option>
+            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+           <label className="block text-sm font-bold text-slate-700 mb-2">اختر الوحدة</label>
+            <select 
+              value={selectedUnitId} 
+              onChange={(e) => setSelectedUnitId(e.target.value)}
+              className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all disabled:opacity-50"
+              required
+              disabled={!selectedSubjectId}
+            >
+              <option value="">-- يرجى الاختيار --</option>
+              {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">عنوان التمرين</label>
+          <input 
+            type="text" 
+            value={title} 
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="مثال: تمرين حول المكتسبات القبلية"
+            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+            required
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={isSubmitting}
+          className="w-full bg-emerald-600 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70"
+        >
+          {isSubmitting ? (
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
+          ) : (
+            <>حفظ التمرين <Save size={18} /></>
+          )}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function AdminAddSubject({ onBack }: { onBack: () => void }) {
+  const [name, setName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || !name) return;
+    setIsSubmitting(true);
+    try {
+      const id = 's_' + Math.random().toString(36).substr(2, 9);
+      const { error } = await supabase.from('subjects').insert([{
+        id,
+        name,
+        color: 'text-indigo-500',
+        bg: 'bg-indigo-100',
+        bar_color: 'bg-indigo-500',
+        icon_name: 'BookOpen',
+        progress: 0
+      }]);
+      if (!error) {
+        alert('تمت إضافة المادة بنجاح!');
+        onBack();
+      } else {
+        alert('حدث خطأ: ' + error.message);
+      }
+    } catch (err: any) {
+      alert('خطأ: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="glass rounded-[2rem] p-6 max-w-2xl mx-auto">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
+          <ChevronRight size={20} />
+        </button>
+        <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-sm">
+           <BookOpen size={24} />
+        </div>
+        <div>
+          <h2 className="font-bold text-xl text-slate-800">إضافة مادة جديدة</h2>
+          <p className="text-xs text-slate-500 font-medium">قم بإضافة مادة لتنظيم الوحدات بداخلها.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">اسم المادة</label>
+          <input 
+            type="text" 
+            value={name} 
+            onChange={(e) => setName(e.target.value)}
+            placeholder="مثال: الفلسفة"
+            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+            required
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={isSubmitting}
+          className="w-full bg-indigo-600 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-indigo-500/30 disabled:opacity-70"
+        >
+          {isSubmitting ? (
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
+          ) : (
+            <>حفظ المادة <Save size={18} /></>
+          )}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function AdminAddUnit({ onBack }: { onBack: () => void }) {
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
+  const [name, setName] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    async function fetchSubjects() {
+      if (!supabase) return;
+      const { data } = await supabase.from('subjects').select('*');
+      if (data) setSubjects(data);
+    }
+    fetchSubjects();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || !name || !selectedSubjectId) return;
+    setIsSubmitting(true);
+    try {
+      const id = 'u_' + Math.random().toString(36).substr(2, 9);
+      const { error } = await supabase.from('units').insert([{
+        id,
+        subject_id: selectedSubjectId,
+        name,
+        unit_order: 99
+      }]);
+      if (!error) {
+        alert('تمت إضافة الوحدة بنجاح!');
+        onBack();
+      } else {
+        alert('حدث خطأ: ' + error.message);
+      }
+    } catch (err: any) {
+      alert('خطأ: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="glass rounded-[2rem] p-6 max-w-2xl mx-auto">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
+          <ChevronRight size={20} />
+        </button>
+        <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center shadow-sm">
+           <Target size={24} />
+        </div>
+        <div>
+          <h2 className="font-bold text-xl text-slate-800">إضافة وحدة جديدة</h2>
+          <p className="text-xs text-slate-500 font-medium">قم بإضافة وحدة داخل مادة معينة.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">اختر المادة</label>
+          <select 
+            value={selectedSubjectId} 
+            onChange={(e) => setSelectedSubjectId(e.target.value)}
+            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+            required
+          >
+            <option value="">-- يرجى الاختيار --</option>
+            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">اسم الوحدة</label>
+          <input 
+            type="text" 
+            value={name} 
+            onChange={(e) => setName(e.target.value)}
+            placeholder="مثال: الميكانيك الكلاسيكية"
+            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+            required
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={isSubmitting}
+          className="w-full bg-purple-600 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-purple-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-purple-500/30 disabled:opacity-70"
+        >
+          {isSubmitting ? (
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
+          ) : (
+            <>حفظ الوحدة <Save size={18} /></>
+          )}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 function AdminDashboard({ loading }: { loading: boolean }) {
-  const [view, setView] = useState<'dashboard' | 'add_lesson'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'add_lesson' | 'add_exercise' | 'manage_subjects' | 'manage_units'>('dashboard');
   const [stats, setStats] = useState({ subjects: 0, units: 0, lessons: 0, exercises: 0 });
   const [dbLoading, setDbLoading] = useState(false);
 
@@ -251,9 +552,10 @@ function AdminDashboard({ loading }: { loading: boolean }) {
     );
   }
 
-  if (view === 'add_lesson') {
-    return <AdminAddLesson onBack={() => setView('dashboard')} />;
-  }
+  if (view === 'add_lesson') return <AdminAddLesson onBack={() => setView('dashboard')} />;
+  if (view === 'add_exercise') return <AdminAddExercise onBack={() => setView('dashboard')} />;
+  if (view === 'manage_subjects') return <AdminAddSubject onBack={() => setView('dashboard')} />;
+  if (view === 'manage_units') return <AdminAddUnit onBack={() => setView('dashboard')} />;
 
   return (
     <div className="space-y-6">
@@ -316,19 +618,26 @@ function AdminDashboard({ loading }: { loading: boolean }) {
               </div>
               <ChevronLeft size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
             </button>
-            <button className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-emerald-50 border-transparent hover:border-emerald-100 transition-all text-right group border">
+            <button onClick={() => setView('add_exercise')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-emerald-50 border-transparent hover:border-emerald-100 transition-all text-right group border">
               <div className="flex items-center gap-3">
                  <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform"><PenTool size={16}/></div>
                  <span className="font-bold text-sm text-slate-700 group-hover:text-emerald-600 transition-colors">إضافة تمرين جديد</span>
               </div>
               <ChevronLeft size={16} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
             </button>
-             <button className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-indigo-50 border-transparent hover:border-indigo-100 transition-all text-right group border">
+             <button onClick={() => setView('manage_subjects')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-indigo-50 border-transparent hover:border-indigo-100 transition-all text-right group border">
               <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform"><Settings size={16}/></div>
-                 <span className="font-bold text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">إدارة المواد والوحدات</span>
+                 <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform"><BookOpen size={16}/></div>
+                 <span className="font-bold text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">إضافة مادة جديدة</span>
               </div>
               <ChevronLeft size={16} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
+            </button>
+            <button onClick={() => setView('manage_units')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-purple-50 border-transparent hover:border-purple-100 transition-all text-right group border">
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform"><Target size={16}/></div>
+                 <span className="font-bold text-sm text-slate-700 group-hover:text-purple-600 transition-colors">إضافة وحدة جديدة</span>
+              </div>
+              <ChevronLeft size={16} className="text-slate-400 group-hover:text-purple-500 transition-colors" />
             </button>
           </div>
         </div>
