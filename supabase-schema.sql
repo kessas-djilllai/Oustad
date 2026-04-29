@@ -8,7 +8,8 @@ CREATE TABLE subjects (
   color TEXT,
   bg TEXT,
   icon_name TEXT,
-  bar_color TEXT
+  bar_color TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 2. Create Units Table
@@ -16,7 +17,8 @@ CREATE TABLE units (
   id TEXT PRIMARY KEY,
   subject_id TEXT REFERENCES subjects(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  unit_order INTEGER NOT NULL
+  unit_order INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 3. Create Lessons Table
@@ -26,7 +28,8 @@ CREATE TABLE lessons (
   title TEXT NOT NULL,
   lesson_order INTEGER NOT NULL,
   video_url TEXT,
-  summary_content TEXT
+  summary_content TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 4. Create Exercises Table
@@ -36,7 +39,8 @@ CREATE TABLE exercises (
   title TEXT NOT NULL,
   exercise_order INTEGER NOT NULL,
   content TEXT,
-  solution TEXT
+  solution TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 5. Insert Sample Data

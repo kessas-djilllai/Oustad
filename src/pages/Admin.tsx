@@ -791,6 +791,33 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
           </motion.div>
         )}
 
+        <div className="mt-8 pt-6 border-t border-slate-100">
+           <h4 className="font-bold text-slate-800 mb-2 flex items-center justify-between">
+              تحديث الصلاحيات (Supabase RLS)
+              <button 
+                 type="button"
+                 onClick={() => {
+                   navigator.clipboard.writeText(`CREATE POLICY "Allow public update to subjects" ON subjects FOR UPDATE USING (true);\nCREATE POLICY "Allow public update to units" ON units FOR UPDATE USING (true);\nCREATE POLICY "Allow public update to lessons" ON lessons FOR UPDATE USING (true);\nCREATE POLICY "Allow public update to exercises" ON exercises FOR UPDATE USING (true);\nCREATE POLICY "Allow public delete to subjects" ON subjects FOR DELETE USING (true);\nCREATE POLICY "Allow public delete to units" ON units FOR DELETE USING (true);\nCREATE POLICY "Allow public delete to lessons" ON lessons FOR DELETE USING (true);\nCREATE POLICY "Allow public delete to exercises" ON exercises FOR DELETE USING (true);`);
+                   triggerAlert('تم نسخ الكود!', 'success');
+                 }}
+                 className="text-[10px] bg-slate-100 font-bold px-3 py-1 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"
+               >
+                 نسخ الكود الكامل
+               </button>
+           </h4>
+           <p className="text-xs text-slate-500 mb-3 leading-relaxed">إذا واجهتك مشكلة في التعديل أو الحذف (لا يحدث شيء وتظهر رسالة خطأ)، انسخ كود SQL أدناه وقم بتنفيذه في قسم <b>SQL Editor</b> في منصة Supabase:</p>
+           
+           <pre className="bg-slate-900 text-slate-300 p-4 rounded-xl text-left text-xs overflow-x-auto dir-ltr font-mono leading-loose">
+{`-- تحديث الصلاحيات للحذف والتعديل
+CREATE POLICY "Allow public update to subjects" ON subjects FOR UPDATE USING (true);
+CREATE POLICY "Allow public update to units" ON units FOR UPDATE USING (true);
+...
+CREATE POLICY "Allow public delete to subjects" ON subjects FOR DELETE USING (true);
+CREATE POLICY "Allow public delete to units" ON units FOR DELETE USING (true);
+...`}
+           </pre>
+        </div>
+
         <button 
           onClick={handleSave}
           disabled={isSaving || !isValidated}

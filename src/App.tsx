@@ -246,21 +246,36 @@ function StudentPortal({ loading }: { loading: boolean }) {
       
       try {
         setDbLoading(true);
-        // This expects you to have run supabase-schema.sql in your Supabase project
-        const { data: dbSubjects, error } = await supabase.from('subjects').select('*, units(*, lessons(*), exercises(*))');
+        // Fetch all data separately to ensure everything is caught regardless of PostgREST join constraints
+        const [subRes, unitRes, lessRes, exRes] = await Promise.all([
+          supabase.from('subjects').select('*').order('created_at', { ascending: true }),
+          supabase.from('units').select('*').order('created_at', { ascending: true }),
+          supabase.from('lessons').select('*').order('created_at', { ascending: true }),
+          supabase.from('exercises').select('*').order('created_at', { ascending: true }),
+        ]);
         
-        if (error) throw error;
-        if (dbSubjects && dbSubjects.length > 0) {
+        if (subRes.error) throw subRes.error;
+        
+        const subjectsData = subRes.data || [];
+        const unitsData = unitRes.data || [];
+        const lessonsData = lessRes.data || [];
+        const exercisesData = exRes.data || [];
+
+        if (subjectsData.length > 0) {
           // Format the data to match our UI state format
-          const formattedSubjects = dbSubjects.map((sub: any) => ({
-            ...sub,
-            icon: Calculator, // In a real app, map icon_name to actual Lucide component
-            units: sub.units?.sort((a: any, b: any) => a.unit_order - b.unit_order).map((u: any) => ({
-              ...u,
-              lessons: u.lessons?.sort((a: any, b: any) => a.lesson_order - b.lesson_order) || [],
-              exercises: u.exercises?.sort((a: any, b: any) => a.exercise_order - b.exercise_order) || [],
-            })) || []
-          }));
+          const formattedSubjects = subjectsData.map((sub: any) => {
+            const subUnits = unitsData.filter(u => u.subject_id === sub.id).sort((a: any, b: any) => a.unit_order - b.unit_order);
+            
+            return {
+              ...sub,
+              icon: Calculator, // In a real app, map icon_name to actual Lucide component
+              units: subUnits.map((u: any) => ({
+                ...u,
+                lessons: lessonsData.filter(l => l.unit_id === u.id).sort((a: any, b: any) => a.lesson_order - b.lesson_order),
+                exercises: exercisesData.filter(e => e.unit_id === u.id).sort((a: any, b: any) => a.exercise_order - b.exercise_order),
+              }))
+            };
+          });
           setSubjects(formattedSubjects);
         }
       } catch (err) {
