@@ -59,3 +59,11 @@ body {
   background-color: #f1f5f9 !important;
   font-weight: 700 !important;
 }
+
+.katex {
+  direction: ltr;
+  unicode-bidi: embed;
+}
+.katex-display {
+  direction: ltr;
+}

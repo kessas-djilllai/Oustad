@@ -9,7 +9,8 @@ import {
   PlayCircle, 
   PenTool, 
   Plus, 
-  Save, 
+  Save,
+  Trash,
   Settings, 
   ChevronLeft, 
   ChevronRight,
@@ -54,8 +55,10 @@ function AlertModal() {
             {alertData.type === 'error' ? <X size={32} /> : alertData.type === 'success' ? <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> : <Menu size={32} />}
          </div>
          <h3 className="text-xl font-bold text-slate-800 mb-2">{alertData.type === 'error' ? 'خطأ' : alertData.type === 'success' ? 'نجاح' : 'تنبيه'}</h3>
-         <p className="text-slate-600 font-medium mb-6">{alertData.message}</p>
-         <button onClick={() => setIsOpen(false)} className="w-full bg-slate-900 text-white font-bold rounded-xl py-3 hover:bg-slate-800 transition-all">حسناً</button>
+         <div className="text-slate-600 font-medium mb-6 text-sm break-words whitespace-pre-wrap w-full border-t border-slate-100 pt-4 overflow-y-auto max-h-60" style={{userSelect: 'text'}}>
+           {alertData.message}
+         </div>
+         <button onClick={() => setIsOpen(false)} className="w-full bg-slate-900 text-white font-bold rounded-xl py-3 hover:bg-slate-800 transition-all text-sm">حسناً</button>
       </motion.div>
     </div>
   );
@@ -983,11 +986,119 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
               </div>
               <ChevronLeft size={16} className="text-slate-400 group-hover:text-purple-500 transition-colors" />
             </button>
+             <button onClick={() => setView('manage_content')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-slate-100 border-transparent hover:border-slate-300 transition-all text-right group border">
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform"><Trash size={16}/></div>
+                 <span className="font-bold text-sm text-slate-700 group-hover:text-slate-900 transition-colors">إدارة المحتوى (حذف)</span>
+              </div>
+              <ChevronLeft size={16} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+            </button>
           </div>
         </div>
       </div>
     </div>
   )
+}
+
+function AdminManageContent({ onBack }: { onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<'subjects' | 'units' | 'lessons' | 'exercises'>('subjects');
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchItems = async () => {
+    if (!supabase) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from(activeTab).select('*');
+      if (error) {
+        console.error("Supabase error:", error);
+        triggerAlert("Error: " + error.message, "error");
+      }
+      setItems(data || []);
+    } catch (e) {
+      console.error("Exception fetching", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchItems();
+  }, [activeTab]);
+
+  const handleDelete = async (id: string) => {
+    if (!supabase) return;
+    if (!window.confirm("هل أنت متأكد من الحذف؟ سيتم حذف جميع العناصر المرتبطة به أيضاً.")) return;
+    
+    try {
+      // In Supabase, if RLS blocks delete, it returns no error but doesn't delete. We can request representation to verify.
+      const { data, error } = await supabase.from(activeTab).delete().eq('id', id).select();
+      if (error) throw error;
+      if (data && data.length === 0) {
+        throw new Error('لم يتم الحذف. غالباً بسبب سياسات الأمان (RLS) في قاعدة البيانات. يرجى تفعيل الحذف بتنفيذ الكود التالي في Supabase SQL: \nCREATE POLICY "Allow delete" ON ' + activeTab + ' FOR DELETE USING (true);');
+      }
+      triggerAlert("تم الحذف بنجاح", "success");
+      fetchItems();
+    } catch (e: any) {
+      triggerAlert("خطأ في الحذف: " + e.message, "error");
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
+          <ChevronRight size={20} />
+        </button>
+        <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+           <Trash size={24} />
+        </div>
+        <div>
+          <h2 className="font-bold text-xl text-slate-800">إدارة المحتوى</h2>
+          <p className="text-xs text-slate-500 font-bold mt-1">عرض وحذف المواد، الوحدات، الدروس والتمارين</p>
+        </div>
+      </div>
+
+      <div className="flex gap-2 border-b border-slate-200 pb-4 mb-6 overflow-x-auto whitespace-nowrap">
+        {[
+          { id: 'subjects', label: 'المواد' },
+          { id: 'units', label: 'الوحدات' },
+          { id: 'lessons', label: 'الدروس' },
+          { id: 'exercises', label: 'التمارين' }
+        ].map(tab => (
+           <button 
+             key={tab.id}
+             onClick={() => setActiveTab(tab.id as any)}
+             className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === tab.id ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+           >
+             {tab.label}
+           </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center p-8"><div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div></div>
+      ) : (
+        <div className="space-y-3">
+          {items.length === 0 ? (
+            <p className="text-center text-slate-500 py-8 font-bold text-sm">لا توجد عناصر حالياً</p>
+          ) : (
+            items.map(item => (
+              <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm">
+                <div>
+                  <h4 className="font-bold text-slate-800 text-sm md:text-base">{item.title || item.name}</h4>
+                  <p className="text-[10px] text-slate-400 mt-1">{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-DZ') : ''}</p>
+                </div>
+                <button onClick={() => handleDelete(item.id)} className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
+                  <Trash size={16} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function AdminLayout() {
@@ -1063,6 +1174,12 @@ export function AdminLayout() {
             >
                <PenTool size={18} /> إضافة تمرين (ذكاء اصطناعي)
             </button>
+            <button 
+              onClick={() => { setView('manage_content'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_content' ? 'bg-red-50 text-red-600 shadow-sm' : 'text-slate-600 hover:bg-white/60'}`}
+            >
+               <Trash size={18} /> إدارة المحتوى (حذف)
+            </button>
           </nav>
           
           <div className="pt-4 border-t border-slate-200/50 space-y-2 mt-auto">
@@ -1120,6 +1237,7 @@ export function AdminLayout() {
              {view === 'add_exercise' && <AdminAddExercise onBack={() => setView('dashboard')} />}
              {view === 'manage_subjects' && <AdminAddSubject onBack={() => setView('dashboard')} />}
              {view === 'manage_units' && <AdminAddUnit onBack={() => setView('dashboard')} />}
+             {view === 'manage_content' && <AdminManageContent onBack={() => setView('dashboard')} />}
              {view === 'settings' && <AdminSettings onBack={() => setView('dashboard')} />}
           </div>
         )}

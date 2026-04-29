@@ -100,5 +100,15 @@ CREATE POLICY "Allow public insert to subjects" ON subjects FOR INSERT WITH CHEC
 CREATE POLICY "Allow public insert to units" ON units FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public insert to lessons" ON lessons FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public insert to exercises" ON exercises FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow public delete to subjects" ON subjects FOR DELETE USING (true);
+CREATE POLICY "Allow public delete to units" ON units FOR DELETE USING (true);
+CREATE POLICY "Allow public delete to lessons" ON lessons FOR DELETE USING (true);
+CREATE POLICY "Allow public delete to exercises" ON exercises FOR DELETE USING (true);
+
+CREATE POLICY "Allow public update to subjects" ON subjects FOR UPDATE USING (true);
+CREATE POLICY "Allow public update to units" ON units FOR UPDATE USING (true);
+CREATE POLICY "Allow public update to lessons" ON lessons FOR UPDATE USING (true);
+CREATE POLICY "Allow public update to exercises" ON exercises FOR UPDATE USING (true);
 CREATE POLICY "Allow public insert/update to admin_settings" ON admin_settings FOR ALL USING (true);
 

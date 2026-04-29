@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { AdminLayout, AdminLogin } from "./pages/Admin";
@@ -199,8 +202,41 @@ const SUBJECTS_DATA = [
 ];
 
 function StudentPortal({ loading }: { loading: boolean }) {
-  const [view, setView] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any }>({ type: 'dashboard' });
   const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
+  
+  const [view, setViewState] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any }>(() => {
+    const saved = localStorage.getItem('portal_view');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Fix up the icon which gets lost in JSON stringify
+        if (parsed.subject) {
+          const foundSubject = SUBJECTS_DATA.find(s => s.id === parsed.subject.id);
+          if (foundSubject) {
+             parsed.subject.icon = foundSubject.icon;
+          } else {
+             // Default to generic icon if not found in SUBJECTS_DATA
+             parsed.subject.icon = BookOpen;
+          }
+        }
+        return parsed;
+      } catch (e) {
+        console.error("Failed to parse saved view", e);
+      }
+    }
+    return { type: 'dashboard' };
+  });
+
+  const setView = (newView: any) => {
+    // Before saving, ensure we don't try to stringify the icon component
+    setViewState(newView);
+    const viewToSave = { ...newView };
+    if (viewToSave.subject) {
+      viewToSave.subject = { ...viewToSave.subject, icon: undefined }; 
+    }
+    localStorage.setItem('portal_view', JSON.stringify(viewToSave));
+  };
+  
   const [dbLoading, setDbLoading] = useState(false);
 
   useEffect(() => {
@@ -304,24 +340,27 @@ function StudentPortal({ loading }: { loading: boolean }) {
     );
   }
 
+  const currentSubject = subjects.find(s => s.id === view.subject?.id) || view.subject;
+  const currentUnit = currentSubject?.units?.find((u: any) => u.id === view.unit?.id) || view.unit;
+
   return (
     <AnimatePresence mode="wait">
       <motion.div
-         key={view.type + (view.subject?.id || '') + (view.unit?.id || '') + (view.listType || '')}
+         key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}
          initial={{ opacity: 0, x: -10 }}
          animate={{ opacity: 1, x: 0 }}
          exit={{ opacity: 0, x: 10 }}
          transition={{ duration: 0.2 }}
       >
         {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s) => setView({ type: 'subject_type', subject: s })} />}
-        {view.type === 'subject_type' && <SubjectTypeView subject={view.subject} onBack={() => setView({ type: 'dashboard' })} onSelectType={(t) => setView({ type: 'subject_units', subject: view.subject, listType: t })} />}
-        {view.type === 'subject_units' && <SubjectUnitsView subject={view.subject} listType={view.listType} onBack={() => setView({ type: 'subject_type', subject: view.subject })} onUnitClick={(u) => setView({ type: 'list', subject: view.subject, unit: u, listType: view.listType })} />}
-        {view.type === 'list' && <ContentListView subject={view.subject} unit={view.unit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: view.subject, listType: view.listType })} onSelectItem={(item) => {
+        {view.type === 'subject_type' && <SubjectTypeView subject={currentSubject} onBack={() => setView({ type: 'dashboard' })} onSelectType={(t) => setView({ type: 'subject_units', subject: currentSubject, listType: t })} />}
+        {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'subject_type', subject: currentSubject })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
+        {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
           if (view.listType === 'exercises') {
-            setView({ type: 'solve_exercise', subject: view.subject, unit: view.unit, exercise: item });
+            setView({ type: 'solve_exercise', subject: currentSubject, unit: currentUnit, exercise: item });
           }
         }} />}
-        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={view.subject} unit={view.unit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: view.subject, unit: view.unit, listType: 'exercises' })} />}
+        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'exercises' })} />}
       </motion.div>
     </AnimatePresence>
   );
@@ -652,7 +691,8 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
          {!showAnswers ? (
             <div className="markdown-body rtl prose max-w-none text-right">
               <ReactMarkdown 
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={{
                   table: ({node, ...props}) => (
                     <div className="overflow-x-auto w-full mb-6 relative">
@@ -671,7 +711,8 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                </div>
                <div className="markdown-body rtl prose max-w-none text-right">
                  <ReactMarkdown 
-                  remarkPlugins={[remarkGfm]}
+                  remarkPlugins={[remarkGfm, remarkMath]}
+                  rehypePlugins={[rehypeKatex]}
                   components={{
                     table: ({node, ...props}) => (
                       <div className="overflow-x-auto w-full mb-6 relative">
