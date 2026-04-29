@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   --font-sans: "Tajawal", ui-sans-serif, system-ui, sans-serif;
@@ -28,4 +29,24 @@ body {
   100% {
     transform: translateX(100%);
   }
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse !important;
+  border: 1px solid #cbd5e1 !important;
+  margin-top: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.prose th,
+.prose td {
+  border: 1px solid #cbd5e1 !important;
+  padding: 0.75rem 1rem !important;
+  text-align: right !important;
+}
+
+.prose th {
+  background-color: #f1f5f9 !important;
+  font-weight: 700 !important;
 }

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { AdminLayout, AdminLogin } from "./pages/Admin";
@@ -31,7 +33,9 @@ import {
   Unlock,
   Plus,
   Save,
-  Trash
+  Trash,
+  Printer,
+  CheckCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -593,223 +597,78 @@ function ContentListView({ subject, unit, listType, onBack, onSelectItem }: { su
 }
 
 function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject: any, unit: any, exercise: any, onBack: () => void }) {
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [isRevealed, setIsRevealed] = useState(false);
-  const [score, setScore] = useState(0);
-  const [isFinished, setIsFinished] = useState(false);
-
-  const getQuestions = () => {
+  const [showAnswers, setShowAnswers] = useState(false);
+  
+  const getExerciseData = () => {
     if (exercise?.content) {
       try {
         const parsed = JSON.parse(exercise.content);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-           return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].exam) {
+           return parsed[0];
         }
       } catch (e) {
         console.error("Failed to parse exercise content", e);
       }
     }
     
-    const getMockQuestions = (subjectName: string) => {
-      if (subjectName?.includes('تاريخ') || subjectName?.includes('جغرافيا')) {
-        return [
-          {
-            id: 1,
-            text: "في سياق تطور العالم الثالث بعد الحرب العالمية الثانية، أي من الأحداث التالية يُعتبر التطبيق العملي الأول لمبادئ التضامن الأفرو-آسيوي التي مهدت لظهور حركة عدم الانحياز؟",
-            options: [
-              { id: 'a', text: "تأسيس منظمة الأمم المتحدة عام 1945.", label: "أ" },
-              { id: 'b', text: "انعقاد مؤتمر باندونغ بإندونيسيا عام 1955.", label: "ب", isCorrect: true },
-              { id: 'c', text: "الإعلان عن مشروع مارشال الاقتصادي عام 1947.", label: "ج" },
-            ]
-          },
-          {
-            id: 2,
-            text: "ما هو الهدف الرئيسي من تأسيس حركة عدم الانحياز؟",
-            options: [
-              { id: 'a', text: "التحالف مع المعسكر الشرقي.", label: "أ" },
-              { id: 'b', text: "الاستقلال والابتعاد عن صراعات الحرب الباردة.", label: "ب", isCorrect: true },
-              { id: 'c', text: "بناء قوة عسكرية موحدة أفريقية أسيوية.", label: "ج" },
-            ]
-          }
-        ];
-      }
-      if (subjectName?.includes('رياضيات')) {
-        return [
-          {
-            id: 1,
-            text: "ما هي مشتقة الدالة الأسية f(x) = e^(2x) ؟",
-            options: [
-              { id: 'a', text: "f'(x) = 2e^(2x)", label: "أ", isCorrect: true },
-              { id: 'b', text: "f'(x) = e^(2x)", label: "ب" },
-              { id: 'c', text: "f'(x) = 2xe^(2x)", label: "ج" },
-            ]
-          },
-          {
-            id: 2,
-            text: "النهاية الشهيرة للدالة (e^x - 1)/x لما يؤول x إلى الصفر هي:",
-            options: [
-              { id: 'a', text: "0", label: "أ" },
-              { id: 'b', text: "1", label: "ب", isCorrect: true },
-              { id: 'c', text: "+∞", label: "ج" },
-            ]
-          }
-        ];
-      }
-      
-      // Default fallback questions
-      return [
-        {
-          id: 1,
-          text: `السؤال الأول للتمرين: ${exercise?.title || 'تمرين عام'}`,
-          options: [
-            { id: 'a', text: "الخيار الأول", label: "أ" },
-            { id: 'b', text: "الخيار الثاني", label: "ب" },
-            { id: 'c', text: "الخيار الثالث", label: "ج" },
-          ]
-        },
-        {
-          id: 2,
-          text: "السؤال الثاني لاختبار الفهم:",
-          options: [
-            { id: 'a', text: "إجابة صحيحة", label: "أ" },
-            { id: 'b', text: "إجابة خاطئة", label: "ب" },
-            { id: 'c', text: "إجابة محتملة", label: "ج" },
-          ]
-        }
-      ];
+    // Default fallback
+    return {
+       exam: "لم يتم العثور على نص التمرين أو حدث خطأ في التحميل.",
+       solution: "لم يتم العثور على التصحيح النموذجي."
     };
-    return getMockQuestions(subject?.name || '');
   };
 
-  const questions = getQuestions();
-  const progress = ((currentQuestion + 1) / questions.length) * 100;
+  const data = getExerciseData();
 
-  const handleOptionClick = (idx: number) => {
-    if (isRevealed) return;
-    setSelectedOption(idx);
-    setIsRevealed(true);
-    if (currentQ.options[idx].isCorrect) {
-      setScore(s => s + 1);
-    }
-  };
-
-  const handleNext = () => {
-    if (currentQuestion < questions.length - 1) {
-      setCurrentQuestion(prev => prev + 1);
-      setSelectedOption(null);
-      setIsRevealed(false);
-    } else {
-      setIsFinished(true);
-    }
-  };
-
-  if (isFinished) {
-    return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="glass rounded-[2rem] p-8 text-center shadow-sm">
-           <div className="w-24 h-24 mx-auto bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mb-6">
-             <Target size={48} />
-           </div>
-           <h2 className="text-2xl font-bold text-slate-800 mb-2">أحسنت! لقد أنهيت التمرين</h2>
-           <p className="text-slate-500 mb-8">نتيجتك هي {score} من {questions.length}</p>
-           <button onClick={onBack} className="px-8 py-3 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-colors">
-             العودة للقائمة
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 pb-20">
+      <div className="flex items-center justify-between mb-4 print:hidden">
+        <button onClick={onBack} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 shadow-sm border border-slate-100">
+          <ChevronRight size={20} />
+        </button>
+        <div className="flex gap-2">
+           <button onClick={() => window.print()} className="px-4 md:px-5 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition flex items-center gap-2 text-sm shadow-sm">
+             <Printer size={16} /> <span className="hidden sm:inline">طباعة</span>
+           </button>
+           <button onClick={() => setShowAnswers(!showAnswers)} className="px-4 md:px-5 py-2 bg-emerald-100 text-emerald-700 font-bold rounded-xl hover:bg-emerald-200 transition text-sm shadow-sm flex items-center gap-2">
+             <CheckCircle size={16} /> <span>{showAnswers ? 'إخفاء الحل' : 'عرض الحل'}</span>
            </button>
         </div>
       </div>
-    );
-  }
 
-  const currentQ = questions[currentQuestion];
-
-  return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={onBack} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50">
-          <ChevronRight size={20} />
-        </button>
-        <div className="flex items-center gap-2">
-           <span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">{subject?.name}</span>
-           <span className="px-4 py-1.5 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">{unit?.name}</span>
-        </div>
-      </div>
-
-      <div className="glass rounded-[2rem] p-6 shadow-sm">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-slate-800 text-sm md:text-base">السؤال {currentQuestion + 1} من {questions.length}</h3>
-          <span className="text-emerald-500 font-bold text-sm">{Math.round(progress)}%</span>
-        </div>
-        <div className="w-full bg-slate-100 rounded-full h-2 mb-8 overflow-hidden">
-          <div className="bg-emerald-500 h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 font-bold text-slate-800 text-lg md:text-xl text-center leading-relaxed">
-          {currentQ.text}
-        </div>
-
-        <div className="space-y-4">
-          {currentQ.options.map((option, idx) => {
-            let btnClass = 'border-slate-100 bg-white text-slate-700 hover:border-slate-200';
-            let labelClass = 'bg-emerald-50 text-emerald-600';
+      <div className="bg-white mx-auto shadow-sm border border-slate-200 print:shadow-none print:border-none p-6 md:p-12 lg:p-16 text-slate-900 border-t-[12px] border-t-slate-800 relative z-10 font-[Traditional_Arabic,serif] text-base md:text-lg" style={{ minHeight: '29.7cm' }}>
+         <div className="text-center mb-10 border-b border-slate-300 pb-8">
+            <h1 className="text-lg md:text-xl font-bold mb-2">الجمهورية الجزائرية الديمقراطية الشعبية</h1>
+            <h2 className="text-md md:text-lg font-bold mb-8">وزارة التربية الوطنية</h2>
             
-            if (isRevealed) {
-              if (option.isCorrect) {
-                btnClass = 'border-emerald-500 bg-emerald-50 text-emerald-800 ring-2 ring-emerald-500/20';
-                labelClass = 'bg-emerald-200 text-emerald-800';
-              } else if (selectedOption === idx && !option.isCorrect) {
-                btnClass = 'border-red-500 bg-red-50 text-red-800 ring-2 ring-red-500/20';
-                labelClass = 'bg-red-200 text-red-800';
-              }
-            } else if (selectedOption === idx) {
-              btnClass = 'border-emerald-500 bg-emerald-50 text-emerald-800';
-              labelClass = 'bg-emerald-200 text-emerald-800';
-            }
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-y-4 gap-x-2 text-right mb-6 bg-slate-50 p-4 border border-slate-200">
+               <div className="col-span-1 md:col-span-4 text-center font-bold text-xl md:text-2xl mb-4 text-slate-800 border-b border-slate-200 pb-4">امتحان شهادة البكالوريا (تمرين مقترح)</div>
+               <div className="md:col-span-2"><span className="font-bold">المادة:</span> {subject?.name || 'غير محدد'}</div>
+               <div className="md:col-span-2"><span className="font-bold">الوحدة:</span> {unit?.name || 'غير محدد'}</div>
+               <div className="col-span-1 md:col-span-4 mt-2"><span className="font-bold">الموضوع:</span> {exercise?.title || 'تمرين عام'}</div>
+            </div>
+         </div>
 
-            return (
-              <button
-                key={option.id}
-                onClick={() => handleOptionClick(idx)}
-                disabled={isRevealed}
-                className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all text-right font-bold disabled:cursor-default ${btnClass}`}
-              >
-                <span>{option.text}</span>
-                <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-colors ${labelClass}`}>
-                  {option.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {isRevealed && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className={`mt-6 p-4 rounded-xl border flex items-center gap-3 font-bold ${
-              currentQ.options[selectedOption!]?.isCorrect 
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-                : 'bg-red-50 border-red-200 text-red-700'
-            }`}
-          >
-            {currentQ.options[selectedOption!]?.isCorrect ? (
-              <>مؤشر صحيح! إجابة ممتازة 🎉</>
-            ) : (
-              <>إجابة خاطئة. حاول التركيز أكثر في المرة القادمة.</>
-            )}
-          </motion.div>
-        )}
-
-        <div className="mt-8 flex justify-end">
-          <button
-            onClick={handleNext}
-            disabled={!isRevealed}
-            className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl disabled:opacity-50 hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            {currentQuestion < questions.length - 1 ? 'السؤال التالي' : 'عرض النتيجة'}
-          </button>
-        </div>
+         {!showAnswers ? (
+            <div className="markdown-body rtl prose max-w-none text-right">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{data.exam}</ReactMarkdown>
+            </div>
+         ) : (
+            <div className="mt-8 border-t-2 border-emerald-500 pt-8">
+               <div className="text-center mb-6">
+                 <h3 className="text-xl font-bold text-emerald-700 bg-emerald-50 inline-block px-6 py-2 rounded-full border border-emerald-200">التصحيح النموذجي</h3>
+               </div>
+               <div className="markdown-body rtl prose max-w-none text-right">
+                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{data.solution}</ReactMarkdown>
+               </div>
+            </div>
+         )}
+         
+         <div className="mt-20 pt-8 border-t border-slate-300 text-center text-sm font-bold text-slate-600 block">
+            — بالتوفيق والنجاح —
+         </div>
       </div>
     </div>
-  );
+  )
 }
 

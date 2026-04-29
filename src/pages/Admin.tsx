@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { GoogleGenAI, Type } from "@google/genai";
+import { getSubjectPrompt } from '../lib/prompts';
 import { 
   BookOpen, 
   Target, 
@@ -23,6 +24,42 @@ import {
   Cpu
 } from "lucide-react";
 import { motion } from "motion/react";
+
+export type AlertEventPayload = { message: string, type?: 'success' | 'error' | 'info' };
+
+export const triggerAlert = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+  window.dispatchEvent(new CustomEvent<AlertEventPayload>('show-admin-alert', { detail: { message, type } }));
+};
+
+function AlertModal() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [alertData, setAlertData] = useState<AlertEventPayload>({ message: '', type: 'info' });
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      setAlertData(e.detail);
+      setIsOpen(true);
+    };
+    window.addEventListener('show-admin-alert', handler as EventListener);
+    return () => window.removeEventListener('show-admin-alert', handler as EventListener);
+  }, []);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
+      <motion.div initial={{scale: 0.95, opacity: 0}} animate={{scale: 1, opacity: 1}} className="relative bg-white rounded-[2rem] p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center">
+         <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${alertData.type === 'error' ? 'bg-red-100 text-red-600' : alertData.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
+            {alertData.type === 'error' ? <X size={32} /> : alertData.type === 'success' ? <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> : <Menu size={32} />}
+         </div>
+         <h3 className="text-xl font-bold text-slate-800 mb-2">{alertData.type === 'error' ? 'خطأ' : alertData.type === 'success' ? 'نجاح' : 'تنبيه'}</h3>
+         <p className="text-slate-600 font-medium mb-6">{alertData.message}</p>
+         <button onClick={() => setIsOpen(false)} className="w-full bg-slate-900 text-white font-bold rounded-xl py-3 hover:bg-slate-800 transition-all">حسناً</button>
+      </motion.div>
+    </div>
+  );
+}
 
 function StatCard({ title, value, trend, icon }: { title: string, value: string, trend: string, icon: React.ReactNode }) {
   const isPositive = trend.startsWith('+');
@@ -76,7 +113,7 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !selectedUnitId || !title) {
-       alert('الرجاء التأكد من تعبئة جميع الحقول وإعداد قاعدة البيانات (Supabase).');
+       triggerAlert('الرجاء التأكد من تعبئة جميع الحقول وإعداد قاعدة البيانات (Supabase).', 'error');
        return;
     }
     setIsSubmitting(true);
@@ -89,13 +126,13 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
         lesson_order: 99 // simplistic order for demo
       }]);
       if (!error) {
-        alert('تمت إضافة الدرس بنجاح!');
+        triggerAlert('تمت إضافة الدرس بنجاح!', 'success');
         onBack();
       } else {
-        alert('حدث خطأ أثناء الإضافة: ' + error.message);
+        triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
       }
     } catch (err: any) {
-      alert('حدث خطأ غير متوقع: ' + err.message);
+      triggerAlert('حدث خطأ غير متوقع: ' + err.message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -207,11 +244,11 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
     const apiKey = localStorage.getItem('admin_api_key');
     const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-3-flash-preview';
     if (!apiKey) {
-      alert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات أولاً.");
+      triggerAlert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات أولاً.", 'error');
       return;
     }
     if (!selectedSubjectId || !selectedUnitId || !title) {
-       alert("الرجاء اختيار المادة والوحدة وكتابة عنوان التمرين أولاً.");
+       triggerAlert("الرجاء اختيار المادة والوحدة وكتابة عنوان التمرين أولاً.", 'error');
        return;
     }
     
@@ -221,10 +258,7 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
       const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || '';
       const unitName = units.find(u => u.id === selectedUnitId)?.name || '';
       
-      const prompt = `أنت معلم خبير في التعليم الثانوي. قم بإنشاء تمرين تفاعلي يتكون من 5 أسئلة اختيار من متعدد (QCM) حول مادة "${subjectName}" وتحديداً وحدة "${unitName}". 
-واستهدف هذا العنوان: "${title}".
-يجب أن يحتوي كل سؤال على 3 أو 4 خيارات، مع تحديد الخيار الصحيح.
-قم بإرجاع النتيجة بصيغة JSON معتمدة حسب المخطط التالي.`;
+      const prompt = getSubjectPrompt(subjectName, unitName, title);
 
       const response = await ai.models.generateContent({
         model: aiModel,
@@ -232,38 +266,26 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
         config: {
           responseMimeType: "application/json",
           responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                id: { type: Type.INTEGER },
-                text: { type: Type.STRING, description: "نص السؤال" },
-                options: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      id: { type: Type.STRING, description: "مثل a, b, c, d" },
-                      text: { type: Type.STRING, description: "نص الخيار" },
-                      label: { type: Type.STRING, description: "أ, ب, ج, د" },
-                      isCorrect: { type: Type.BOOLEAN, description: "هل هذا الخيار هو الصحيح" }
-                    },
-                    required: ["id", "text", "label", "isCorrect"]
-                  }
-                }
-              },
-              required: ["id", "text", "options"]
-            }
+            type: Type.OBJECT,
+            properties: {
+              exam: { type: Type.STRING, description: "نص موضوع الامتحان بتنسيق Markdown. لا تضع الحل هنا." },
+              solution: { type: Type.STRING, description: "نص التصحيح النموذجي للامتحان بتنسيق Markdown" }
+            },
+            required: ["exam", "solution"]
           }
         }
       });
       
       const jsonStr = response.text.trim();
-      const parsedQuestions = JSON.parse(jsonStr);
-      setGeneratedQuestions(parsedQuestions);
-      alert("تم توليد الأسئلة بنجاح!");
+      const parsedData = JSON.parse(jsonStr);
+      setGeneratedQuestions([{ exam: parsedData.exam, solution: parsedData.solution }]);
+      triggerAlert("تم توليد الموضوع بنجاح!", 'success');
     } catch (err: any) {
-      alert("حدث خطأ أثناء التوليد: " + err.message);
+      if (err.message && err.message.includes('503')) {
+         triggerAlert("خوادم جوجل (Gemini) تواجه ضغطاً كبيراً حالياً (خطأ 503). الرجاء المحاولة مرة أخرى بعد قليل.", 'error');
+      } else {
+         triggerAlert("حدث خطأ أثناء التوليد: " + err.message, 'error');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -272,7 +294,7 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !selectedUnitId || !title) {
-       alert('الرجاء التأكد من تعبئة جميع الحقول وإعداد قاعدة البيانات (Supabase).');
+       triggerAlert('الرجاء التأكد من تعبئة جميع الحقول وإعداد قاعدة البيانات (Supabase).', 'error');
        return;
     }
     setIsSubmitting(true);
@@ -289,13 +311,13 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
         content: contentStr
       }]);
       if (!error) {
-        alert('تمت إضافة التمرين بنجاح!');
+        triggerAlert('تمت إضافة التمرين بنجاح!', 'success');
         onBack();
       } else {
-        alert('حدث خطأ أثناء الإضافة: ' + error.message);
+        triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
       }
     } catch (err: any) {
-      alert('حدث خطأ غير متوقع: ' + err.message);
+      triggerAlert('حدث خطأ غير متوقع: ' + err.message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -420,13 +442,13 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
         progress: 0
       }]);
       if (!error) {
-        alert('تمت إضافة المادة بنجاح!');
+        triggerAlert('تمت إضافة المادة بنجاح!', 'success');
         onBack();
       } else {
-        alert('حدث خطأ: ' + error.message);
+        triggerAlert('حدث خطأ: ' + error.message, 'error');
       }
     } catch (err: any) {
-      alert('خطأ: ' + err.message);
+      triggerAlert('خطأ: ' + err.message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -504,13 +526,13 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
         unit_order: 99
       }]);
       if (!error) {
-        alert('تمت إضافة الوحدة بنجاح!');
+        triggerAlert('تمت إضافة الوحدة بنجاح!', 'success');
         onBack();
       } else {
-        alert('حدث خطأ: ' + error.message);
+        triggerAlert('حدث خطأ: ' + error.message, 'error');
       }
     } catch (err: any) {
-      alert('خطأ: ' + err.message);
+      triggerAlert('خطأ: ' + err.message, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -688,7 +710,7 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isValidated) {
-        alert("الرجاء التحقق من المفتاح أولاً");
+        triggerAlert("الرجاء التحقق من المفتاح أولاً", 'error');
         return;
     }
     setIsSaving(true);
@@ -699,10 +721,10 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
       if (supabase) {
         await supabase.from('admin_settings').upsert({ id: 1, api_key: apiKey, ai_model: selectedModel });
       }
-      alert("تم حفظ الإعدادات بنجاح!");
+      triggerAlert("تم حفظ الإعدادات بنجاح!", 'success');
       onBack();
     } catch (err: any) {
-      alert("حدث خطأ أثناء الحفظ في قاعدة البيانات: " + err.message + "\nتم الحفظ محلياً.");
+      triggerAlert("حدث خطأ أثناء الحفظ في قاعدة البيانات: " + err.message + "\nتم الحفظ محلياً.", 'error');
     } finally {
       setIsSaving(false);
     }
@@ -983,6 +1005,7 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50 relative flex md:flex-row flex-col">
+      <AlertModal />
       {/* Mobile Header (Sidebar Toggle + Title) */}
       <div className="md:hidden flex justify-between items-center p-4 bg-white border-b border-slate-100 z-40 sticky top-0">
         <button onClick={() => setIsSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200">
