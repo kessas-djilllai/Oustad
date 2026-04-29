@@ -7,6 +7,8 @@ import "katex/dist/katex.min.css";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { AdminLayout, AdminLogin } from "./pages/Admin";
+import { GoogleGenAI, Type } from "@google/genai";
+import { getSubjectPrompt } from "./lib/prompts";
 import { 
   BookOpen,
   Target, 
@@ -39,6 +41,7 @@ import {
   Trash,
   Printer,
   CheckCircle,
+  RefreshCw,
   X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -114,14 +117,15 @@ function StudentLayout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
+              transition={{ duration: 0.15 }}
               className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
             />
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 bottom-0 w-64 glass !bg-white/95 !backdrop-blur-2xl z-50 p-6 flex flex-col border-l border-white/50 shadow-2xl"
+              transition={{ type: 'tween', duration: 0.2 }}
+              className="fixed top-0 right-0 bottom-0 w-64 glass !bg-white/95 !backdrop-blur-2xl z-50 p-6 flex flex-col border-l border-white/50 shadow-2xl rounded-l-[2rem]"
             >
               <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-3">
@@ -205,7 +209,7 @@ const SUBJECTS_DATA = [
 function StudentPortal({ loading }: { loading: boolean }) {
   const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
   
-  const [view, setViewState] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any }>(() => {
+  const [view, setViewState] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any, lesson?: any }>(() => {
     const saved = localStorage.getItem('portal_view');
     if (saved) {
       try {
@@ -383,9 +387,8 @@ function StudentPortal({ loading }: { loading: boolean }) {
            exit={{ opacity: 0, x: 10 }}
            transition={{ duration: 0.2 }}
         >
-          {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s) => setView({ type: 'subject_type', subject: s })} onStartQuiz={() => setShowQuizModal(true)} />}
-          {view.type === 'subject_type' && <SubjectTypeView subject={currentSubject} onBack={() => setView({ type: 'dashboard' })} onSelectType={(t) => setView({ type: 'subject_units', subject: currentSubject, listType: t })} />}
-          {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'subject_type', subject: currentSubject })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
+          {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s, type) => setView({ type: 'subject_units', subject: s, listType: type })} onStartQuiz={() => setShowQuizModal(true)} />}
+          {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
           {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
             if (view.listType === 'exercises') {
               setView({ type: 'solve_exercise', subject: currentSubject, unit: currentUnit, exercise: item });
@@ -539,15 +542,23 @@ function QuizModal({ onClose, subjects }: { onClose: () => void, subjects: any[]
   );
 }
 
-function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: any[], onSubjectClick: (s: any) => void, onStartQuiz: () => void }) {
+function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: any[], onSubjectClick: (s: any, listType: 'lessons' | 'exercises') => void, onStartQuiz: () => void }) {
+  const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>(() => {
+    return (localStorage.getItem('dashboard_active_tab') as 'lessons' | 'exercises') || 'lessons';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dashboard_active_tab', activeTab);
+  }, [activeTab]);
+
   return (
     <div className="space-y-4 md:space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
-        <div className="col-span-1 md:col-span-2 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col justify-center relative overflow-hidden group hover:shadow-lg transition-all min-h-[120px] md:min-h-[160px] bg-gradient-to-br from-white to-blue-50/50">
-          <div className="absolute -left-10 -top-10 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl group-hover:bg-blue-400/30 transition-all pointer-events-none" />
+        <div className="col-span-1 md:col-span-2 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col justify-center relative overflow-hidden group hover:shadow-lg transition-all min-h-[120px] md:min-h-[160px] bg-gradient-to-br from-white to-orange-50/50">
+          <div className="absolute -left-10 -top-10 w-32 h-32 bg-orange-400/20 rounded-full blur-2xl group-hover:bg-orange-400/30 transition-all pointer-events-none" />
           <div className="flex items-start justify-between relative">
             <div>
-              <div className="inline-flex items-center gap-1 text-[10px] md:text-xs text-blue-600 font-bold bg-blue-100 px-2 py-1 rounded-lg mb-2">
+              <div className="inline-flex items-center gap-1 text-[10px] md:text-xs text-orange-600 font-bold bg-orange-100 px-2 py-1 rounded-lg mb-2">
                 <Calendar size={12} />
                 الامتحان القادم
               </div>
@@ -564,18 +575,18 @@ function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: an
 
         <button 
            onClick={onStartQuiz}
-           className="col-span-1 rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-row md:flex-col items-center md:items-start justify-between bg-gradient-to-br from-indigo-500 to-blue-600 group text-right hover:shadow-xl hover:shadow-blue-500/20 transition-all"
+           className="col-span-1 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-row md:flex-col items-center md:items-start justify-between bg-gradient-to-br from-white to-blue-50/50 group text-right hover:shadow-lg transition-all"
         >
-           <div className="flex items-center gap-3 md:gap-0 md:flex-col md:items-start text-white">
-             <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/20 text-white flex items-center justify-center shrink-0 md:mb-4 shadow-sm backdrop-blur-sm">
+           <div className="flex items-center gap-3 md:gap-0 md:flex-col md:items-start">
+             <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 md:mb-4 shadow-sm">
                 <Target size={20} />
               </div>
               <div>
-                <p className="text-[10px] md:text-xs font-medium text-white/80 mb-0.5 md:mb-1">اختبار سريع (كويز)</p>
-                <h4 className="font-bold text-white text-sm md:text-lg leading-tight">تدرب الآن</h4>
+                <p className="text-[10px] md:text-xs font-bold text-indigo-500 mb-0.5 md:mb-1">اختبار سريع (كويز)</p>
+                <h4 className="font-bold text-slate-800 text-sm md:text-lg leading-tight">تدرب الآن</h4>
               </div>
            </div>
-           <div className="flex items-center gap-1 text-[10px] md:text-xs text-blue-100 font-medium bg-white/20 px-3 py-1.5 rounded-lg mt-0 md:mt-4 group-hover:bg-white group-hover:text-blue-600 transition-colors">
+           <div className="flex items-center gap-1 text-[10px] md:text-xs text-indigo-600 font-bold bg-indigo-50 px-3 py-1.5 rounded-lg mt-0 md:mt-4 group-hover:bg-indigo-100 transition-colors">
               <PlayCircle size={14} />
              <span>ابدأ الكويز</span>
            </div>
@@ -583,39 +594,62 @@ function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: an
       </div>
 
       <div>
-        <div className="flex justify-between items-center mb-3 md:mb-4">
+        <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-4 md:mb-6 gap-3">
           <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-1.5 md:gap-2">
             <BookOpen size={18} className="text-indigo-500" />
             المواد الدراسية
           </h3>
-          <span className="text-[10px] md:text-sm font-bold text-slate-500 bg-slate-100 px-2 md:px-3 py-1 rounded-lg md:rounded-xl">علوم تجريبية</span>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-          {subjects.map((sub) => (
-            <motion.div 
-              key={sub.id} 
-              whileHover={{ scale: 1.02 }}
-              onClick={() => onSubjectClick(sub)}
-              className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 flex flex-col justify-between cursor-pointer group glass-hover"
+          
+          <div className="flex bg-slate-100 p-1 rounded-xl w-full md:w-auto">
+            <button 
+              onClick={() => setActiveTab('lessons')}
+              className={`flex-1 md:w-32 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'lessons' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              <div className="flex justify-between items-start mb-3 md:mb-6">
-                 <div className={`w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${sub.bg} ${sub.color} flex items-center justify-center shadow-sm`}>
-                   <sub.icon size={18} className="md:w-6 md:h-6" />
-                 </div>
-              </div>
-              <div>
-                 <h4 className="font-bold text-sm md:text-lg text-slate-800 mb-2 md:mb-4 truncate">{sub.name}</h4>
-                 <div className="flex justify-between text-[9px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">
-                    <span>التقدم</span>
-                    <span>{sub.progress}%</span>
-                 </div>
-                 <div className="w-full bg-slate-100 rounded-full h-1 md:h-1.5 overflow-hidden">
-                   <div className={`h-full rounded-full ${sub.barColor}`} style={{ width: `${sub.progress}%` }} />
-                 </div>
-              </div>
-            </motion.div>
-          ))}
+              الدروس
+            </button>
+            <button 
+              onClick={() => setActiveTab('exercises')}
+              className={`flex-1 md:w-32 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'exercises' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              التمارين
+            </button>
+          </div>
         </div>
+        <AnimatePresence mode="wait">
+          <motion.div 
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4"
+          >
+            {subjects.map((sub) => (
+              <motion.div 
+                key={sub.id} 
+                whileHover={{ scale: 1.02 }}
+                onClick={() => onSubjectClick(sub, activeTab)}
+                className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 flex flex-col justify-between cursor-pointer group glass-hover"
+              >
+                <div className="flex justify-between items-start mb-3 md:mb-6">
+                   <div className={`w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${sub.bg} ${sub.color} flex items-center justify-center shadow-sm`}>
+                     <sub.icon size={18} className="md:w-6 md:h-6" />
+                   </div>
+                </div>
+                <div>
+                   <h4 className="font-bold text-sm md:text-lg text-slate-800 mb-2 md:mb-4 truncate">{sub.name}</h4>
+                   <div className="flex justify-between text-[9px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">
+                      <span>التقدم</span>
+                      <span>{sub.progress}%</span>
+                   </div>
+                   <div className="w-full bg-slate-100 rounded-full h-1 md:h-1.5 overflow-hidden">
+                     <div className={`h-full rounded-full ${sub.barColor}`} style={{ width: `${sub.progress}%` }} />
+                   </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   )
@@ -685,20 +719,40 @@ function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject:
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-        {subject.units.map((unit: any, index: number) => (
+        {subject.units.map((unit: any, index: number) => {
+          let progress = 0;
+          const total = (unit.lessons?.length || 0) + (unit.exercises?.length || 0);
+          if (total > 0) {
+            let completed = 0;
+            unit.lessons?.forEach((l: any) => {
+              if (localStorage.getItem('completed_lesson_' + l.id) === 'true') completed++;
+            });
+            unit.exercises?.forEach((e: any) => {
+              if (localStorage.getItem('completed_exercise_' + e.id) === 'true') completed++;
+            });
+            progress = Math.round((completed / total) * 100);
+          }
+          
+          return (
           <motion.div 
             key={unit.id}
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}
             onClick={() => onUnitClick(unit)}
             className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300"
           >
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="text-[10px] md:text-xs font-bold text-slate-400 mb-1 block">الوحدة {index + 1}</span>
+            <div className="flex justify-between items-start">
+              <div className="w-full pl-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] md:text-xs font-bold text-slate-400 block">الوحدة {index + 1}</span>
+                  <span className="text-[10px] md:text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{progress}%</span>
+                </div>
                 <h3 className="font-bold text-sm md:text-lg text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1">{unit.name}</h3>
                 <div className="flex gap-3 md:gap-4 mt-2 md:mt-4 text-xs md:text-sm text-slate-500 font-medium">
-                  <span className="flex items-center gap-1 md:gap-1.5"><FileText size={14} className="text-blue-400"/> {unit.lessons.length} دروس</span>
-                  <span className="flex items-center gap-1 md:gap-1.5"><PenTool size={14} className="text-emerald-400"/> {unit.exercises.length} تمارين</span>
+                  <span className="flex items-center gap-1 md:gap-1.5"><FileText size={14} className="text-blue-400"/> {unit.lessons?.length || 0} دروس</span>
+                  <span className="flex items-center gap-1 md:gap-1.5"><PenTool size={14} className="text-emerald-400"/> {unit.exercises?.length || 0} تمارين</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-1 mt-4 overflow-hidden">
+                   <div className="h-full rounded-full bg-blue-500 transition-all duration-1000" style={{ width: `${progress}%` }} />
                 </div>
               </div>
               <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all shrink-0">
@@ -706,7 +760,7 @@ function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject:
               </div>
             </div>
           </motion.div>
-        ))}
+        )})}
       </div>
     </div>
   )
@@ -810,8 +864,57 @@ function ContentListView({ subject, unit, listType, onBack, onSelectItem }: { su
   )
 }
 
+function LessonDetailsView({ subject, unit, lesson, onBack }: { subject: any, unit: any, lesson: any, onBack: () => void }) {
+  useEffect(() => {
+    if (lesson?.id) {
+      localStorage.setItem('completed_lesson_' + lesson.id, 'true');
+      window.dispatchEvent(new Event('progress_updated'));
+    }
+  }, [lesson?.id]);
+
+  const getLessonContent = () => {
+    if (lesson?.content) return lesson.content;
+    return `### محتوى الدرس
+هذا هو المحتوى التجريبي للدرس: **${lesson?.title || 'بلا عنوان'}**.
+
+يمكنك هنا قراءة المفاهيم، التعرف على القوانين الأساسية والملاحظات الهامة.
+    `;
+  };
+
+  return (
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
+        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
+          <ChevronRight size={18} className="md:w-5 md:h-5" />
+        </button>
+        <div>
+          <h2 className="font-bold text-base md:text-xl text-slate-800">{lesson?.title}</h2>
+          <p className="text-[10px] md:text-xs text-slate-500 font-medium">{subject?.name} - {unit?.name}</p>
+        </div>
+      </div>
+
+      <div className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8">
+        <div className="prose prose-sm md:prose-base prose-slate max-w-none text-right" dir="rtl">
+           <div className="markdown-body">
+             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+               {getLessonContent()}
+             </ReactMarkdown>
+           </div>
+        </div>
+        <div className="mt-8 flex justify-center">
+           <div className="inline-flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl text-sm font-bold">
+             <CheckCircle size={18} />
+             <span>تم تحديث نسبة الإنجاز تلقائياً</span>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject: any, unit: any, exercise: any, onBack: () => void }) {
   const [showAnswers, setShowAnswers] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   
   const getExerciseData = () => {
     if (exercise?.content) {
@@ -832,19 +935,76 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
     };
   };
 
-  const data = getExerciseData();
+  const [currentExercise, setCurrentExercise] = useState(() => getExerciseData());
+
+  const generateNewExercise = async () => {
+    const apiKey = localStorage.getItem('admin_api_key');
+    const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-3-flash-preview';
+    if (!apiKey) {
+      alert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const prompt = getSubjectPrompt(subject?.name || '', unit?.name || '', exercise?.title || '');
+      const newPrompt = prompt + "\n\nملاحظة مهمة: يرجى توليد تمرين مشابه للتمرين السابق من حيث الفكرة، لكن بمعطيات جديدة أو أرقام مختلفة تماماً، لكي يتدرب الطالب بشكل أفضل.";
+
+      const response = await ai.models.generateContent({
+        model: aiModel,
+        contents: newPrompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              exam: { type: Type.STRING, description: "نص موضوع الامتحان بتنسيق Markdown. لا تضع الحل هنا." },
+              solution: { type: Type.STRING, description: "نص التصحيح النموذجي للامتحان بتنسيق Markdown" }
+            },
+            required: ["exam", "solution"]
+          }
+        }
+      });
+      
+      if (response.text) {
+        const jsonStr = response.text.trim();
+        const parsedData = JSON.parse(jsonStr);
+        setCurrentExercise(parsedData);
+        setShowAnswers(false);
+      }
+    } catch (e: any) {
+      alert("حدث خطأ أثناء التوليد: " + e.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20">
-      <div className="flex items-center justify-between mb-4 print:hidden">
-        <button onClick={onBack} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 shadow-sm border border-slate-100">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 print:hidden gap-4">
+        <button onClick={onBack} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 shadow-sm border border-slate-100 shrink-0">
           <ChevronRight size={20} />
         </button>
-        <div className="flex gap-2">
-           <button onClick={() => window.print()} className="px-4 md:px-5 py-2 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition flex items-center gap-2 text-sm shadow-sm">
-             <Printer size={16} /> <span className="hidden sm:inline">طباعة</span>
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+           <button 
+             onClick={generateNewExercise}
+             disabled={isGenerating}
+             className="px-4 md:px-5 py-2 bg-blue-100 text-blue-700 font-bold rounded-xl hover:bg-blue-200 transition flex items-center justify-center gap-2 text-sm shadow-sm flex-1 md:flex-none disabled:opacity-50"
+           >
+             <RefreshCw size={16} className={isGenerating ? "animate-spin" : ""} /> 
+             <span>{isGenerating ? 'جاري التوليد...' : 'تمرين جديد'}</span>
            </button>
-           <button onClick={() => setShowAnswers(!showAnswers)} className="px-4 md:px-5 py-2 bg-emerald-100 text-emerald-700 font-bold rounded-xl hover:bg-emerald-200 transition text-sm shadow-sm flex items-center gap-2">
+           <button 
+             onClick={() => {
+               setShowAnswers(!showAnswers);
+               if (!showAnswers && exercise?.id) {
+                 localStorage.setItem('completed_exercise_' + exercise.id, 'true');
+                 window.dispatchEvent(new Event('progress_updated'));
+               }
+             }} 
+             className="px-4 md:px-5 py-2 bg-emerald-100 text-emerald-700 font-bold rounded-xl hover:bg-emerald-200 transition text-sm shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
+           >
              <CheckCircle size={16} /> <span>{showAnswers ? 'إخفاء الحل' : 'عرض الحل'}</span>
            </button>
         </div>
@@ -856,33 +1016,37 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
             <h2 className="text-md md:text-lg font-bold mb-8">وزارة التربية الوطنية</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-y-4 gap-x-2 text-right mb-6 bg-slate-50 p-4 border border-slate-200">
-               <div className="col-span-1 md:col-span-4 text-center font-bold text-xl md:text-2xl mb-4 text-slate-800 border-b border-slate-200 pb-4">امتحان شهادة البكالوريا (تمرين مقترح)</div>
+               <div className="col-span-1 md:col-span-4 text-center font-bold text-xl md:text-2xl mb-4 text-slate-800 border-b border-slate-200 pb-4">تدريب إضافي (تمرين مقترح من الذكاء الاصطناعي)</div>
                <div className="md:col-span-2"><span className="font-bold">المادة:</span> {subject?.name || 'غير محدد'}</div>
                <div className="md:col-span-2"><span className="font-bold">الوحدة:</span> {unit?.name || 'غير محدد'}</div>
                <div className="col-span-1 md:col-span-4 mt-2"><span className="font-bold">الموضوع:</span> {exercise?.title || 'تمرين عام'}</div>
             </div>
          </div>
 
-         {!showAnswers ? (
-            <div className="markdown-body rtl prose max-w-none text-right">
-              <ReactMarkdown 
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex]}
-                components={{
-                  table: ({node, ...props}) => (
-                    <div className="overflow-x-auto w-full mb-6 relative" dir="ltr">
-                      <table {...props} className="w-full text-center border-collapse border border-slate-300" />
-                    </div>
-                  ),
-                  th: ({node, ...props}) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
-                  td: ({node, ...props}) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
-                }}
-              >
-                {data.exam?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
-              </ReactMarkdown>
-            </div>
-         ) : (
-            <div className="mt-8 border-t-2 border-emerald-500 pt-8">
+         <div className="markdown-body rtl prose max-w-none text-right">
+           <ReactMarkdown 
+             remarkPlugins={[remarkGfm, remarkMath]}
+             rehypePlugins={[rehypeKatex]}
+             components={{
+               table: ({node, ...props}: any) => (
+                 <div className="overflow-x-auto w-full mb-6 relative" dir="ltr">
+                   <table {...props} className="w-full text-center border-collapse border border-slate-300" />
+                 </div>
+               ),
+               th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
+               td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />,
+               ul: ({node, ...props}: any) => <ul {...props} className="list-disc list-outside pr-6 space-y-2 mb-4" />,
+               ol: ({node, ...props}: any) => <ol {...props} className="list-decimal list-outside pr-6 space-y-2 mb-4" />,
+               li: ({node, ...props}: any) => <li {...props} className="mb-2" />,
+               p: ({node, children, ...props}: any) => <p {...props} className="mb-4 last:mb-0 inline">{children}</p>
+             }}
+           >
+             {currentExercise.exam?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
+           </ReactMarkdown>
+         </div>
+
+         {showAnswers && currentExercise.solution && (
+            <div className="mt-8 border-t-2 border-emerald-500 pt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                <div className="text-center mb-6">
                  <h3 className="text-xl font-bold text-emerald-700 bg-emerald-50 inline-block px-6 py-2 rounded-full border border-emerald-200">التصحيح النموذجي</h3>
                </div>
@@ -891,16 +1055,20 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                   remarkPlugins={[remarkGfm, remarkMath]}
                   rehypePlugins={[rehypeKatex]}
                   components={{
-                    table: ({node, ...props}) => (
+                    table: ({node, ...props}: any) => (
                       <div className="overflow-x-auto w-full mb-6 relative" dir="ltr">
                         <table {...props} className="w-full text-center border-collapse border border-slate-300" />
                       </div>
                     ),
-                    th: ({node, ...props}) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
-                    td: ({node, ...props}) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
+                    th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
+                    td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />,
+                    ul: ({node, ...props}: any) => <ul {...props} className="list-disc list-outside pr-6 space-y-2 mb-4" />,
+                    ol: ({node, ...props}: any) => <ol {...props} className="list-decimal list-outside pr-6 space-y-2 mb-4" />,
+                    li: ({node, ...props}: any) => <li {...props} className="mb-2" />,
+                    p: ({node, children, ...props}: any) => <p {...props} className="mb-4 last:mb-0 inline">{children}</p>
                   }}
                  >
-                  {data.solution?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
+                  {currentExercise.solution?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
                  </ReactMarkdown>
                </div>
             </div>
