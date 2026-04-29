@@ -651,7 +651,18 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
 
          {!showAnswers ? (
             <div className="markdown-body rtl prose max-w-none text-right">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{data.exam}</ReactMarkdown>
+              <ReactMarkdown 
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  table: ({node, ...props}) => (
+                    <div className="overflow-x-auto w-full mb-6 relative">
+                      <table {...props} className="w-full text-right" />
+                    </div>
+                  )
+                }}
+              >
+                {data.exam}
+              </ReactMarkdown>
             </div>
          ) : (
             <div className="mt-8 border-t-2 border-emerald-500 pt-8">
@@ -659,7 +670,18 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                  <h3 className="text-xl font-bold text-emerald-700 bg-emerald-50 inline-block px-6 py-2 rounded-full border border-emerald-200">التصحيح النموذجي</h3>
                </div>
                <div className="markdown-body rtl prose max-w-none text-right">
-                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{data.solution}</ReactMarkdown>
+                 <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    table: ({node, ...props}) => (
+                      <div className="overflow-x-auto w-full mb-6 relative">
+                        <table {...props} className="w-full text-right" />
+                      </div>
+                    )
+                  }}
+                 >
+                  {data.solution}
+                 </ReactMarkdown>
                </div>
             </div>
          )}

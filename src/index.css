@@ -46,6 +46,15 @@ body {
   text-align: right !important;
 }
 
+.prose h2,
+.prose h3 {
+  border-bottom: 4px double #10b981 !important;
+  padding-bottom: 0.5rem !important;
+  margin-bottom: 1rem !important;
+  width: max-content !important;
+  max-width: 100% !important;
+}
+
 .prose th {
   background-color: #f1f5f9 !important;
   font-weight: 700 !important;
