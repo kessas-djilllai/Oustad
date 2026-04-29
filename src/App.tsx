@@ -260,7 +260,9 @@ function StudentPortal({ loading }: { loading: boolean }) {
       if (!supabase) return; // Fallback to SUBJECTS_DATA if not configured
       
       try {
-        setDbLoading(true);
+        if (subjects === SUBJECTS_DATA) {
+          setDbLoading(true);
+        }
         // Fetch all data separately to ensure everything is caught regardless of PostgREST join constraints
         const [subRes, unitRes, lessRes, exRes] = await Promise.all([
           supabase.from('subjects').select('*').order('created_at', { ascending: true }),
@@ -1034,11 +1036,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                  </div>
                ),
                th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
-               td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />,
-               ul: ({node, ...props}: any) => <ul {...props} className="list-disc list-outside pr-6 space-y-2 mb-4" />,
-               ol: ({node, ...props}: any) => <ol {...props} className="list-decimal list-outside pr-6 space-y-2 mb-4" />,
-               li: ({node, ...props}: any) => <li {...props} className="mb-2" />,
-               p: ({node, children, ...props}: any) => <p {...props} className="mb-4 last:mb-0 inline">{children}</p>
+               td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
              }}
            >
              {currentExercise.exam?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
@@ -1061,11 +1059,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                       </div>
                     ),
                     th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
-                    td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />,
-                    ul: ({node, ...props}: any) => <ul {...props} className="list-disc list-outside pr-6 space-y-2 mb-4" />,
-                    ol: ({node, ...props}: any) => <ol {...props} className="list-decimal list-outside pr-6 space-y-2 mb-4" />,
-                    li: ({node, ...props}: any) => <li {...props} className="mb-2" />,
-                    p: ({node, children, ...props}: any) => <p {...props} className="mb-4 last:mb-0 inline">{children}</p>
+                    td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
                   }}
                  >
                   {currentExercise.solution?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
