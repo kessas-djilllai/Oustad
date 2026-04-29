@@ -38,7 +38,8 @@ import {
   Save,
   Trash,
   Printer,
-  CheckCircle
+  CheckCircle,
+  X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -238,6 +239,16 @@ function StudentPortal({ loading }: { loading: boolean }) {
   };
   
   const [dbLoading, setDbLoading] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [showQuizModal, setShowQuizModal] = useState(false);
+
+  useEffect(() => {
+    const handleProgressUpdate = () => {
+      setRefreshTrigger(prev => prev + 1);
+    };
+    window.addEventListener('progress_updated', handleProgressUpdate);
+    return () => window.removeEventListener('progress_updated', handleProgressUpdate);
+  }, []);
 
   useEffect(() => {
     // Example of how you would fetch from Supabase if keys are provided
@@ -265,9 +276,13 @@ function StudentPortal({ loading }: { loading: boolean }) {
           // Format the data to match our UI state format
           const formattedSubjects = subjectsData.map((sub: any) => {
             const subUnits = unitsData.filter(u => u.subject_id === sub.id).sort((a: any, b: any) => a.unit_order - b.unit_order);
+            const storedProgress = localStorage.getItem('progress_' + sub.id);
+            const p = storedProgress ? parseInt(storedProgress, 10) : (sub.progress || 0);
             
             return {
               ...sub,
+              barColor: sub.bar_color || 'bg-blue-500',
+              progress: p,
               icon: Calculator, // In a real app, map icon_name to actual Lucide component
               units: subUnits.map((u: any) => ({
                 ...u,
@@ -286,7 +301,7 @@ function StudentPortal({ loading }: { loading: boolean }) {
     }
 
     fetchData();
-  }, []);
+  }, [refreshTrigger]);
 
   if (loading || dbLoading) {
     return (
@@ -359,66 +374,212 @@ function StudentPortal({ loading }: { loading: boolean }) {
   const currentUnit = currentSubject?.units?.find((u: any) => u.id === view.unit?.id) || view.unit;
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-         key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}
-         initial={{ opacity: 0, x: -10 }}
-         animate={{ opacity: 1, x: 0 }}
-         exit={{ opacity: 0, x: 10 }}
-         transition={{ duration: 0.2 }}
-      >
-        {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s) => setView({ type: 'subject_type', subject: s })} />}
-        {view.type === 'subject_type' && <SubjectTypeView subject={currentSubject} onBack={() => setView({ type: 'dashboard' })} onSelectType={(t) => setView({ type: 'subject_units', subject: currentSubject, listType: t })} />}
-        {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'subject_type', subject: currentSubject })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
-        {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
-          if (view.listType === 'exercises') {
-            setView({ type: 'solve_exercise', subject: currentSubject, unit: currentUnit, exercise: item });
-          }
-        }} />}
-        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'exercises' })} />}
-      </motion.div>
-    </AnimatePresence>
+    <>
+      <AnimatePresence mode="wait">
+        <motion.div
+           key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}
+           initial={{ opacity: 0, x: -10 }}
+           animate={{ opacity: 1, x: 0 }}
+           exit={{ opacity: 0, x: 10 }}
+           transition={{ duration: 0.2 }}
+        >
+          {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s) => setView({ type: 'subject_type', subject: s })} onStartQuiz={() => setShowQuizModal(true)} />}
+          {view.type === 'subject_type' && <SubjectTypeView subject={currentSubject} onBack={() => setView({ type: 'dashboard' })} onSelectType={(t) => setView({ type: 'subject_units', subject: currentSubject, listType: t })} />}
+          {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'subject_type', subject: currentSubject })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
+          {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
+            if (view.listType === 'exercises') {
+              setView({ type: 'solve_exercise', subject: currentSubject, unit: currentUnit, exercise: item });
+            } else {
+              setView({ type: 'view_lesson', subject: currentSubject, unit: currentUnit, lesson: item });
+            }
+          }} />}
+          {view.type === 'view_lesson' && <LessonDetailsView subject={currentSubject} unit={currentUnit} lesson={view.lesson} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'lessons' })} />}
+          {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'exercises' })} />}
+        </motion.div>
+      </AnimatePresence>
+      {showQuizModal && <QuizModal onClose={() => setShowQuizModal(false)} subjects={subjects} />}
+    </>
   );
 }
 
-function DashboardView({ subjects, onSubjectClick }: { subjects: any[], onSubjectClick: (s: any) => void }) {
+function QuizModal({ onClose, subjects }: { onClose: () => void, subjects: any[] }) {
+  const [step, setStep] = useState(0);
+  const [selectedSubject, setSelectedSubject] = useState<any>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+
+  const mockQuestions = [
+    {
+       q: "ما هو الهدف الأساسي من المراجعة الدورية؟",
+       options: ["تضييع الوقت", "تثبيت المعلومات", "نسيان الدروس", "إرهاق العقل"],
+       correct: 1
+    },
+    {
+       q: "ما هي أفضل طريقة للتحضير للامتحان؟",
+       options: ["السهر طوال الليل", "دراسة كل شيء في يوم واحد", "التدريب على حل المواضيع السابقة", "تجاهل الدروس الصعبة"],
+       correct: 2
+    }
+  ];
+
+  const handleNext = () => {
+    if (step === 0 && selectedSubject) {
+      setStep(1);
+    } else if (step > 0 && step <= mockQuestions.length) {
+      if (selectedAnswer === mockQuestions[step - 1].correct) {
+         // correct
+      }
+      setStep(step + 1);
+      setSelectedAnswer(null);
+    }
+  };
+
+  const handleFinish = () => {
+    // Increase subject progress
+    if (selectedSubject) {
+       const key = 'progress_' + selectedSubject.id;
+       let current = parseInt(localStorage.getItem(key) || '0', 10);
+       if (current === 0) current = selectedSubject.progress || 0;
+       
+       let newProgress = current + 15;
+       if (newProgress > 100) newProgress = 100;
+       localStorage.setItem(key, newProgress.toString());
+       window.dispatchEvent(new Event('progress_updated'));
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <motion.div initial={{y: 50, opacity: 0}} animate={{y: 0, opacity: 1}} className="relative bg-white rounded-[2rem] p-6 max-w-md w-full shadow-2xl flex flex-col">
+        <button onClick={onClose} className="absolute top-4 left-4 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full p-2">
+           <X size={20} />
+        </button>
+
+        {step === 0 && (
+          <div className="text-center pt-4">
+            <div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+               <Target size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-2">اختبار المراجعة السريع</h3>
+            <p className="text-sm text-slate-500 mb-6">اختر المادة التي تريد تقييم مستواك فيها لزيادة نسبة تقدمك.</p>
+            
+            <div className="space-y-2 mb-6 max-h-48 overflow-y-auto">
+              {subjects.map(s => (
+                <button 
+                   key={s.id} 
+                   onClick={() => setSelectedSubject(s)}
+                   className={`w-full p-3 rounded-xl border text-sm font-bold transition-all text-right ${selectedSubject?.id === s.id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                >
+                  {s.name}
+                </button>
+              ))}
+              {subjects.length === 0 && <p className="text-xs text-slate-400">لا توجد مواد مضافة بعد.</p>}
+            </div>
+
+            <button 
+              onClick={handleNext}
+              disabled={!selectedSubject}
+              className="w-full bg-blue-500 text-white font-bold rounded-xl py-3 hover:bg-blue-600 transition-all disabled:opacity-50"
+            >
+              ابدأ الاختبار
+            </button>
+          </div>
+        )}
+
+        {step > 0 && step <= mockQuestions.length && (
+          <div className="pt-2">
+            <div className="flex justify-between text-xs text-slate-400 font-bold mb-4">
+               <span>السؤال {step} من {mockQuestions.length}</span>
+               <span>{selectedSubject?.name}</span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-6 leading-relaxed">
+              {mockQuestions[step - 1].q}
+            </h3>
+            
+            <div className="space-y-3 mb-8">
+              {mockQuestions[step - 1].options.map((opt, idx) => (
+                <button 
+                   key={idx}
+                   onClick={() => setSelectedAnswer(idx)}
+                   className={`w-full p-4 rounded-xl border text-sm font-bold transition-all text-right ${selectedAnswer === idx ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white hover:border-slate-300 hover:shadow-sm'}`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+
+            <button 
+              onClick={handleNext}
+              disabled={selectedAnswer === null}
+              className="w-full bg-slate-800 text-white font-bold rounded-xl py-3 hover:bg-slate-900 transition-all disabled:opacity-50"
+            >
+              التالي
+            </button>
+          </div>
+        )}
+
+        {step > mockQuestions.length && (
+          <div className="text-center pt-8 pb-4">
+            <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
+               <CheckCircle size={40} />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800 mb-2">أحسنت!</h3>
+            <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">لقد أكملت الكويز بنجاح وتم تحديث نسبة التقدم في مادة {selectedSubject?.name}.</p>
+            
+            <button 
+              onClick={handleFinish}
+              className="w-full bg-emerald-500 text-white font-bold rounded-xl py-3.5 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30"
+            >
+              العودة للرئيسية
+            </button>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: any[], onSubjectClick: (s: any) => void, onStartQuiz: () => void }) {
   return (
     <div className="space-y-4 md:space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
-        <div className="col-span-1 md:col-span-2 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col justify-center relative overflow-hidden group hover:shadow-lg transition-all min-h-[120px] md:min-h-[160px]">
+        <div className="col-span-1 md:col-span-2 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col justify-center relative overflow-hidden group hover:shadow-lg transition-all min-h-[120px] md:min-h-[160px] bg-gradient-to-br from-white to-blue-50/50">
           <div className="absolute -left-10 -top-10 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl group-hover:bg-blue-400/30 transition-all pointer-events-none" />
-          <h2 className="text-lg md:text-2xl font-bold text-slate-800 mb-2 flex items-center gap-2">
-            <Sparkles className="text-blue-500" size={20} />
-            ماذا تريد أن تتعلم اليوم؟
-          </h2>
-          <div className="relative mt-1 md:mt-2">
-            <input 
-              type="text" 
-              placeholder="ابحث عن درس، تمرين..." 
-              className="w-full bg-white/80 border border-slate-200 rounded-xl md:rounded-2xl py-3 md:py-4 pr-10 md:pr-12 pl-4 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 shadow-sm transition-all"
-            />
-            <Search className="absolute right-3 md:right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <button className="absolute left-1.5 md:left-2 top-1/2 -translate-y-1/2 bg-blue-500 text-white rounded-lg md:rounded-xl px-3 md:px-4 py-1.5 md:py-2 hover:bg-blue-600 transition-colors focus:ring-2 focus:outline-none focus:ring-blue-300 font-bold text-[10px] md:text-xs">
-              شات
-            </button>
+          <div className="flex items-start justify-between relative">
+            <div>
+              <div className="inline-flex items-center gap-1 text-[10px] md:text-xs text-blue-600 font-bold bg-blue-100 px-2 py-1 rounded-lg mb-2">
+                <Calendar size={12} />
+                الامتحان القادم
+              </div>
+              <h2 className="text-xl md:text-3xl font-black text-slate-800 mb-2">
+                بكالوريا تجريبي
+              </h2>
+              <p className="text-xs md:text-sm text-slate-500 font-medium flex items-center gap-1.5">
+                <Clock size={16} />
+                متبقي 14 يوماً على الامتحان
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="col-span-1 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-row md:flex-col items-center md:items-start justify-between bg-gradient-to-br from-white to-orange-50/50 group glass-hover">
-           <div className="flex items-center gap-3 md:gap-0 md:flex-col md:items-start">
-             <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 md:mb-4 shadow-sm">
-                <Calendar size={20} />
+        <button 
+           onClick={onStartQuiz}
+           className="col-span-1 rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-row md:flex-col items-center md:items-start justify-between bg-gradient-to-br from-indigo-500 to-blue-600 group text-right hover:shadow-xl hover:shadow-blue-500/20 transition-all"
+        >
+           <div className="flex items-center gap-3 md:gap-0 md:flex-col md:items-start text-white">
+             <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-white/20 text-white flex items-center justify-center shrink-0 md:mb-4 shadow-sm backdrop-blur-sm">
+                <Target size={20} />
               </div>
               <div>
-                <p className="text-[10px] md:text-xs font-bold text-orange-500 mb-0.5 md:mb-1">الامتحان القادم</p>
-                <h4 className="font-bold text-slate-800 text-sm md:text-lg leading-tight">بكالوريا تجريبي</h4>
+                <p className="text-[10px] md:text-xs font-medium text-white/80 mb-0.5 md:mb-1">اختبار سريع (كويز)</p>
+                <h4 className="font-bold text-white text-sm md:text-lg leading-tight">تدرب الآن</h4>
               </div>
            </div>
-           <div className="flex items-center gap-1 text-[10px] md:text-xs text-slate-500 font-medium bg-white/60 px-2 py-1 rounded-lg">
-             <Clock size={12} />
-             <span>بعد 14 يوم</span>
+           <div className="flex items-center gap-1 text-[10px] md:text-xs text-blue-100 font-medium bg-white/20 px-3 py-1.5 rounded-lg mt-0 md:mt-4 group-hover:bg-white group-hover:text-blue-600 transition-colors">
+              <PlayCircle size={14} />
+             <span>ابدأ الكويز</span>
            </div>
-        </div>
+        </button>
       </div>
 
       <div>
@@ -441,7 +602,6 @@ function DashboardView({ subjects, onSubjectClick }: { subjects: any[], onSubjec
                  <div className={`w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${sub.bg} ${sub.color} flex items-center justify-center shadow-sm`}>
                    <sub.icon size={18} className="md:w-6 md:h-6" />
                  </div>
-                 <span className="text-[10px] md:text-xs font-bold text-slate-500 bg-slate-100/80 px-1.5 py-0.5 md:px-2 md:py-1 rounded-md md:rounded-lg">{sub.units.length} وحدات</span>
               </div>
               <div>
                  <h4 className="font-bold text-sm md:text-lg text-slate-800 mb-2 md:mb-4 truncate">{sub.name}</h4>
@@ -710,13 +870,15 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                 rehypePlugins={[rehypeKatex]}
                 components={{
                   table: ({node, ...props}) => (
-                    <div className="overflow-x-auto w-full mb-6 relative">
-                      <table {...props} className="w-full text-right" />
+                    <div className="overflow-x-auto w-full mb-6 relative" dir="ltr">
+                      <table {...props} className="w-full text-center border-collapse border border-slate-300" />
                     </div>
-                  )
+                  ),
+                  th: ({node, ...props}) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
+                  td: ({node, ...props}) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
                 }}
               >
-                {data.exam}
+                {data.exam?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
               </ReactMarkdown>
             </div>
          ) : (
@@ -730,13 +892,15 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                   rehypePlugins={[rehypeKatex]}
                   components={{
                     table: ({node, ...props}) => (
-                      <div className="overflow-x-auto w-full mb-6 relative">
-                        <table {...props} className="w-full text-right" />
+                      <div className="overflow-x-auto w-full mb-6 relative" dir="ltr">
+                        <table {...props} className="w-full text-center border-collapse border border-slate-300" />
                       </div>
-                    )
+                    ),
+                    th: ({node, ...props}) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
+                    td: ({node, ...props}) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
                   }}
                  >
-                  {data.solution}
+                  {data.solution?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
                  </ReactMarkdown>
                </div>
             </div>

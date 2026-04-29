@@ -84,6 +84,116 @@ function StatCard({ title, value, trend, icon }: { title: string, value: string,
   )
 }
 
+function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lessons' | 'exercises', title: string }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [confirmDelete, setConfirmDelete] = useState<{id: string, name: string} | null>(null);
+
+  const fetchItems = async () => {
+    if (!supabase) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.from(type).select('*');
+      if (error) {
+        triggerAlert("خطأ في جلب البيانات: " + error.message, "error");
+      }
+      setItems(data || []);
+    } catch (e: any) {
+      triggerAlert("حدث خطأ غير متوقع: " + e.message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchItems();
+  }, [type]);
+
+  const executeDelete = async (id: string) => {
+    if (!supabase) {
+      triggerAlert("قاعدة البيانات غير متصلة", "error");
+      return;
+    }
+    
+    setConfirmDelete(null);
+    setDeletingId(id);
+    
+    try {
+      const { data, error } = await supabase.from(type).delete().eq('id', id).select();
+      if (error) throw error;
+      if (data && data.length === 0) {
+        throw new Error('لم يتم الحذف. غالباً بسبب سياسات الأمان (RLS) في قاعدة البيانات. يمكن حل هذا بتشغيل أمر SQL للسماح بالحذف.');
+      }
+      triggerAlert("تم الحذف بنجاح", "success");
+      fetchItems();
+    } catch (e: any) {
+      // Return a detailed string to be displayed
+      let detailedError = "خطأ في الحذف: " + e.message;
+      if (e.message?.includes('foreign key constraint') || e.code === '23503') {
+        detailedError = "لا يمكن حذف هذا العنصر لأنه مرتبط بعناصر أخرى (مثلاً: وحدة تحتوي على دروس، أو مادة تحتوي على وحدات). يرجى حذف العناصر المرتبطة أولاً.";
+      } else if (e.message?.includes('RLS')) {
+         detailedError = "صلاحيات قاعدة البيانات (RLS) تمنع الحذف. يجب تفعيل سياسة الحذف (DELETE policy) في Supabase للإدمن.";
+      }
+      triggerAlert(detailedError, "error");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="mt-10 pt-8 border-t border-slate-200 relative">
+      {confirmDelete && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm -m-6 rounded-[2rem]">
+            <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-xl text-center">
+               <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash size={32} />
+               </div>
+               <h3 className="font-bold text-lg mb-2 text-slate-800">تأكيد الحذف</h3>
+               <p className="text-slate-600 mb-6 text-sm">هل أنت متأكد من حذف '{confirmDelete.name}'؟ لا يمكن التراجع عن هذا الإجراء.</p>
+               <div className="flex gap-3">
+                 <button type="button" onClick={() => setConfirmDelete(null)} className="flex-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200">إلغاء</button>
+                 <button type="button" onClick={() => executeDelete(confirmDelete.id)} className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600">نعم، احذف</button>
+               </div>
+            </div>
+         </div>
+      )}
+      <h3 className="font-bold text-lg text-slate-800 mb-4">{title}</h3>
+      {loading ? (
+        <div className="flex justify-center p-8"><div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div></div>
+      ) : (
+        <div className="space-y-3">
+          {items.length === 0 ? (
+            <p className="text-center text-slate-500 py-8 font-bold text-sm">لا توجد عناصر حالياً</p>
+          ) : (
+            items.map(item => (
+              <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm">
+                <div>
+                  <h4 className="font-bold text-slate-800 text-sm md:text-base">{item.title || item.name}</h4>
+                  <p className="text-[10px] text-slate-400 mt-1">{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-DZ') : ''}</p>
+                </div>
+                <button 
+                  type="button"
+                  onClick={() => setConfirmDelete({id: item.id, name: item.title || item.name || 'العنصر'})} 
+                  disabled={deletingId === item.id}
+                  className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deletingId === item.id ? (
+                    <div className="w-4 h-4 border-2 border-red-200 border-t-red-500 rounded-full animate-spin"></div>
+                  ) : (
+                    <Trash size={16} />
+                  )}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminAddLesson({ onBack }: { onBack: () => void }) {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
@@ -985,40 +1095,33 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
         <div className="col-span-1 glass rounded-[2rem] p-6 hidden lg:block">
           <h3 className="font-bold text-lg text-slate-800 mb-6">إجراءات سريعة</h3>
           <div className="space-y-3">
-            <button onClick={() => setView('add_lesson')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-blue-50 border-transparent hover:border-blue-100 transition-all text-right group border">
-              <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform"><Plus size={16}/></div>
-                 <span className="font-bold text-sm text-slate-700 group-hover:text-blue-600 transition-colors">إضافة درس جديد</span>
-              </div>
-              <ChevronLeft size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
-            </button>
-            <button onClick={() => setView('add_exercise')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-emerald-50 border-transparent hover:border-emerald-100 transition-all text-right group border">
-              <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform"><PenTool size={16}/></div>
-                 <span className="font-bold text-sm text-slate-700 group-hover:text-emerald-600 transition-colors">إضافة تمرين جديد</span>
-              </div>
-              <ChevronLeft size={16} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
-            </button>
-             <button onClick={() => setView('manage_subjects')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-indigo-50 border-transparent hover:border-indigo-100 transition-all text-right group border">
+            <button onClick={() => setView('manage_subjects')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-indigo-50 border-transparent hover:border-indigo-100 transition-all text-right group border">
               <div className="flex items-center gap-3">
                  <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform"><BookOpen size={16}/></div>
-                 <span className="font-bold text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">إضافة مادة جديدة</span>
+                 <span className="font-bold text-sm text-slate-700 group-hover:text-indigo-600 transition-colors">إدارة المواد</span>
               </div>
               <ChevronLeft size={16} className="text-slate-400 group-hover:text-indigo-500 transition-colors" />
             </button>
             <button onClick={() => setView('manage_units')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-purple-50 border-transparent hover:border-purple-100 transition-all text-right group border">
               <div className="flex items-center gap-3">
                  <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform"><Target size={16}/></div>
-                 <span className="font-bold text-sm text-slate-700 group-hover:text-purple-600 transition-colors">إضافة وحدة جديدة</span>
+                 <span className="font-bold text-sm text-slate-700 group-hover:text-purple-600 transition-colors">إدارة الوحدات</span>
               </div>
               <ChevronLeft size={16} className="text-slate-400 group-hover:text-purple-500 transition-colors" />
             </button>
-             <button onClick={() => setView('manage_content')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-slate-100 border-transparent hover:border-slate-300 transition-all text-right group border">
+            <button onClick={() => setView('add_lesson')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-blue-50 border-transparent hover:border-blue-100 transition-all text-right group border">
               <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center group-hover:scale-110 transition-transform"><Trash size={16}/></div>
-                 <span className="font-bold text-sm text-slate-700 group-hover:text-slate-900 transition-colors">إدارة المحتوى (حذف)</span>
+                 <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform"><PlayCircle size={16}/></div>
+                 <span className="font-bold text-sm text-slate-700 group-hover:text-blue-600 transition-colors">إدارة الدروس</span>
               </div>
-              <ChevronLeft size={16} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+              <ChevronLeft size={16} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
+            </button>
+            <button onClick={() => setView('add_exercise')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-emerald-50 border-transparent hover:border-emerald-100 transition-all text-right group border">
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform"><PenTool size={16}/></div>
+                 <span className="font-bold text-sm text-slate-700 group-hover:text-emerald-600 transition-colors">إدارة التمارين</span>
+              </div>
+              <ChevronLeft size={16} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
             </button>
           </div>
         </div>
@@ -1027,49 +1130,10 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
   )
 }
 
+
+
 function AdminManageContent({ onBack }: { onBack: () => void }) {
   const [activeTab, setActiveTab] = useState<'subjects' | 'units' | 'lessons' | 'exercises'>('subjects');
-  const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  const fetchItems = async () => {
-    if (!supabase) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from(activeTab).select('*');
-      if (error) {
-        console.error("Supabase error:", error);
-        triggerAlert("Error: " + error.message, "error");
-      }
-      setItems(data || []);
-    } catch (e) {
-      console.error("Exception fetching", e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchItems();
-  }, [activeTab]);
-
-  const handleDelete = async (id: string) => {
-    if (!supabase) return;
-    if (!window.confirm("هل أنت متأكد من الحذف؟ سيتم حذف جميع العناصر المرتبطة به أيضاً.")) return;
-    
-    try {
-      // In Supabase, if RLS blocks delete, it returns no error but doesn't delete. We can request representation to verify.
-      const { data, error } = await supabase.from(activeTab).delete().eq('id', id).select();
-      if (error) throw error;
-      if (data && data.length === 0) {
-        throw new Error('لم يتم الحذف. غالباً بسبب سياسات الأمان (RLS) في قاعدة البيانات. يرجى تفعيل الحذف بتنفيذ الكود التالي في Supabase SQL: \nCREATE POLICY "Allow delete" ON ' + activeTab + ' FOR DELETE USING (true);');
-      }
-      triggerAlert("تم الحذف بنجاح", "success");
-      fetchItems();
-    } catch (e: any) {
-      triggerAlert("خطأ في الحذف: " + e.message, "error");
-    }
-  };
 
   return (
     <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
@@ -1077,12 +1141,12 @@ function AdminManageContent({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
           <ChevronRight size={20} />
         </button>
-        <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
-           <Trash size={24} />
+        <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
+           <BookOpen size={24} />
         </div>
         <div>
           <h2 className="font-bold text-xl text-slate-800">إدارة المحتوى</h2>
-          <p className="text-xs text-slate-500 font-bold mt-1">عرض وحذف المواد، الوحدات، الدروس والتمارين</p>
+          <p className="text-xs text-slate-500 font-bold mt-1">عرض وحذف المحتوى الحالي</p>
         </div>
       </div>
 
@@ -1103,27 +1167,11 @@ function AdminManageContent({ onBack }: { onBack: () => void }) {
         ))}
       </div>
 
-      {loading ? (
-        <div className="flex justify-center p-8"><div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div></div>
-      ) : (
-        <div className="space-y-3">
-          {items.length === 0 ? (
-            <p className="text-center text-slate-500 py-8 font-bold text-sm">لا توجد عناصر حالياً</p>
-          ) : (
-            items.map(item => (
-              <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm">
-                <div>
-                  <h4 className="font-bold text-slate-800 text-sm md:text-base">{item.title || item.name}</h4>
-                  <p className="text-[10px] text-slate-400 mt-1">{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-DZ') : ''}</p>
-                </div>
-                <button onClick={() => handleDelete(item.id)} className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm">
-                  <Trash size={16} />
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+      {activeTab === 'subjects' && <AdminEntityList type="subjects" title="المواد الدراسية" />}
+      {activeTab === 'units' && <AdminEntityList type="units" title="الوحدات" />}
+      {activeTab === 'lessons' && <AdminEntityList type="lessons" title="الدروس" />}
+      {activeTab === 'exercises' && <AdminEntityList type="exercises" title="التمارين" />}
+
     </div>
   );
 }
@@ -1178,34 +1226,34 @@ export function AdminLayout() {
                <BookOpen size={18} /> لوحة الإحصائيات
             </button>
             <button 
+              onClick={() => { setView('manage_content'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_content' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+            >
+               <BookOpen size={18} /> عرض ومسح المحتوى
+            </button>
+            <button 
               onClick={() => { setView('manage_subjects'); closeSidebar(); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_subjects' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <BookOpen size={18} /> إضافة مادة
+               <BookOpen size={18} /> إدارة المواد
             </button>
             <button 
               onClick={() => { setView('manage_units'); closeSidebar(); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_units' ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <Target size={18} /> إضافة وحدة
+               <Target size={18} /> إدارة الوحدات
             </button>
             <button 
               onClick={() => { setView('add_lesson'); closeSidebar(); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_lesson' ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <PlayCircle size={18} /> إضافة درس
+               <PlayCircle size={18} /> إدارة الدروس
             </button>
             <button 
               onClick={() => { setView('add_exercise'); closeSidebar(); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_exercise' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <PenTool size={18} /> إضافة تمرين (ذكاء اصطناعي)
-            </button>
-            <button 
-              onClick={() => { setView('manage_content'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_content' ? 'bg-red-50 text-red-600 shadow-sm' : 'text-slate-600 hover:bg-white/60'}`}
-            >
-               <Trash size={18} /> إدارة المحتوى (حذف)
+               <PenTool size={18} /> إدارة التمارين
             </button>
           </nav>
           
@@ -1260,11 +1308,11 @@ export function AdminLayout() {
         ) : (
           <div className="animate-in fade-in duration-300 slide-in-from-bottom-4">
              {view === 'dashboard' && <AdminDashboard setView={setView} />}
+             {view === 'manage_content' && <AdminManageContent onBack={() => setView('dashboard')} />}
              {view === 'add_lesson' && <AdminAddLesson onBack={() => setView('dashboard')} />}
              {view === 'add_exercise' && <AdminAddExercise onBack={() => setView('dashboard')} />}
              {view === 'manage_subjects' && <AdminAddSubject onBack={() => setView('dashboard')} />}
              {view === 'manage_units' && <AdminAddUnit onBack={() => setView('dashboard')} />}
-             {view === 'manage_content' && <AdminManageContent onBack={() => setView('dashboard')} />}
              {view === 'settings' && <AdminSettings onBack={() => setView('dashboard')} />}
           </div>
         )}
