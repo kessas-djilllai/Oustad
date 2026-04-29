@@ -75,14 +75,30 @@ VALUES
   ('s_e1', 's_u1', 'تمرين الاستنساخ', 1),
   ('s_e2', 's_u1', 'تمرين الترجمة', 2);
 
+-- 6. Admin Settings Table
+CREATE TABLE admin_settings (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  api_key TEXT,
+  ai_model TEXT
+);
+
 -- Set up Row Level Security (RLS) if you add users later. 
 -- For now, allow read access to everyone:
 ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE units ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lessons ENABLE ROW LEVEL SECURITY;
 ALTER TABLE exercises ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_settings ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow public read access to subjects" ON subjects FOR SELECT USING (true);
 CREATE POLICY "Allow public read access to units" ON units FOR SELECT USING (true);
 CREATE POLICY "Allow public read access to lessons" ON lessons FOR SELECT USING (true);
 CREATE POLICY "Allow public read access to exercises" ON exercises FOR SELECT USING (true);
+CREATE POLICY "Allow public read access to admin_settings" ON admin_settings FOR SELECT USING (true);
+
+CREATE POLICY "Allow public insert to subjects" ON subjects FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public insert to units" ON units FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public insert to lessons" ON lessons FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public insert to exercises" ON exercises FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public insert/update to admin_settings" ON admin_settings FOR ALL USING (true);
+

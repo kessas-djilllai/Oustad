@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { GoogleGenAI, Type } from "@google/genai";
 import { 
   BookOpen, 
   Target, 
@@ -15,7 +16,11 @@ import {
   Lock,
   Eye,
   EyeOff,
-  UserCircle
+  UserCircle,
+  Menu,
+  X,
+  Wand2,
+  Cpu
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -174,6 +179,8 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchSubjects() {
@@ -196,6 +203,72 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
     fetchUnits();
   }, [selectedSubjectId]);
 
+  const generateWithAI = async () => {
+    const apiKey = localStorage.getItem('admin_api_key');
+    const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-3-flash-preview';
+    if (!apiKey) {
+      alert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات أولاً.");
+      return;
+    }
+    if (!selectedSubjectId || !selectedUnitId || !title) {
+       alert("الرجاء اختيار المادة والوحدة وكتابة عنوان التمرين أولاً.");
+       return;
+    }
+    
+    setIsGenerating(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || '';
+      const unitName = units.find(u => u.id === selectedUnitId)?.name || '';
+      
+      const prompt = `أنت معلم خبير في التعليم الثانوي. قم بإنشاء تمرين تفاعلي يتكون من 5 أسئلة اختيار من متعدد (QCM) حول مادة "${subjectName}" وتحديداً وحدة "${unitName}". 
+واستهدف هذا العنوان: "${title}".
+يجب أن يحتوي كل سؤال على 3 أو 4 خيارات، مع تحديد الخيار الصحيح.
+قم بإرجاع النتيجة بصيغة JSON معتمدة حسب المخطط التالي.`;
+
+      const response = await ai.models.generateContent({
+        model: aiModel,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.INTEGER },
+                text: { type: Type.STRING, description: "نص السؤال" },
+                options: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING, description: "مثل a, b, c, d" },
+                      text: { type: Type.STRING, description: "نص الخيار" },
+                      label: { type: Type.STRING, description: "أ, ب, ج, د" },
+                      isCorrect: { type: Type.BOOLEAN, description: "هل هذا الخيار هو الصحيح" }
+                    },
+                    required: ["id", "text", "label", "isCorrect"]
+                  }
+                }
+              },
+              required: ["id", "text", "options"]
+            }
+          }
+        }
+      });
+      
+      const jsonStr = response.text.trim();
+      const parsedQuestions = JSON.parse(jsonStr);
+      setGeneratedQuestions(parsedQuestions);
+      alert("تم توليد الأسئلة بنجاح!");
+    } catch (err: any) {
+      alert("حدث خطأ أثناء التوليد: " + err.message);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !selectedUnitId || !title) {
@@ -205,11 +278,15 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
     setIsSubmitting(true);
     try {
       const exercise_id = 'e_' + Math.random().toString(36).substr(2, 9);
+      // We store the generated questions in the 'content' column as JSON string
+      const contentStr = generatedQuestions.length > 0 ? JSON.stringify(generatedQuestions) : null;
+      
       const { error } = await supabase.from('exercises').insert([{
         id: exercise_id,
         unit_id: selectedUnitId,
         title: title,
-        exercise_order: 99
+        exercise_order: 99,
+        content: contentStr
       }]);
       if (!error) {
         alert('تمت إضافة التمرين بنجاح!');
@@ -279,17 +356,40 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
           />
         </div>
 
-        <button 
-          type="submit" 
-          disabled={isSubmitting}
-          className="w-full bg-emerald-600 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70"
-        >
-          {isSubmitting ? (
-            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
-          ) : (
-            <>حفظ التمرين <Save size={18} /></>
-          )}
-        </button>
+        <div className="flex gap-4">
+          <button 
+            type="button" 
+            onClick={generateWithAI}
+            disabled={isGenerating || !selectedSubjectId || !selectedUnitId || !title}
+            className="w-full bg-blue-50 text-blue-600 font-bold rounded-xl py-3.5 mt-6 hover:bg-blue-100 transition-all flex items-center justify-center gap-2 border border-blue-200 disabled:opacity-50"
+          >
+            {isGenerating ? (
+               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-blue-600/30 border-t-blue-600 rounded-full" />
+            ) : (
+               <>توليد الأسئلة بالذكاء الاصطناعي <Wand2 size={18} /></>
+            )}
+          </button>
+          <button 
+            type="submit" 
+            disabled={isSubmitting}
+            className="w-full bg-emerald-600 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-emerald-500/30 disabled:opacity-70"
+          >
+            {isSubmitting ? (
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
+            ) : (
+              <>حفظ التمرين <Save size={18} /></>
+            )}
+          </button>
+        </div>
+
+        {generatedQuestions.length > 0 && (
+          <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+            <h3 className="font-bold text-slate-700 mb-3 text-sm flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span> الأسئلة المُولّدة جاهزة
+            </h3>
+            <p className="text-xs text-slate-500">تم تجهيز {generatedQuestions.length} أسئلة بنجاح. سيتم إرفاقها بالتمرين عند الحفظ.</p>
+          </div>
+        )}
       </form>
     </div>
   )
@@ -468,8 +568,123 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
   )
 }
 
-function AdminDashboard({ loading }: { loading: boolean }) {
-  const [view, setView] = useState<'dashboard' | 'add_lesson' | 'add_exercise' | 'manage_subjects' | 'manage_units'>('dashboard');
+function AdminSettings({ onBack }: { onBack: () => void }) {
+  const [apiKey, setApiKey] = useState('');
+  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Available models based on Gemini AI spec
+  const AVAILABLE_MODELS = [
+    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (سريع، مجاني)', recommended: true },
+    { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro (احترافي، دقيق)' },
+    { id: 'gemini-3.1-flash-lite-preview', name: 'Gemini Flash Lite (خفيف جداً)' }
+  ];
+
+  useEffect(() => {
+    // Load from DB or local storage
+    async function loadSettings() {
+      const savedKey = localStorage.getItem('admin_api_key') || '';
+      const savedModel = localStorage.getItem('admin_ai_model') || 'gemini-3-flash-preview';
+      setApiKey(savedKey);
+      setSelectedModel(savedModel);
+
+      // Optionally try DB
+      if (supabase) {
+        try {
+          const { data } = await supabase.from('admin_settings').select('*').limit(1).single();
+          if (data && data.api_key) {
+            setApiKey(data.api_key);
+            setSelectedModel(data.ai_model || 'gemini-3-flash-preview');
+          }
+        } catch (e) {
+          // ignore DB error
+        }
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      localStorage.setItem('admin_api_key', apiKey);
+      localStorage.setItem('admin_ai_model', selectedModel);
+      
+      if (supabase) {
+        await supabase.from('admin_settings').upsert({ id: 1, api_key: apiKey, ai_model: selectedModel });
+      }
+      alert("تم حفظ الإعدادات بنجاح!");
+      onBack();
+    } catch (err: any) {
+      alert("حدث خطأ أثناء الحفظ في قاعدة البيانات: " + err.message + "\nتم الحفظ محلياً.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="glass rounded-[2rem] p-6 max-w-2xl mx-auto">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
+          <ChevronRight size={20} />
+        </button>
+        <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center shadow-sm">
+           <Cpu size={24} />
+        </div>
+        <div>
+          <h2 className="font-bold text-xl text-slate-800">إعدادات الذكاء الاصطناعي</h2>
+          <p className="text-xs text-slate-500 font-medium">قم بربط مفتاح Gemini API وتحديد النموذج المستخدم.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-6">
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">مفتاح API الخاص بـ Gemini</label>
+          <input 
+            type="password" 
+            value={apiKey} 
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="AIzaSy..."
+            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500/50 font-mono text-left transition-all"
+            dir="ltr"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">نموذج التوليد المستخدم (Model)</label>
+          <select 
+            value={selectedModel} 
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500/50 transition-all"
+            required
+          >
+            {AVAILABLE_MODELS.map(m => (
+              <option key={m.id} value={m.id}>
+                {m.name} {m.recommended && '(يوصى به)'}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={isSaving}
+          className="w-full bg-slate-800 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-slate-900 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70"
+        >
+          {isSaving ? (
+            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
+          ) : (
+            <>حفظ الإعدادات <Save size={18} /></>
+          )}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function AdminDashboard({ setView }: { setView: (v: string) => void }) {
   const [stats, setStats] = useState({ subjects: 0, units: 0, lessons: 0, exercises: 0 });
   const [dbLoading, setDbLoading] = useState(false);
 
@@ -500,7 +715,7 @@ function AdminDashboard({ loading }: { loading: boolean }) {
     fetchStats();
   }, []);
 
-  if (loading || dbLoading) {
+  if (dbLoading) {
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -559,8 +774,7 @@ function AdminDashboard({ loading }: { loading: boolean }) {
 
   return (
     <div className="space-y-6">
-      {/* Admin Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="إجمالي المواد" value={stats.subjects.toString() || "3"} trend="+1" icon={<BookOpen size={20} className="text-blue-500"/>} />
         <StatCard title="إجمالي الوحدات" value={stats.units.toString() || "12"} trend="+2" icon={<Target size={20} className="text-indigo-500"/>} />
         <StatCard title="الدروس المضافة" value={stats.lessons.toString() || "48"} trend="+5" icon={<PlayCircle size={20} className="text-emerald-500"/>} />
@@ -568,8 +782,8 @@ function AdminDashboard({ loading }: { loading: boolean }) {
       </div>
 
       {/* Main Admin Area */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="col-span-1 md:col-span-2 glass rounded-[2rem] p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="col-span-1 lg:col-span-2 glass rounded-[2rem] p-6">
            <div className="flex justify-between items-center mb-6">
             <h3 className="font-bold text-lg text-slate-800">نشاط المحتوى الأخير</h3>
             <button className="text-sm text-blue-600 font-bold hover:underline">تحديث</button>
@@ -608,7 +822,7 @@ function AdminDashboard({ loading }: { loading: boolean }) {
           </div>
         </div>
 
-        <div className="col-span-1 glass rounded-[2rem] p-6">
+        <div className="col-span-1 glass rounded-[2rem] p-6 hidden lg:block">
           <h3 className="font-bold text-lg text-slate-800 mb-6">إجراءات سريعة</h3>
           <div className="space-y-3">
             <button onClick={() => setView('add_lesson')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-blue-50 border-transparent hover:border-blue-100 transition-all text-right group border">
@@ -648,42 +862,131 @@ function AdminDashboard({ loading }: { loading: boolean }) {
 
 export function AdminLayout() {
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [view, setView] = useState('dashboard');
   const navigate = useNavigate();
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1500);
+    const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
   }, []);
 
+  const closeSidebar = () => setIsSidebarOpen(false);
+
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 md:pb-6 relative flex justify-center">
-      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10">
-        
-        <header className="flex justify-between items-center mb-8 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-slate-50 relative flex md:flex-row flex-col">
+      {/* Mobile Header (Sidebar Toggle + Title) */}
+      <div className="md:hidden flex justify-between items-center p-4 bg-white border-b border-slate-100 z-40 sticky top-0">
+        <button onClick={() => setIsSidebarOpen(true)} className="w-10 h-10 flex items-center justify-center text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200">
+           <Menu size={20} />
+        </button>
+        <h1 className="font-bold text-lg text-slate-800">الإدارة المركزية</h1>
+        <button onClick={() => navigate('/admin/login')} className="w-10 h-10 flex items-center justify-center text-red-500 bg-red-50 rounded-xl">
+           <LogOut size={16} />
+        </button>
+      </div>
+
+      {/* Sidebar Menu */}
+      <div className={`fixed inset-y-0 right-0 w-64 bg-white border-l border-slate-200 z-50 transform transition-transform duration-300 md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="h-full flex flex-col pt-6 pb-6 px-4">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="font-bold text-xl text-slate-800">أدوات الإدارة</h2>
+            <button onClick={closeSidebar} className="md:hidden p-2 text-slate-400 hover:text-slate-600 bg-slate-50 rounded-lg">
+               <X size={20} />
+            </button>
+          </div>
+          
+          <nav className="flex-1 space-y-2">
+            <button 
+              onClick={() => { setView('dashboard'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'dashboard' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+               <BookOpen size={18} /> لوحة الإحصائيات
+            </button>
+            <button 
+              onClick={() => { setView('manage_subjects'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_subjects' ? 'bg-indigo-100 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+               <BookOpen size={18} /> إضافة مادة
+            </button>
+            <button 
+              onClick={() => { setView('manage_units'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_units' ? 'bg-purple-100 text-purple-700' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+               <Target size={18} /> إضافة وحدة
+            </button>
+            <button 
+              onClick={() => { setView('add_lesson'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_lesson' ? 'bg-blue-100 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+               <PlayCircle size={18} /> إضافة درس
+            </button>
+            <button 
+              onClick={() => { setView('add_exercise'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_exercise' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'}`}
+            >
+               <PenTool size={18} /> إضافة تمرين متقدم ذكاء اصطناعي
+            </button>
+          </nav>
+          
+          <div className="pt-4 border-t border-slate-100 space-y-2 mt-auto">
+             <button 
+              onClick={() => { setView('settings'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'settings' ? 'bg-slate-100 text-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}
+            >
+               <Cpu size={18} /> إعدادات الذكاء الاصطناعي
+            </button>
             <button 
               onClick={() => navigate('/')}
-              className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-all"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm text-slate-500 hover:bg-slate-50"
             >
-              <ChevronLeft size={20} />
+               <ChevronRight size={18} /> عرض الواجهة
             </button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div onClick={closeSidebar} className="backdrop-blur-sm bg-black/20 fixed inset-0 z-40 md:hidden animate-in fade-in transition-opacity" />
+      )}
+
+      {/* Main Content */}
+      <div className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10">
+        
+        <header className="hidden md:flex justify-between items-center mb-8 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100">
+          <div className="flex items-center gap-4">
+             <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">A</div>
             <div>
               <h1 className="font-bold text-lg md:text-xl text-slate-800">لوحة التحكم الإدارية</h1>
-              <p className="text-xs text-slate-500 font-medium">نظام الإدارة المركزي</p>
+              <p className="text-xs text-slate-500 font-medium">إدارة المحتوى بكل سهولة</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <button className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-all group">
-              <Settings size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+            <button onClick={() => setView('settings')} className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition-all">
+              <Settings size={20} />
             </button>
             <button onClick={() => navigate('/admin/login')} className="w-auto px-4 h-10 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-all gap-2 font-bold text-xs">
               <LogOut size={16} />
-              <span className="hidden md:inline">تسجيل الخروج</span>
+              <span className="hidden lg:inline">تسجيل الخروج</span>
             </button>
           </div>
         </header>
 
-        <AdminDashboard loading={loading} />
+        {loading ? (
+             <div className="animate-in fade-in duration-500 grid gap-6">
+                <div className="h-64 rounded-[2rem] bg-slate-200 animate-pulse w-full"></div>
+             </div>
+        ) : (
+          <div className="animate-in fade-in duration-300 slide-in-from-bottom-4">
+             {view === 'dashboard' && <AdminDashboard setView={setView} />}
+             {view === 'add_lesson' && <AdminAddLesson onBack={() => setView('dashboard')} />}
+             {view === 'add_exercise' && <AdminAddExercise onBack={() => setView('dashboard')} />}
+             {view === 'manage_subjects' && <AdminAddSubject onBack={() => setView('dashboard')} />}
+             {view === 'manage_units' && <AdminAddUnit onBack={() => setView('dashboard')} />}
+             {view === 'settings' && <AdminSettings onBack={() => setView('dashboard')} />}
+          </div>
+        )}
 
       </div>
     </div>

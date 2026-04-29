@@ -542,28 +542,90 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
-  // Mock questions based on the screenshot
-  const questions = [
-    {
-      id: 1,
-      text: "في سياق تطور العالم الثالث بعد الحرب العالمية الثانية، أي من الأحداث التالية يُعتبر التطبيق العملي الأول لمبادئ التضامن الأفرو-آسيوي التي مهدت لظهور حركة عدم الانحياز؟",
-      options: [
-        { id: 'a', text: "تأسيس منظمة الأمم المتحدة عام 1945.", label: "أ" },
-        { id: 'b', text: "انعقاد مؤتمر باندونغ بإندونيسيا عام 1955.", label: "ب" },
-        { id: 'c', text: "الإعلان عن مشروع مارشال الاقتصادي عام 1947.", label: "ج" },
-      ]
-    },
-    {
-      id: 2,
-      text: "ما هو الهدف الرئيسي من تأسيس حركة عدم الانحياز؟",
-      options: [
-        { id: 'a', text: "التحالف مع المعسكر الشرقي.", label: "أ" },
-        { id: 'b', text: "الاستقلال والابتعاد عن صراعات الحرب الباردة.", label: "ب" },
-        { id: 'c', text: "بناء قوة عسكرية موحدة أفريقية أسيوية.", label: "ج" },
-      ]
+  const getQuestions = () => {
+    if (exercise?.content) {
+      try {
+        const parsed = JSON.parse(exercise.content);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+           return parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse exercise content", e);
+      }
     }
-  ];
+    
+    const getMockQuestions = (subjectName: string) => {
+      if (subjectName?.includes('تاريخ') || subjectName?.includes('جغرافيا')) {
+        return [
+          {
+            id: 1,
+            text: "في سياق تطور العالم الثالث بعد الحرب العالمية الثانية، أي من الأحداث التالية يُعتبر التطبيق العملي الأول لمبادئ التضامن الأفرو-آسيوي التي مهدت لظهور حركة عدم الانحياز؟",
+            options: [
+              { id: 'a', text: "تأسيس منظمة الأمم المتحدة عام 1945.", label: "أ" },
+              { id: 'b', text: "انعقاد مؤتمر باندونغ بإندونيسيا عام 1955.", label: "ب" },
+              { id: 'c', text: "الإعلان عن مشروع مارشال الاقتصادي عام 1947.", label: "ج" },
+            ]
+          },
+          {
+            id: 2,
+            text: "ما هو الهدف الرئيسي من تأسيس حركة عدم الانحياز؟",
+            options: [
+              { id: 'a', text: "التحالف مع المعسكر الشرقي.", label: "أ" },
+              { id: 'b', text: "الاستقلال والابتعاد عن صراعات الحرب الباردة.", label: "ب" },
+              { id: 'c', text: "بناء قوة عسكرية موحدة أفريقية أسيوية.", label: "ج" },
+            ]
+          }
+        ];
+      }
+      if (subjectName?.includes('رياضيات')) {
+        return [
+          {
+            id: 1,
+            text: "ما هي مشتقة الدالة الأسية f(x) = e^(2x) ؟",
+            options: [
+              { id: 'a', text: "f'(x) = 2e^(2x)", label: "أ" },
+              { id: 'b', text: "f'(x) = e^(2x)", label: "ب" },
+              { id: 'c', text: "f'(x) = 2xe^(2x)", label: "ج" },
+            ]
+          },
+          {
+            id: 2,
+            text: "النهاية الشهيرة للدالة (e^x - 1)/x لما يؤول x إلى الصفر هي:",
+            options: [
+              { id: 'a', text: "0", label: "أ" },
+              { id: 'b', text: "1", label: "ب" },
+              { id: 'c', text: "+∞", label: "ج" },
+            ]
+          }
+        ];
+      }
+      
+      // Default fallback questions
+      return [
+        {
+          id: 1,
+          text: `السؤال الأول للتمرين: ${exercise?.title || 'تمرين عام'}`,
+          options: [
+            { id: 'a', text: "الخيار الأول", label: "أ" },
+            { id: 'b', text: "الخيار الثاني", label: "ب" },
+            { id: 'c', text: "الخيار الثالث", label: "ج" },
+          ]
+        },
+        {
+          id: 2,
+          text: "السؤال الثاني لاختبار الفهم:",
+          options: [
+            { id: 'a', text: "إجابة صحيحة", label: "أ" },
+            { id: 'b', text: "إجابة خاطئة", label: "ب" },
+            { id: 'c', text: "إجابة محتملة", label: "ج" },
+          ]
+        }
+      ];
+    };
+    return getMockQuestions(subject?.name || '');
+  };
 
+  const questions = getQuestions();
   const progress = ((currentQuestion + 1) / questions.length) * 100;
 
   const handleNext = () => {
