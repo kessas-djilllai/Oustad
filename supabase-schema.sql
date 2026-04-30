@@ -117,3 +117,21 @@ CREATE POLICY "Allow public update to lessons" ON lessons FOR UPDATE USING (true
 CREATE POLICY "Allow public update to exercises" ON exercises FOR UPDATE USING (true);
 CREATE POLICY "Allow public insert/update to admin_settings" ON admin_settings FOR ALL USING (true);
 
+
+
+-- 7. Create User Progress Table
+CREATE TABLE user_progress (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_id TEXT NOT NULL,
+  item_id TEXT NOT NULL,
+  item_type TEXT NOT NULL,
+  progress_value INTEGER DEFAULT 1,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(device_id, item_type, item_id)
+);
+
+ALTER TABLE user_progress ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public read access to user_progress" ON user_progress FOR SELECT USING (true);
+CREATE POLICY "Allow public insert to user_progress" ON user_progress FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow public update to user_progress" ON user_progress FOR UPDATE USING (true);
+CREATE POLICY "Allow public delete to user_progress" ON user_progress FOR DELETE USING (true);

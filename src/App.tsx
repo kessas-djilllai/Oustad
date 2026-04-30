@@ -4,13 +4,15 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { AdminLayout, AdminLogin } from "./pages/Admin";
-import { QuizView } from "./components/QuizView";
+import { AuthPage } from "./pages/Auth";
+import { loadUserProgress, getProgressSync, saveProgress, checkDailyLogin, getXP, getStreak, addXP } from "./lib/progress";
 import { GoogleGenAI, Type } from "@google/genai";
 import { getSubjectPrompt } from "./lib/prompts";
 import { preprocessMath } from "./lib/utils";
+import { QuizView } from "./components/QuizView";
 import { 
   BookOpen,
   Target, 
@@ -49,10 +51,38 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 
 export default function App() {
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase?.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase?.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
+    }) || { data: { subscription: { unsubscribe: () => {} } } };
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<StudentLayout />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/" element={session ? <StudentLayout session={session} /> : <Navigate to="/auth" replace />} />
         <Route path="/admin" element={<AdminLayout />} />
         <Route path="/admin/login" element={<AdminLogin />} />
       </Routes>
@@ -60,19 +90,38 @@ export default function App() {
   );
 }
 
+
 // ==========================================
 // 1. Student Portal
 // ==========================================
 
-function StudentLayout() {
+function StudentLayout({ session }: { session: any }) {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const [xp, setXP] = useState(0);
+  const [streak, setStreak] = useState(0);
+
+  const userName = session?.user?.user_metadata?.full_name || 'الطالب';
+
+  useEffect(() => {
+    const handleGamification = () => {
+      setXP(getXP());
+      setStreak(getStreak());
+    };
+    handleGamification(); // Initial load
+    window.addEventListener('progress_updated', handleGamification);
+    return () => window.removeEventListener('progress_updated', handleGamification);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleLogout = async () => {
+    await supabase?.auth.signOut();
+  };
 
   return (
     <div className="min-h-screen pb-20 md:pb-6 relative overflow-hidden flex justify-center">
@@ -84,22 +133,29 @@ function StudentLayout() {
         
         <header className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-              ب
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shrink-0">
+              {userName.substring(0, 1)}
             </div>
             <div>
-              <h1 className="font-bold text-xl leading-tight">بكالوريا برو</h1>
-              <p className="text-xs text-slate-500 font-medium">مرحباً، عبد الرحمن 👋</p>
+              <h1 className="font-bold text-xl leading-tight line-clamp-1">بكالوريا برو</h1>
+              <p className="text-xs text-slate-500 font-medium line-clamp-1">مرحباً، {userName} 👋</p>
             </div>
           </div>
           <div className="flex gap-2 relative">
-            <button className="w-10 h-10 rounded-2xl glass glass-hover flex items-center justify-center text-slate-600 transition-all">
+            <div className="flex items-center justify-center gap-1.5 h-10 glass rounded-2xl px-3 font-bold text-orange-500 shadow-sm border border-orange-100 bg-white/50">
+              <span className="text-sm leading-none mt-1" dir="ltr">{streak}</span>
+              <span className="leading-none">🔥</span>
+            </div>
+            <div className="flex items-center justify-center gap-1.5 h-10 glass rounded-2xl px-3 font-bold text-blue-500 shadow-sm border border-blue-100 bg-white/50">
+              <span className="text-sm leading-none mt-1" dir="ltr">{xp} XP</span>
+              <span className="leading-none">🏆</span>
+            </div>
+            <button className="w-10 h-10 hidden sm:flex rounded-2xl glass glass-hover justify-center items-center text-slate-600 transition-all shrink-0">
               <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
             </button>
             <button 
               onClick={() => setIsSidebarOpen(true)}
-              className="w-10 h-10 rounded-2xl glass glass-hover flex items-center justify-center text-slate-600 transition-all"
+              className="w-10 h-10 rounded-2xl glass glass-hover flex items-center justify-center text-slate-600 transition-all shrink-0"
             >
               <Menu size={20} />
             </button>
@@ -132,7 +188,7 @@ function StudentLayout() {
               <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                    ب
+                    {userName.substring(0, 1)}
                   </div>
                   <h2 className="font-bold text-lg text-slate-800">القائمة</h2>
                 </div>
@@ -154,7 +210,7 @@ function StudentLayout() {
                   <Target size={18} />
                   <span>لوحة التحكم (للتجريب)</span>
                 </div>
-                <div className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-red-500 hover:bg-red-50 cursor-pointer">
+                <div onClick={handleLogout} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-red-500 hover:bg-red-50 cursor-pointer">
                   <LogOut size={18} />
                   <span>تسجيل الخروج</span>
                 </div>
@@ -259,6 +315,8 @@ function StudentPortal({ loading }: { loading: boolean }) {
   useEffect(() => {
     // Example of how you would fetch from Supabase if keys are provided
     async function fetchData() {
+      await loadUserProgress();
+      await checkDailyLogin();
       if (!supabase) {
         // compute progress for SUBJECTS_DATA
         const computedSubjects = SUBJECTS_DATA.map((sub: any) => {
@@ -267,11 +325,11 @@ function StudentPortal({ loading }: { loading: boolean }) {
           sub.units?.forEach((u: any) => {
             u.lessons?.forEach((l: any) => {
               totalItems++;
-              if (localStorage.getItem('completed_lesson_' + l.id) === 'true') completedItems++;
+              if (getProgressSync('completed_lesson', l.id) === 1) completedItems++;
             });
             u.exercises?.forEach((e: any) => {
               totalItems++;
-              if (localStorage.getItem('completed_exercise_' + e.id) === 'true') completedItems++;
+              if (getProgressSync('completed_exercise', e.id) === 1) completedItems++;
             });
           });
           const p = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
@@ -322,11 +380,11 @@ function StudentPortal({ loading }: { loading: boolean }) {
             formattedUnits.forEach((u: any) => {
               u.lessons?.forEach((l: any) => {
                 totalItems++;
-                if (localStorage.getItem('completed_lesson_' + l.id) === 'true') completedItems++;
+                if (getProgressSync('completed_lesson', l.id) === 1) completedItems++;
               });
               u.exercises?.forEach((e: any) => {
                 totalItems++;
-                if (localStorage.getItem('completed_exercise_' + e.id) === 'true') completedItems++;
+                if (getProgressSync('completed_exercise', e.id) === 1) completedItems++;
               });
             });
 
@@ -491,7 +549,7 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
   }, [bacDate]);
 
   const totalQuizProgress = Math.round(subjects.reduce((sum, s) => {
-    return sum + parseInt(localStorage.getItem('quiz_progress_' + s.id) || '0', 10);
+    return sum + getProgressSync('quiz_progress', s.id);
   }, 0) / (subjects.length || 1));
 
   const radius = 22;
@@ -717,10 +775,10 @@ function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject:
           if (total > 0) {
             let completed = 0;
             unit.lessons?.forEach((l: any) => {
-              if (localStorage.getItem('completed_lesson_' + l.id) === 'true') completed++;
+              if (getProgressSync('completed_lesson', l.id) === 1) completed++;
             });
             unit.exercises?.forEach((e: any) => {
-              if (localStorage.getItem('completed_exercise_' + e.id) === 'true') completed++;
+              if (getProgressSync('completed_exercise', e.id) === 1) completed++;
             });
             progress = Math.round((completed / total) * 100);
           }
@@ -880,8 +938,10 @@ function ContentListView({ subject, unit, listType, onBack, onSelectItem }: { su
 function LessonDetailsView({ subject, unit, lesson, onBack }: { subject: any, unit: any, lesson: any, onBack: () => void }) {
   useEffect(() => {
     if (lesson?.id) {
-      localStorage.setItem('completed_lesson_' + lesson.id, 'true');
-      window.dispatchEvent(new Event('progress_updated'));
+      if (getProgressSync('completed_lesson', lesson.id) === 0) {
+        addXP(10);
+      }
+      saveProgress('completed_lesson', lesson.id, 1);
     }
   }, [lesson?.id]);
 
@@ -1037,8 +1097,10 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
              onClick={() => {
                setShowAnswers(!showAnswers);
                if (!showAnswers && exercise?.id) {
-                 localStorage.setItem('completed_exercise_' + exercise.id, 'true');
-                 window.dispatchEvent(new Event('progress_updated'));
+                 if (getProgressSync('completed_exercise', exercise.id) === 0) {
+                   addXP(15);
+                 }
+                 saveProgress('completed_exercise', exercise.id, 1);
                }
              }} 
              className="px-4 md:px-5 py-2 bg-emerald-100 text-emerald-700 font-bold rounded-xl hover:bg-emerald-200 transition text-sm shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"

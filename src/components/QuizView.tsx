@@ -10,6 +10,7 @@ import "katex/dist/katex.min.css";
 import { getQuizPrompt } from "../lib/promptQuiz";
 import { supabase } from "../lib/supabase";
 import { preprocessMath } from "../lib/utils";
+import { getProgressSync, saveProgress, addXP } from "../lib/progress";
 
 export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => void }) {
   const [step, setStep] = useState(0);
@@ -111,13 +112,14 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
 
   const handleFinish = () => {
     if (selectedSubject) {
-       const key = 'quiz_progress_' + selectedSubject.id;
-       let current = parseInt(localStorage.getItem(key) || '0', 10);
+       let current = getProgressSync('quiz_progress', selectedSubject.id);
        let additionalProgress = Math.round((score / questions.length) * 100);
        let newProgress = Math.min((current < additionalProgress ? additionalProgress : current), 100);
        
-       localStorage.setItem(key, newProgress.toString());
-       window.dispatchEvent(new Event('progress_updated'));
+       saveProgress('quiz_progress', selectedSubject.id, newProgress);
+    }
+    if (score > 0) {
+      addXP(score * 2);
     }
     onBack();
   };
