@@ -1,20 +1,12 @@
 import { supabase } from './supabase';
 
-export const getDeviceId = async () => {
-    // If logged in, preferred way:
-    if (supabase) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id) {
-          return session.user.id;
-      }
+export const getUserId = async () => {
+    if (!supabase) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user?.id) {
+        return session.user.id;
     }
-    
-    let id = localStorage.getItem('device_id');
-    if (!id) {
-        id = crypto.randomUUID();
-        localStorage.setItem('device_id', id);
-    }
-    return id;
+    return null;
 };
 
 // Simple global cache to avoid waiting on every re-render
@@ -23,12 +15,14 @@ let isProgressLoaded = false;
 
 export const loadUserProgress = async () => {
     if (!supabase) return;
-    const deviceId = await getDeviceId();
+    const userId = await getUserId();
+    if (!userId) return;
+
     try {
         const { data, error } = await supabase
             .from('user_progress')
             .select('*')
-            .eq('device_id', deviceId);
+            .eq('user_id', userId);
             
         if (!error && data) {
             progressCache = {};
@@ -43,22 +37,13 @@ export const loadUserProgress = async () => {
 };
 
 export const getProgressSync = (itemType: string, itemId: string): number => {
-    // If not loaded yet via DB, fallback to localStorage to prevent unmounting flickers
     if (isProgressLoaded) {
         return progressCache[`${itemType}_${itemId}`] || 0;
     }
-    
-    // Fallback for boolean-like ones ('true' -> 1)
-    const val = localStorage.getItem(`${itemType}_${itemId}`);
-    if (val === 'true') return 1;
-    if (val === 'false') return 0;
-    
-    return parseInt(val || '0', 10);
+    return 0;
 };
 
 export const saveProgress = async (itemType: string, itemId: string, progressValue: number = 1) => {
-    // Fallback sync to localStorage so UI works immediately / offline
-    localStorage.setItem(`${itemType}_${itemId}`, progressValue === 1 && itemType.startsWith('completed_') ? 'true' : progressValue.toString());
     progressCache[`${itemType}_${itemId}`] = progressValue;
     
     // Dispatch event so UI updates immediately
@@ -67,11 +52,13 @@ export const saveProgress = async (itemType: string, itemId: string, progressVal
     if (!supabase) return;
     
     try {
-        const deviceId = await getDeviceId();
+        const userId = await getUserId();
+        if (!userId) return;
+
         const { data } = await supabase
             .from('user_progress')
             .select('id')
-            .eq('device_id', deviceId)
+            .eq('user_id', userId)
             .eq('item_type', itemType)
             .eq('item_id', itemId)
             .maybeSingle();
@@ -85,7 +72,7 @@ export const saveProgress = async (itemType: string, itemId: string, progressVal
             await supabase
                 .from('user_progress')
                 .insert({
-                    device_id: deviceId,
+                    user_id: userId,
                     item_type: itemType,
                     item_id: itemId,
                     progress_value: progressValue

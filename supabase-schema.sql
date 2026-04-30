@@ -122,12 +122,12 @@ CREATE POLICY "Allow public insert/update to admin_settings" ON admin_settings F
 -- 7. Create User Progress Table
 CREATE TABLE user_progress (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
-  device_id TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   item_id TEXT NOT NULL,
   item_type TEXT NOT NULL,
   progress_value INTEGER DEFAULT 1,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(device_id, item_type, item_id)
+  UNIQUE(user_id, item_type, item_id)
 );
 
 ALTER TABLE user_progress ENABLE ROW LEVEL SECURITY;
