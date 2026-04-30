@@ -7,6 +7,7 @@ import "katex/dist/katex.min.css";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { AdminLayout, AdminLogin } from "./pages/Admin";
+import { QuizView } from "./components/QuizView";
 import { GoogleGenAI, Type } from "@google/genai";
 import { getSubjectPrompt } from "./lib/prompts";
 import { 
@@ -442,137 +443,6 @@ function StudentPortal({ loading }: { loading: boolean }) {
   );
 }
 
-function QuizView({ onBack, subjects }: { onBack: () => void, subjects: any[] }) {
-  const [step, setStep] = useState(0);
-  const [selectedSubject, setSelectedSubject] = useState<any>(null);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-
-  const mockQuestions = [
-    {
-       q: "ما هو الهدف الأساسي من المراجعة الدورية؟",
-       options: ["تضييع الوقت", "تثبيت المعلومات", "نسيان الدروس", "إرهاق العقل"],
-       correct: 1
-    },
-    {
-       q: "ما هي أفضل طريقة للتحضير للامتحان؟",
-       options: ["السهر طوال الليل", "دراسة كل شيء في يوم واحد", "التدريب على حل المواضيع السابقة", "تجاهل الدروس الصعبة"],
-       correct: 2
-    }
-  ];
-
-  const handleNext = () => {
-    if (step === 0 && selectedSubject) {
-      setStep(1);
-    } else if (step > 0 && step <= mockQuestions.length) {
-      // check answer here if needed
-      setStep(step + 1);
-      setSelectedAnswer(null);
-    }
-  };
-
-  const handleFinish = () => {
-    onBack();
-  };
-
-  return (
-    <div className="space-y-4 md:space-y-6 max-w-2xl mx-auto mt-4 md:mt-10">
-      <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-8">
-        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
-          <ChevronRight size={18} className="md:w-5 md:h-5" />
-        </button>
-        <div>
-          <h2 className="font-bold text-base md:text-xl text-slate-800">اختبار سريع (كويز)</h2>
-        </div>
-      </div>
-
-      <div className="glass rounded-[2rem] p-6 md:p-10 shadow-sm bg-white/60">
-        {step === 0 && (
-          <div className="text-center">
-            <div className="w-16 h-16 md:w-20 md:h-20 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
-               <Target size={32} className="md:w-10 md:h-10" />
-            </div>
-            <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-2">اختر مادة للاختبار</h3>
-            <p className="text-sm md:text-base text-slate-500 mb-8">اختر المادة التي تريد تقييم مستواك فيها لزيادة نسبة تقدمك.</p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-              {subjects.map(s => (
-                <button 
-                   key={s.id} 
-                   onClick={() => setSelectedSubject(s)}
-                   className={`p-4 md:p-5 rounded-2xl border text-sm md:text-base font-bold transition-all text-right flex items-center justify-between ${selectedSubject?.id === s.id ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white/70 text-slate-700 hover:bg-white hover:border-slate-300'}`}
-                >
-                  <span>{s.name}</span>
-                  {selectedSubject?.id === s.id && <CheckCircle size={18} className="text-blue-500" />}
-                </button>
-              ))}
-              {subjects.length === 0 && <div className="col-span-full text-center text-sm text-slate-400 py-4">لا توجد مواد مضافة بعد.</div>}
-            </div>
-
-            <button 
-              onClick={handleNext}
-              disabled={!selectedSubject}
-              className="w-full sm:w-1/2 mx-auto bg-blue-600 text-white font-bold rounded-xl py-3.5 md:py-4 hover:bg-blue-700 transition-all disabled:opacity-50 text-sm md:text-base shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
-            >
-              <span>ابدأ الاختبار الآن</span>
-              <ChevronLeft size={18} />
-            </button>
-          </div>
-        )}
-
-        {step > 0 && step <= mockQuestions.length && (
-          <div className="max-w-xl mx-auto">
-            <div className="flex justify-between items-center text-xs md:text-sm text-slate-400 font-bold mb-6 md:mb-8">
-               <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full">السؤال {step} من {mockQuestions.length}</span>
-               <span className="text-blue-500 font-bold flex items-center gap-1.5"><Target size={14} /> {selectedSubject?.name}</span>
-            </div>
-            <h3 className="text-lg md:text-2xl font-bold text-slate-800 mb-8 md:mb-10 leading-relaxed text-center">
-              {mockQuestions[step - 1].q}
-            </h3>
-            
-            <div className="space-y-3 md:space-y-4 mb-10">
-              {mockQuestions[step - 1].options.map((opt, idx) => (
-                <button 
-                   key={idx}
-                   onClick={() => setSelectedAnswer(idx)}
-                   className={`w-full p-4 md:p-5 rounded-2xl border text-sm md:text-base font-bold transition-all text-right ${selectedAnswer === idx ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 bg-white/70 text-slate-700 hover:bg-white hover:border-slate-300 hover:shadow-sm'}`}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-
-            <button 
-              onClick={handleNext}
-              disabled={selectedAnswer === null}
-              className="w-full bg-slate-800 text-white font-bold rounded-xl py-3.5 md:py-4 hover:bg-slate-900 transition-all disabled:opacity-50 text-sm md:text-base shadow-lg disabled:shadow-none"
-            >
-              السؤال التالي
-            </button>
-          </div>
-        )}
-
-        {step > mockQuestions.length && (
-          <div className="text-center pt-8 md:pt-12 pb-4">
-            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-20 h-20 md:w-24 md:h-24 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 md:mb-8 shadow-inner">
-               <CheckCircle size={40} className="md:w-12 md:h-12" />
-            </motion.div>
-            <h3 className="text-2xl md:text-3xl font-bold text-slate-800 mb-3 md:mb-4">أحسنت!</h3>
-            <p className="text-sm md:text-base text-slate-500 mb-8 font-medium leading-relaxed max-w-sm mx-auto">لقد أكملت الكويز بنجاح وتم تحديث نسبة التقدم في مادة <span className="font-bold text-slate-700">{selectedSubject?.name}</span>.</p>
-            
-            <button 
-              onClick={handleFinish}
-              className="w-full sm:w-1/2 mx-auto bg-emerald-500 text-white font-bold rounded-xl py-3.5 md:py-4 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30 text-sm md:text-base flex items-center justify-center gap-2"
-            >
-              <CheckCircle size={18} />
-              <span>العودة للرئيسية</span>
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: any[], onSubjectClick: (s: any, listType: 'lessons' | 'exercises') => void, onStartQuiz: () => void }) {
   const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>(() => {
     return (localStorage.getItem('dashboard_active_tab') as 'lessons' | 'exercises') || 'lessons';
@@ -581,6 +451,14 @@ function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: an
   useEffect(() => {
     localStorage.setItem('dashboard_active_tab', activeTab);
   }, [activeTab]);
+
+  const totalQuizProgress = Math.round(subjects.reduce((sum, s) => {
+    return sum + parseInt(localStorage.getItem('quiz_progress_' + s.id) || '0', 10);
+  }, 0) / (subjects.length || 1));
+
+  const radius = 22;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (totalQuizProgress / 100) * circumference;
 
   return (
     <div className="space-y-4 md:space-y-8">
@@ -609,11 +487,36 @@ function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: an
            className="col-span-1 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-row md:flex-col items-center md:items-start justify-between bg-gradient-to-br from-white to-blue-50/50 group text-right hover:shadow-lg transition-all"
         >
            <div className="flex items-center gap-3 md:gap-0 md:flex-col md:items-start">
-             <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 md:mb-4 shadow-sm">
-                <Target size={20} />
+             <div className="relative w-14 h-14 md:w-16 md:h-16 md:mb-4 flex items-center justify-center">
+                <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                  <circle
+                    className="text-indigo-100"
+                    strokeWidth="4"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r={radius}
+                    cx="50%"
+                    cy="50%"
+                  />
+                  <circle
+                    className="text-indigo-500 drop-shadow-sm transition-all duration-1000"
+                    strokeWidth="4"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                    r={radius}
+                    cx="50%"
+                    cy="50%"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-indigo-700 font-bold text-xs">
+                   {totalQuizProgress}%
+                </div>
               </div>
               <div>
-                <p className="text-[10px] md:text-xs font-bold text-indigo-500 mb-0.5 md:mb-1">اختبار سريع (كويز)</p>
+                <p className="text-[10px] md:text-xs font-bold text-indigo-500 mb-0.5 md:mb-1">اختبار سريع (الكويز)</p>
                 <h4 className="font-bold text-slate-800 text-sm md:text-lg leading-tight">تدرب الآن</h4>
               </div>
            </div>
