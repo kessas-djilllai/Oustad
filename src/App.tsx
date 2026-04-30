@@ -34,7 +34,7 @@ import {
   Globe,
   FileText,
   PlayCircle,
-  PenTool,
+  ClipboardList,
   Unlock,
   Plus,
   Save,
@@ -244,7 +244,6 @@ function StudentPortal({ loading }: { loading: boolean }) {
   
   const [dbLoading, setDbLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [showQuizModal, setShowQuizModal] = useState(false);
 
   useEffect(() => {
     const handleProgressUpdate = () => {
@@ -257,7 +256,29 @@ function StudentPortal({ loading }: { loading: boolean }) {
   useEffect(() => {
     // Example of how you would fetch from Supabase if keys are provided
     async function fetchData() {
-      if (!supabase) return; // Fallback to SUBJECTS_DATA if not configured
+      if (!supabase) {
+        // compute progress for SUBJECTS_DATA
+        const computedSubjects = SUBJECTS_DATA.map((sub: any) => {
+          let totalItems = 0;
+          let completedItems = 0;
+          sub.units?.forEach((u: any) => {
+            u.lessons?.forEach((l: any) => {
+              totalItems++;
+              if (localStorage.getItem('completed_lesson_' + l.id) === 'true') completedItems++;
+            });
+            u.exercises?.forEach((e: any) => {
+              totalItems++;
+              if (localStorage.getItem('completed_exercise_' + e.id) === 'true') completedItems++;
+            });
+          });
+          const p = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+          return { ...sub, progress: p };
+        });
+        if (JSON.stringify(computedSubjects) !== JSON.stringify(subjects)) {
+            setSubjects(computedSubjects);
+        }
+        return;
+      }
       
       try {
         if (subjects === SUBJECTS_DATA) {
@@ -281,20 +302,34 @@ function StudentPortal({ loading }: { loading: boolean }) {
         if (subjectsData.length > 0) {
           // Format the data to match our UI state format
           const formattedSubjects = subjectsData.map((sub: any) => {
-            const subUnits = unitsData.filter(u => u.subject_id === sub.id).sort((a: any, b: any) => a.unit_order - b.unit_order);
-            const storedProgress = localStorage.getItem('progress_' + sub.id);
-            const p = storedProgress ? parseInt(storedProgress, 10) : (sub.progress || 0);
+            const subUnits = unitsData.filter((u: any) => u.subject_id === sub.id).sort((a: any, b: any) => a.unit_order - b.unit_order);
+            const formattedUnits = subUnits.map((u: any) => ({
+                ...u,
+                lessons: lessonsData.filter((l: any) => l.unit_id === u.id).sort((a: any, b: any) => a.lesson_order - b.lesson_order),
+                exercises: exercisesData.filter((e: any) => e.unit_id === u.id).sort((a: any, b: any) => a.exercise_order - b.exercise_order),
+            }));
+
+            let totalItems = 0;
+            let completedItems = 0;
+            formattedUnits.forEach((u: any) => {
+              u.lessons?.forEach((l: any) => {
+                totalItems++;
+                if (localStorage.getItem('completed_lesson_' + l.id) === 'true') completedItems++;
+              });
+              u.exercises?.forEach((e: any) => {
+                totalItems++;
+                if (localStorage.getItem('completed_exercise_' + e.id) === 'true') completedItems++;
+              });
+            });
+
+            const p = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
             
             return {
               ...sub,
               barColor: sub.bar_color || 'bg-blue-500',
               progress: p,
               icon: Calculator, // In a real app, map icon_name to actual Lucide component
-              units: subUnits.map((u: any) => ({
-                ...u,
-                lessons: lessonsData.filter(l => l.unit_id === u.id).sort((a: any, b: any) => a.lesson_order - b.lesson_order),
-                exercises: exercisesData.filter(e => e.unit_id === u.id).sort((a: any, b: any) => a.exercise_order - b.exercise_order),
-              }))
+              units: formattedUnits
             };
           });
           setSubjects(formattedSubjects);
@@ -389,7 +424,7 @@ function StudentPortal({ loading }: { loading: boolean }) {
            exit={{ opacity: 0, x: 10 }}
            transition={{ duration: 0.2 }}
         >
-          {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s, type) => setView({ type: 'subject_units', subject: s, listType: type })} onStartQuiz={() => setShowQuizModal(true)} />}
+          {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s, type) => setView({ type: 'subject_units', subject: s, listType: type })} onStartQuiz={() => setView({ type: 'quiz' })} />}
           {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
           {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
             if (view.listType === 'exercises') {
@@ -400,14 +435,14 @@ function StudentPortal({ loading }: { loading: boolean }) {
           }} />}
           {view.type === 'view_lesson' && <LessonDetailsView subject={currentSubject} unit={currentUnit} lesson={view.lesson} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'lessons' })} />}
           {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'exercises' })} />}
+          {view.type === 'quiz' && <QuizView subjects={subjects} onBack={() => setView({ type: 'dashboard' })} />}
         </motion.div>
       </AnimatePresence>
-      {showQuizModal && <QuizModal onClose={() => setShowQuizModal(false)} subjects={subjects} />}
     </>
   );
 }
 
-function QuizModal({ onClose, subjects }: { onClose: () => void, subjects: any[] }) {
+function QuizView({ onBack, subjects }: { onBack: () => void, subjects: any[] }) {
   const [step, setStep] = useState(0);
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
@@ -429,84 +464,77 @@ function QuizModal({ onClose, subjects }: { onClose: () => void, subjects: any[]
     if (step === 0 && selectedSubject) {
       setStep(1);
     } else if (step > 0 && step <= mockQuestions.length) {
-      if (selectedAnswer === mockQuestions[step - 1].correct) {
-         // correct
-      }
+      // check answer here if needed
       setStep(step + 1);
       setSelectedAnswer(null);
     }
   };
 
   const handleFinish = () => {
-    // Increase subject progress
-    if (selectedSubject) {
-       const key = 'progress_' + selectedSubject.id;
-       let current = parseInt(localStorage.getItem(key) || '0', 10);
-       if (current === 0) current = selectedSubject.progress || 0;
-       
-       let newProgress = current + 15;
-       if (newProgress > 100) newProgress = 100;
-       localStorage.setItem(key, newProgress.toString());
-       window.dispatchEvent(new Event('progress_updated'));
-    }
-    onClose();
+    onBack();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-      <motion.div initial={{y: 50, opacity: 0}} animate={{y: 0, opacity: 1}} className="relative bg-white rounded-[2rem] p-6 max-w-md w-full shadow-2xl flex flex-col">
-        <button onClick={onClose} className="absolute top-4 left-4 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full p-2">
-           <X size={20} />
+    <div className="space-y-4 md:space-y-6 max-w-2xl mx-auto mt-4 md:mt-10">
+      <div className="flex items-center gap-3 md:gap-4 mb-4 md:mb-8">
+        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
+          <ChevronRight size={18} className="md:w-5 md:h-5" />
         </button>
+        <div>
+          <h2 className="font-bold text-base md:text-xl text-slate-800">اختبار سريع (كويز)</h2>
+        </div>
+      </div>
 
+      <div className="glass rounded-[2rem] p-6 md:p-10 shadow-sm bg-white/60">
         {step === 0 && (
-          <div className="text-center pt-4">
-            <div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
-               <Target size={32} />
+          <div className="text-center">
+            <div className="w-16 h-16 md:w-20 md:h-20 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
+               <Target size={32} className="md:w-10 md:h-10" />
             </div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">اختبار المراجعة السريع</h3>
-            <p className="text-sm text-slate-500 mb-6">اختر المادة التي تريد تقييم مستواك فيها لزيادة نسبة تقدمك.</p>
+            <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-2">اختر مادة للاختبار</h3>
+            <p className="text-sm md:text-base text-slate-500 mb-8">اختر المادة التي تريد تقييم مستواك فيها لزيادة نسبة تقدمك.</p>
             
-            <div className="space-y-2 mb-6 max-h-48 overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
               {subjects.map(s => (
                 <button 
                    key={s.id} 
                    onClick={() => setSelectedSubject(s)}
-                   className={`w-full p-3 rounded-xl border text-sm font-bold transition-all text-right ${selectedSubject?.id === s.id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                   className={`p-4 md:p-5 rounded-2xl border text-sm md:text-base font-bold transition-all text-right flex items-center justify-between ${selectedSubject?.id === s.id ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm' : 'border-slate-200 bg-white/70 text-slate-700 hover:bg-white hover:border-slate-300'}`}
                 >
-                  {s.name}
+                  <span>{s.name}</span>
+                  {selectedSubject?.id === s.id && <CheckCircle size={18} className="text-blue-500" />}
                 </button>
               ))}
-              {subjects.length === 0 && <p className="text-xs text-slate-400">لا توجد مواد مضافة بعد.</p>}
+              {subjects.length === 0 && <div className="col-span-full text-center text-sm text-slate-400 py-4">لا توجد مواد مضافة بعد.</div>}
             </div>
 
             <button 
               onClick={handleNext}
               disabled={!selectedSubject}
-              className="w-full bg-blue-500 text-white font-bold rounded-xl py-3 hover:bg-blue-600 transition-all disabled:opacity-50"
+              className="w-full sm:w-1/2 mx-auto bg-blue-600 text-white font-bold rounded-xl py-3.5 md:py-4 hover:bg-blue-700 transition-all disabled:opacity-50 text-sm md:text-base shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2"
             >
-              ابدأ الاختبار
+              <span>ابدأ الاختبار الآن</span>
+              <ChevronLeft size={18} />
             </button>
           </div>
         )}
 
         {step > 0 && step <= mockQuestions.length && (
-          <div className="pt-2">
-            <div className="flex justify-between text-xs text-slate-400 font-bold mb-4">
-               <span>السؤال {step} من {mockQuestions.length}</span>
-               <span>{selectedSubject?.name}</span>
+          <div className="max-w-xl mx-auto">
+            <div className="flex justify-between items-center text-xs md:text-sm text-slate-400 font-bold mb-6 md:mb-8">
+               <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full">السؤال {step} من {mockQuestions.length}</span>
+               <span className="text-blue-500 font-bold flex items-center gap-1.5"><Target size={14} /> {selectedSubject?.name}</span>
             </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-6 leading-relaxed">
+            <h3 className="text-lg md:text-2xl font-bold text-slate-800 mb-8 md:mb-10 leading-relaxed text-center">
               {mockQuestions[step - 1].q}
             </h3>
             
-            <div className="space-y-3 mb-8">
+            <div className="space-y-3 md:space-y-4 mb-10">
               {mockQuestions[step - 1].options.map((opt, idx) => (
                 <button 
                    key={idx}
                    onClick={() => setSelectedAnswer(idx)}
-                   className={`w-full p-4 rounded-xl border text-sm font-bold transition-all text-right ${selectedAnswer === idx ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white hover:border-slate-300 hover:shadow-sm'}`}
+                   className={`w-full p-4 md:p-5 rounded-2xl border text-sm md:text-base font-bold transition-all text-right ${selectedAnswer === idx ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-slate-200 bg-white/70 text-slate-700 hover:bg-white hover:border-slate-300 hover:shadow-sm'}`}
                 >
                   {opt}
                 </button>
@@ -516,30 +544,31 @@ function QuizModal({ onClose, subjects }: { onClose: () => void, subjects: any[]
             <button 
               onClick={handleNext}
               disabled={selectedAnswer === null}
-              className="w-full bg-slate-800 text-white font-bold rounded-xl py-3 hover:bg-slate-900 transition-all disabled:opacity-50"
+              className="w-full bg-slate-800 text-white font-bold rounded-xl py-3.5 md:py-4 hover:bg-slate-900 transition-all disabled:opacity-50 text-sm md:text-base shadow-lg disabled:shadow-none"
             >
-              التالي
+              السؤال التالي
             </button>
           </div>
         )}
 
         {step > mockQuestions.length && (
-          <div className="text-center pt-8 pb-4">
-            <div className="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6">
-               <CheckCircle size={40} />
-            </div>
-            <h3 className="text-2xl font-bold text-slate-800 mb-2">أحسنت!</h3>
-            <p className="text-sm text-slate-500 mb-6 font-medium leading-relaxed">لقد أكملت الكويز بنجاح وتم تحديث نسبة التقدم في مادة {selectedSubject?.name}.</p>
+          <div className="text-center pt-8 md:pt-12 pb-4">
+            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-20 h-20 md:w-24 md:h-24 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6 md:mb-8 shadow-inner">
+               <CheckCircle size={40} className="md:w-12 md:h-12" />
+            </motion.div>
+            <h3 className="text-2xl md:text-3xl font-bold text-slate-800 mb-3 md:mb-4">أحسنت!</h3>
+            <p className="text-sm md:text-base text-slate-500 mb-8 font-medium leading-relaxed max-w-sm mx-auto">لقد أكملت الكويز بنجاح وتم تحديث نسبة التقدم في مادة <span className="font-bold text-slate-700">{selectedSubject?.name}</span>.</p>
             
             <button 
               onClick={handleFinish}
-              className="w-full bg-emerald-500 text-white font-bold rounded-xl py-3.5 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30"
+              className="w-full sm:w-1/2 mx-auto bg-emerald-500 text-white font-bold rounded-xl py-3.5 md:py-4 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/30 text-sm md:text-base flex items-center justify-center gap-2"
             >
-              العودة للرئيسية
+              <CheckCircle size={18} />
+              <span>العودة للرئيسية</span>
             </button>
           </div>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -692,7 +721,7 @@ function SubjectTypeView({ subject, onBack, onSelectType }: { subject: any, onBa
            className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 transition-all border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
         >
            <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 transition-transform shadow-sm">
-             <PenTool size={28} className="md:w-10 md:h-10" />
+             <ClipboardList size={28} className="md:w-10 md:h-10" />
            </div>
            <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-emerald-700 transition-colors">التمارين</h3>
            <p className="text-[10px] md:text-sm text-slate-500 leading-tight">حل تمارين تطبيقية مع التصحيح</p>
@@ -712,7 +741,7 @@ function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject:
           <ChevronRight size={18} className="md:w-5 md:h-5" />
         </button>
         <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl ${isLessons ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'} flex items-center justify-center shadow-sm`}>
-           {isLessons ? <PlayCircle size={16} className="md:w-5 md:h-5"/> : <PenTool size={16} className="md:w-5 md:h-5"/>}
+           {isLessons ? <PlayCircle size={16} className="md:w-5 md:h-5"/> : <ClipboardList size={16} className="md:w-5 md:h-5"/>}
         </div>
         <div>
           <h2 className="font-bold text-base md:text-xl text-slate-800">{subject.name} - الوحدات</h2>
@@ -751,7 +780,7 @@ function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject:
                 <h3 className="font-bold text-sm md:text-lg text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1">{unit.name}</h3>
                 <div className="flex gap-3 md:gap-4 mt-2 md:mt-4 text-xs md:text-sm text-slate-500 font-medium">
                   <span className="flex items-center gap-1 md:gap-1.5"><FileText size={14} className="text-blue-400"/> {unit.lessons?.length || 0} دروس</span>
-                  <span className="flex items-center gap-1 md:gap-1.5"><PenTool size={14} className="text-emerald-400"/> {unit.exercises?.length || 0} تمارين</span>
+                  <span className="flex items-center gap-1 md:gap-1.5"><ClipboardList size={14} className="text-emerald-400"/> {unit.exercises?.length || 0} تمارين</span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-1 mt-4 overflow-hidden">
                    <div className="h-full rounded-full bg-blue-500 transition-all duration-1000" style={{ width: `${progress}%` }} />
@@ -800,7 +829,7 @@ function UnitDetailsView({ subject, unit, onBack, onSelectType }: { subject: any
            className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 transition-all border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
         >
            <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 transition-transform shadow-sm">
-             <PenTool size={28} className="md:w-10 md:h-10" />
+             <ClipboardList size={28} className="md:w-10 md:h-10" />
            </div>
            <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-emerald-700 transition-colors">التمارين</h3>
            <p className="text-[10px] md:text-sm text-slate-500 leading-tight">حل تمارين تطبيقية مع التصحيح</p>
@@ -827,7 +856,7 @@ function ContentListView({ subject, unit, listType, onBack, onSelectItem }: { su
           </div>
         </div>
         <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl ${isLessons ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'} flex items-center justify-center shadow-sm`}>
-           {isLessons ? <PlayCircle size={16} className="md:w-5 md:h-5"/> : <PenTool size={16} className="md:w-5 md:h-5"/>}
+           {isLessons ? <PlayCircle size={16} className="md:w-5 md:h-5"/> : <ClipboardList size={16} className="md:w-5 md:h-5"/>}
         </div>
       </div>
 
@@ -836,29 +865,53 @@ function ContentListView({ subject, unit, listType, onBack, onSelectItem }: { su
           <div className="text-center py-10 text-slate-500 font-bold text-sm md:text-base">لا يوجد محتوى حالياً</div>
         ) : (
           <div className="space-y-2 md:space-y-3">
-            {items.map((item: any, idx: number) => (
-              <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-5 bg-white/70 hover:bg-white rounded-2xl md:rounded-3xl border border-slate-100 transition-all group">
-                <div className="flex items-center gap-3 md:gap-4 mb-3 sm:mb-0">
-                  <div className={`w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full flex items-center justify-center font-bold text-xs md:text-sm shadow-sm ${isLessons ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'}`}>
-                    {idx + 1}
+            {isLessons ? (
+              items.map((item: any, idx: number) => (
+                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-5 bg-white/70 hover:bg-white rounded-2xl md:rounded-3xl border border-slate-100 transition-all group">
+                  <div className="flex items-center gap-3 md:gap-4 mb-3 sm:mb-0">
+                    <div className={"w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full flex items-center justify-center font-bold text-xs md:text-sm shadow-sm bg-blue-50 text-blue-600 border border-blue-100"}>
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-xs md:text-base">{item.title}</h4>
+                      <p className="text-[10px] md:text-xs font-bold text-slate-400 mt-1 md:mt-1.5 flex items-center gap-1 md:gap-1.5">
+                        <ClipboardList size={10} className="text-emerald-500 md:w-3 md:h-3"/>
+                        {`يقابله: ${unit.exercises[idx]?.title || 'لا يوجد تمرين'}`}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-xs md:text-base">{item.title}</h4>
-                    <p className="text-[10px] md:text-xs font-bold text-slate-400 mt-1 md:mt-1.5 flex items-center gap-1 md:gap-1.5">
-                      {isLessons ? <PenTool size={10} className="text-emerald-500 md:w-3 md:h-3"/> : <PlayCircle size={10} className="text-blue-500 md:w-3 md:h-3" />}
-                      {isLessons ? `يقابله: ${unit.exercises[idx]?.title || 'لا يوجد تمرين'}` : `مرتبط بدرس: ${unit.lessons[idx]?.title || 'غير محدد'}`}
-                    </p>
-                  </div>
+                  <button 
+                    onClick={() => onSelectItem && onSelectItem(item)}
+                    className="px-4 py-2 md:px-6 md:py-2.5 rounded-xl text-[10px] md:text-sm font-bold text-white transition-all shadow-sm w-full sm:w-auto flex justify-center items-center gap-1.5 md:gap-2 bg-blue-600 hover:bg-blue-700 hover:shadow-md"
+                  >
+                    شاهد الدرس
+                    <ChevronLeft size={14} className="opacity-70 md:w-4 md:h-4" />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => onSelectItem && onSelectItem(item)}
-                  className={`px-4 py-2 md:px-6 md:py-2.5 rounded-xl text-[10px] md:text-sm font-bold text-white transition-all shadow-sm w-full sm:w-auto flex justify-center items-center gap-1.5 md:gap-2 ${isLessons ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-md' : 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-md'}`}
-                >
-                  {isLessons ? 'شاهد الدرس' : 'ابدأ الحل'}
-                  <ChevronLeft size={14} className="opacity-70 md:w-4 md:h-4" />
-                </button>
+              ))
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                {items.map((item: any, idx: number) => (
+                  <div 
+                    key={item.id} 
+                    onClick={() => onSelectItem && onSelectItem(item)}
+                    className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300 relative overflow-hidden flex flex-col min-h-[140px]"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+                        <ClipboardList size={20} className="md:w-6 md:h-6"/>
+                      </div>
+                      <span className="text-[10px] md:text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md">تمرين {idx + 1}</span>
+                    </div>
+                    <h3 className="font-bold text-sm md:text-lg text-slate-800 group-hover:text-emerald-600 transition-colors line-clamp-2 leading-tight flex-1">{item.title}</h3>
+                    <div className="mt-4 flex items-center justify-between text-[10px] md:text-xs font-bold text-slate-500 relative z-10 w-full">
+                       <span>اضغط للبدء</span>
+                       <ChevronLeft size={14} className="text-emerald-500 group-hover:-translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
