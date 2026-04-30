@@ -75,6 +75,12 @@ body {
   line-height: 1.7 !important;
 }
 
+.quiz-markdown p {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline;
+}
+
 .katex {
   direction: ltr;
   unicode-bidi: embed;

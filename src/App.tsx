@@ -897,7 +897,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
 
   const generateNewExercise = async () => {
     const apiKey = localStorage.getItem('admin_api_key');
-    const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-3-flash-preview';
+    const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-2.5-flash';
     if (!apiKey) {
       alert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
       return;

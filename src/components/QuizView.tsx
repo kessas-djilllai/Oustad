@@ -2,6 +2,12 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight, Target, CheckCircle, ChevronLeft } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
+import { getQuizPrompt } from "../lib/promptQuiz";
 
 export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => void }) {
   const [step, setStep] = useState(0);
@@ -28,7 +34,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
       const ai = new GoogleGenAI({ apiKey });
       const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-2.5-flash';
 
-      const prompt = `أنت أستاذ خبير يضع كويز (اختبار قصير) للطلاب. المادة: ${selectedSubject.name}. الوحدة: ${selectedUnit.name}. قم بإنشاء 10 أسئلة دقيقة (QCM) حول هذه الوحدة. يجب أن يكون هناك 4 خيارات لكل سؤال، مع تحديد الإجابة الصحيحة (رقم الفهرس من 0 إلى 3). تأكد من صحة المعلومات وأن الأسئلة في المستوى المناسب.\n\nتنبيه حرج جداً: إذا احتجت لكتابة معادلات رياضية أو فيزيائية، استخدم صيغ LaTeX الصحيحة واستخدم $ أو $$، وبما أن المخرجات ستكون بصيغة JSON، يجب عليك عمل هروب (Escape) لكل علامة مائلة عكسية (Backslash) عن طريق مضاعفتها، مثلاً اكتب \\\\frac بدلاً من \\frac. الإغلاق الخاطئ للمعادلات سيؤدي لتعطل التطبيق.`;
+      const prompt = getQuizPrompt(selectedSubject.name, selectedUnit.name);
       
       const response = await ai.models.generateContent({
         model: aiModel,
@@ -45,9 +51,10 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                         type: Type.ARRAY,
                         items: { type: Type.STRING }
                     },
-                    correct: { type: Type.INTEGER }
+                    correct: { type: Type.INTEGER },
+                    justification: { type: Type.STRING }
                 },
-                required: ["q", "options", "correct"],
+                required: ["q", "options", "correct", "justification"],
                 }
             }
         }
@@ -188,9 +195,11 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full">السؤال {currentQuestionIdx + 1} من {questions.length}</span>
                <span className="text-blue-500 font-bold flex flex-col sm:flex-row items-end sm:items-center gap-1.5"><Target size={14} /> <span className="line-clamp-1">{selectedUnit?.name}</span></span>
             </div>
-            <h3 className="text-lg md:text-2xl font-bold text-slate-800 mb-8 md:mb-10 leading-relaxed text-center">
-              {questions[currentQuestionIdx].q}
-            </h3>
+            <div className="text-lg md:text-2xl font-bold text-slate-800 mb-8 md:mb-10 leading-relaxed text-center markdown-body quiz-markdown prose max-w-none" dir="rtl">
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                {questions[currentQuestionIdx].q}
+              </ReactMarkdown>
+            </div>
             
             <div className="space-y-3 md:space-y-4 mb-10">
               {questions[currentQuestionIdx].options.map((opt: string, idx: number) => {
@@ -206,14 +215,30 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                 }
                 
                 return (
-                  <button 
-                    key={idx} 
-                    onClick={() => !isAnswerChecked && setSelectedAnswer(idx)}
-                    disabled={isAnswerChecked}
-                    className={`w-full p-4 md:p-5 rounded-2xl border text-sm md:text-base font-bold transition-all text-right ${btnClass}`}
-                  >
-                    {opt}
-                  </button>
+                  <div key={idx} className="space-y-2">
+                    <button 
+                      onClick={() => !isAnswerChecked && setSelectedAnswer(idx)}
+                      disabled={isAnswerChecked}
+                      className={`w-full p-4 md:p-5 rounded-2xl border text-sm md:text-base font-bold transition-all text-right markdown-body quiz-markdown prose max-w-none ${btnClass}`}
+                      dir="rtl"
+                    >
+                       <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                          {opt}
+                      </ReactMarkdown>
+                    </button>
+                    {isAnswerChecked && idx === questions[currentQuestionIdx].correct && questions[currentQuestionIdx].justification && (
+                      <div className="text-right p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 animate-in fade-in slide-in-from-top-2">
+                        <h4 className="font-bold mb-2 flex items-center justify-end gap-2 text-emerald-900">
+                          <span>التبرير</span>
+                        </h4>
+                        <div className="text-sm md:text-base markdown-body quiz-markdown" dir="rtl">
+                           <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                              {questions[currentQuestionIdx].justification}
+                           </ReactMarkdown>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )
               })}
             </div>

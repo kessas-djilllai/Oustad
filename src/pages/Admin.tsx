@@ -355,7 +355,7 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
 
   const generateWithAI = async () => {
     const apiKey = localStorage.getItem('admin_api_key');
-    const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-3-flash-preview';
+    const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-2.5-flash';
     if (!apiKey) {
       triggerAlert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات أولاً.", 'error');
       return;
@@ -710,7 +710,7 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
 
 function AdminSettings({ onBack }: { onBack: () => void }) {
   const [apiKey, setApiKey] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
+  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const [availableModels, setAvailableModels] = useState<{id: string, name: string}[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -719,7 +719,7 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
   
   useEffect(() => {
     async function loadSettings() {
-      const savedModel = localStorage.getItem('admin_ai_model') || 'gemini-3-flash-preview';
+      const savedModel = localStorage.getItem('admin_ai_model') || 'gemini-2.5-flash';
       let currentKey = localStorage.getItem('admin_api_key') || '';
       
       setSelectedModel(savedModel);
