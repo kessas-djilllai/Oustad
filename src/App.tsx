@@ -313,10 +313,20 @@ function StudentPortal({ loading }: { loading: boolean }) {
   }, []);
 
   useEffect(() => {
-    // Example of how you would fetch from Supabase if keys are provided
-    async function fetchData() {
+    async function initUser() {
       await loadUserProgress();
       await checkDailyLogin();
+      setRefreshTrigger(prev => prev + 1); // trigger initial data formatting
+    }
+    initUser();
+  }, []);
+
+  useEffect(() => {
+    // Prevent fetching formatting if data isn't loaded yet
+    if (refreshTrigger === 0) return;
+
+    // Example of how you would fetch from Supabase if keys are provided
+    async function fetchData() {
       if (!supabase) {
         // compute progress for SUBJECTS_DATA
         const computedSubjects = SUBJECTS_DATA.map((sub: any) => {

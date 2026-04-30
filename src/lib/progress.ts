@@ -30,6 +30,7 @@ export const loadUserProgress = async () => {
                 progressCache[`${p.item_type}_${p.item_id}`] = p.progress_value;
             });
             isProgressLoaded = true;
+            window.dispatchEvent(new Event('progress_updated'));
         }
     } catch (e) {
         console.error("Could not load user progress", e);
