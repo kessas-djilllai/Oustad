@@ -72,8 +72,23 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
             }
         }
       });
-      const generated = JSON.parse(response.text || '[]');
+      let generated = JSON.parse(response.text || '[]');
       if (generated && generated.length > 0) {
+        // Randomize the options since AI sometimes returns the correct answer in the first position
+        generated = generated.map((q: any) => {
+          const correctValue = q.options[q.correct];
+          const newOptions = [...q.options];
+          for (let i = newOptions.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newOptions[i], newOptions[j]] = [newOptions[j], newOptions[i]];
+          }
+          return {
+            ...q,
+            options: newOptions,
+            correct: newOptions.indexOf(correctValue)
+          };
+        });
+
         setQuestions(generated);
         setStep(2);
       } else {

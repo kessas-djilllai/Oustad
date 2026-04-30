@@ -625,7 +625,19 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
 
 function AdminAddSubject({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState('');
+  const [selectedColor, setSelectedColor] = useState('indigo');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const colors = [
+    { id: 'indigo', name: 'نيلي', bg: 'bg-indigo-500' },
+    { id: 'blue', name: 'أزرق', bg: 'bg-blue-500' },
+    { id: 'emerald', name: 'أخضر', bg: 'bg-emerald-500' },
+    { id: 'orange', name: 'برتقالي', bg: 'bg-orange-500' },
+    { id: 'purple', name: 'بنفسجي', bg: 'bg-purple-500' },
+    { id: 'pink', name: 'وردي', bg: 'bg-pink-500' },
+    { id: 'amber', name: 'أصفر', bg: 'bg-amber-500' },
+    { id: 'slate', name: 'رمادي', bg: 'bg-slate-500' },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -636,9 +648,9 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
       const { error } = await supabase.from('subjects').insert([{
         id,
         name,
-        color: 'text-indigo-500',
-        bg: 'bg-indigo-100',
-        bar_color: 'bg-indigo-500',
+        color: `text-${selectedColor}-500`,
+        bg: `bg-${selectedColor}-100`,
+        bar_color: `bg-${selectedColor}-500`,
         icon_name: 'BookOpen',
         progress: 0
       }]);
@@ -661,7 +673,7 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
           <ChevronRight size={20} />
         </button>
-        <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-sm">
+        <div className={`w-12 h-12 rounded-2xl bg-${selectedColor}-100 text-${selectedColor}-600 flex items-center justify-center shadow-sm`}>
            <BookOpen size={24} />
         </div>
         <div>
@@ -678,15 +690,30 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
             value={name} 
             onChange={(e) => setName(e.target.value)}
             placeholder="مثال: الفلسفة"
-            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all"
+            className={`w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-${selectedColor}-500/50 transition-all`}
             required
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">لون المادة</label>
+          <div className="flex flex-wrap gap-3">
+            {colors.map(c => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setSelectedColor(c.id)}
+                className={`w-10 h-10 rounded-full ${c.bg} shadow-sm border-2 transition-all ${selectedColor === c.id ? 'border-slate-800 scale-110 shadow-md' : 'border-transparent opacity-80 hover:opacity-100'}`}
+                title={c.name}
+              />
+            ))}
+          </div>
         </div>
 
         <button 
           type="submit" 
           disabled={isSubmitting}
-          className="w-full bg-indigo-600 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-indigo-500/30 disabled:opacity-70"
+          className={`w-full bg-slate-800 text-white font-bold rounded-xl py-3.5 mt-6 hover:bg-slate-900 transition-all flex items-center justify-center gap-2 shadow-lg disabled:opacity-70`}
         >
           {isSubmitting ? (
             <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
@@ -960,7 +987,7 @@ function AdminBacDate({ onBack }: { onBack: () => void }) {
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-2">تاريخ الامتحان القادم</label>
           <input 
-            type="date" 
+            type="datetime-local" 
             value={bacDate} 
             onChange={(e) => setBacDate(e.target.value)}
             className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono"

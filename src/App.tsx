@@ -13,6 +13,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { getSubjectPrompt } from "./lib/prompts";
 import { preprocessMath } from "./lib/utils";
 import { QuizView } from "./components/QuizView";
+import { SubjectTypeView, SubjectUnitsView, UnitDetailsView, ContentListView, LessonDetailsView, InteractiveExerciseView } from "./components/StudentViews";
 import { 
   BookOpen,
   Target, 
@@ -48,7 +49,9 @@ import {
   RefreshCw,
   X,
   Flame,
-  Trophy
+  Star,
+  Sun,
+  Moon
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -104,6 +107,20 @@ function StudentLayout({ session }: { session: any }) {
 
   const userName = session?.user?.user_metadata?.full_name || 'الطالب';
 
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
+
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
     return () => clearTimeout(timer);
@@ -114,12 +131,13 @@ function StudentLayout({ session }: { session: any }) {
   };
 
   return (
-    <div className="min-h-screen pb-20 md:pb-6 relative overflow-hidden flex justify-center">
-      {/* Background Decorative Blobs */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-200/50 blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-200/50 blur-[100px] pointer-events-none" />
+    <div className="min-h-screen pb-20 md:pb-6 relative flex justify-center">
+      {/* Background Gradient & Blobs */}
+      <div className="fixed inset-0 z-0 bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-[#0b0f19] dark:to-slate-900 pointer-events-none" />
+      <div className="fixed top-0 left-0 w-[60vw] h-[60vh] rounded-full bg-blue-300/20 dark:bg-blue-600/10 blur-[120px] pointer-events-none z-0 -translate-x-1/2 -translate-y-1/2" />
+      <div className="fixed bottom-0 right-0 w-[60vw] h-[60vh] rounded-full bg-indigo-300/20 dark:bg-indigo-600/10 blur-[120px] pointer-events-none z-0 translate-x-1/3 translate-y-1/3" />
       
-      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10">
+      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10 relative">
         
         <header className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
@@ -132,12 +150,19 @@ function StudentLayout({ session }: { session: any }) {
             </div>
           </div>
           <div className="flex gap-2 relative">
-            <button className="w-10 h-10 hidden sm:flex rounded-2xl glass glass-hover justify-center items-center text-slate-600 transition-all shrink-0">
+            <button 
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="w-10 h-10 flex rounded-2xl glass glass-hover justify-center items-center text-slate-600 dark:text-slate-300 transition-all shrink-0"
+              aria-label="Toggle Dark Mode"
+            >
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <button className="w-10 h-10 hidden sm:flex rounded-2xl glass glass-hover justify-center items-center text-slate-600 dark:text-slate-300 transition-all shrink-0">
               <Bell size={20} />
             </button>
             <button 
               onClick={() => setIsSidebarOpen(true)}
-              className="w-10 h-10 rounded-2xl glass glass-hover flex items-center justify-center text-slate-600 transition-all shrink-0"
+              className="w-10 h-10 rounded-2xl glass glass-hover flex items-center justify-center text-slate-600 dark:text-slate-300 transition-all shrink-0"
             >
               <Menu size={20} />
             </button>
@@ -165,7 +190,7 @@ function StudentLayout({ session }: { session: any }) {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'tween', duration: 0.2 }}
-              className="fixed top-0 right-0 bottom-0 w-64 glass !bg-white/95 !backdrop-blur-2xl z-50 p-6 flex flex-col border-l border-white/50 shadow-2xl rounded-l-[2rem]"
+              className="fixed top-0 right-0 bottom-0 w-64 glass !bg-white/95 dark:!bg-slate-900/95 !backdrop-blur-2xl z-50 p-6 flex flex-col border-l border-white/50 dark:border-slate-800 shadow-2xl rounded-l-[2rem]"
             >
               <div className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-3">
@@ -174,7 +199,7 @@ function StudentLayout({ session }: { session: any }) {
                   </div>
                   <h2 className="font-bold text-lg text-slate-800">القائمة</h2>
                 </div>
-                <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
+                <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
                   <ChevronRight size={18} />
                 </button>
               </div>
@@ -186,13 +211,13 @@ function StudentLayout({ session }: { session: any }) {
                 <SidebarItem icon={<MessageCircle size={18} />} title="المجتمع" />
               </div>
 
-              <div className="border-t border-slate-100 pt-4 space-y-2">
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-2">
                 <SidebarItem icon={<Settings size={18} />} title="الإعدادات" />
-                <div onClick={() => navigate('/admin')} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-emerald-600 hover:bg-emerald-50 cursor-pointer">
+                <div onClick={() => navigate('/admin')} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 cursor-pointer">
                   <Target size={18} />
                   <span>لوحة التحكم (للتجريب)</span>
                 </div>
-                <div onClick={handleLogout} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-red-500 hover:bg-red-50 cursor-pointer">
+                <div onClick={handleLogout} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 cursor-pointer">
                   <LogOut size={18} />
                   <span>تسجيل الخروج</span>
                 </div>
@@ -207,7 +232,7 @@ function StudentLayout({ session }: { session: any }) {
 
 function SidebarItem({ icon, title, active, badge }: { icon: React.ReactNode, title: string, active?: boolean, badge?: string }) {
   return (
-    <div className={`flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-all ${active ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-100'}`}>
+    <div className={`flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-all ${active ? 'bg-blue-50 text-blue-600 dark:bg-blue-600/20 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
       <div className="flex items-center gap-3 font-bold text-sm">
         {icon}
         <span>{title}</span>
@@ -405,28 +430,42 @@ function StudentPortal({ loading }: { loading: boolean }) {
   if (loading || dbLoading) {
     return (
       <div className="space-y-4 md:space-y-8 animate-in fade-in duration-500">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
           {/* Main search skeleton */}
-          <div className="col-span-1 md:col-span-2 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 min-h-[120px] md:min-h-[160px] flex flex-col justify-center gap-3 relative overflow-hidden border border-slate-200/40">
+          <div className="col-span-2 md:col-span-3 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 min-h-[120px] md:min-h-[160px] flex flex-col justify-center gap-3 relative overflow-hidden border border-slate-200/40">
             <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[shimmer_1.5s_infinite]" />
             <div className="flex items-center gap-3">
-               <div className="w-6 h-6 rounded-md bg-blue-100/50 animate-pulse" />
+               <div className="w-6 h-6 rounded-md bg-orange-100/50 animate-pulse" />
                <div className="h-6 md:h-8 bg-slate-200/50 rounded-xl w-1/3 animate-pulse" />
             </div>
             <div className="h-12 md:h-14 bg-slate-100/80 rounded-xl md:rounded-2xl w-full border border-slate-200/50 mt-1" />
           </div>
 
-          {/* Next exam skeleton */}
-          <div className="col-span-1 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 min-h-[120px] md:min-h-[160px] flex flex-row md:flex-col items-center md:items-start justify-between md:justify-center gap-3 md:gap-4 relative overflow-hidden border border-slate-200/40">
+          <div className="col-span-1 md:col-span-1 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 min-h-[120px] md:min-h-[160px] flex flex-col items-center justify-center gap-3 relative overflow-hidden border border-slate-200/40">
             <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[shimmer_1.5s_infinite] delay-75" />
-            <div className="flex items-center gap-3 md:gap-0 md:flex-col md:items-start w-full">
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-orange-50 animate-pulse shrink-0 md:mb-4" />
-              <div className="space-y-2 w-full">
-                 <div className="h-3 bg-slate-200/50 rounded-md w-1/3 animate-pulse" />
-                 <div className="h-5 md:h-6 bg-slate-200/80 rounded-md w-2/3 animate-pulse" />
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-indigo-50 animate-pulse" />
+            <div className="h-3 bg-slate-200/50 rounded-md w-1/2 animate-pulse mt-1" />
+            <div className="h-4 bg-slate-200/80 rounded-md w-2/3 animate-pulse" />
+          </div>
+          
+          <div className="col-span-1 md:col-span-2 flex flex-col md:flex-row gap-3 md:gap-6 min-h-[120px] md:min-h-[160px]">
+            <div className="flex-1 glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 flex flex-row md:flex-col items-center justify-center md:gap-2 relative overflow-hidden border border-slate-200/40 gap-3">
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[shimmer_1.5s_infinite] delay-150" />
+              <div className="w-8 h-8 md:w-16 md:h-16 rounded-full bg-orange-50 animate-pulse" />
+              <div className="flex flex-col gap-1 w-1/2 md:w-full md:items-center">
+                <div className="h-4 bg-slate-200/80 rounded-md w-1/2 animate-pulse" />
+                <div className="h-3 bg-slate-200/50 rounded-md w-2/3 animate-pulse" />
               </div>
             </div>
-            <div className="w-16 h-6 md:w-20 md:h-8 bg-slate-100 rounded-lg shrink-0" />
+            
+            <div className="flex-1 glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 flex flex-row md:flex-col items-center justify-center md:gap-2 relative overflow-hidden border border-slate-200/40 gap-3">
+              <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[shimmer_1.5s_infinite] delay-300" />
+              <div className="w-8 h-8 md:w-16 md:h-16 rounded-full bg-amber-50 animate-pulse" />
+              <div className="flex flex-col gap-1 w-1/2 md:w-full md:items-center">
+                <div className="h-4 bg-slate-200/80 rounded-md w-1/2 animate-pulse" />
+                <div className="h-3 bg-slate-200/50 rounded-md w-2/3 animate-pulse" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -508,7 +547,6 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
   const [timeLeft, setTimeLeft] = useState<{days: number, hours: number, minutes: number} | null>(null);
   const [xp, setXP] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [currentSlide, setCurrentSlide] = useState(0);
 
   useEffect(() => {
     const handleGamification = () => {
@@ -518,13 +556,6 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
     handleGamification();
     window.addEventListener('progress_updated', handleGamification);
     return () => window.removeEventListener('progress_updated', handleGamification);
-  }, []);
-
-  useEffect(() => {
-    const slideInterval = setInterval(() => {
-      setCurrentSlide((prev) => (prev === 0 ? 1 : 0));
-    }, 4000);
-    return () => clearInterval(slideInterval);
   }, []);
 
   useEffect(() => {
@@ -539,7 +570,6 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
     
     const calculateTimeLeft = () => {
       const target = new Date(bacDate);
-      target.setHours(0, 0, 0, 0); // Start of the day
       const now = new Date();
       
       const diff = target.getTime() - now.getTime();
@@ -570,8 +600,8 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
 
   return (
     <div className="space-y-4 md:space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
-        <div className="col-span-1 md:col-span-2 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col justify-center relative overflow-hidden group hover:shadow-lg transition-all min-h-[120px] md:min-h-[160px] bg-gradient-to-br from-white to-orange-50/50">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
+        <div className="col-span-2 md:col-span-3 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col justify-center relative overflow-hidden group hover:shadow-lg transition-all min-h-[120px] md:min-h-[160px] bg-gradient-to-br from-white to-orange-50/50">
           <div className="absolute -left-10 -top-10 w-32 h-32 bg-orange-400/20 rounded-full blur-2xl group-hover:bg-orange-400/30 transition-all pointer-events-none" />
           <div className="flex items-start justify-between relative">
             <div>
@@ -607,97 +637,77 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
           </div>
         </div>
 
-        <div className="col-span-1 min-h-[120px] md:min-h-[160px] relative">
-          <AnimatePresence mode="wait">
-            {currentSlide === 0 ? (
-              <motion.button 
-                key="quiz-card"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                onClick={onStartQuiz}
-                className="absolute inset-0 w-full h-full glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-row md:flex-col items-center md:items-start justify-between bg-gradient-to-br from-white to-indigo-50/50 group text-right hover:shadow-lg transition-all overflow-hidden border border-indigo-100/50"
-              >
-                <div className="absolute -left-10 -top-10 w-32 h-32 bg-indigo-400/20 rounded-full blur-2xl group-hover:bg-indigo-400/30 transition-all pointer-events-none" />
-                <div className="flex items-center gap-3 md:gap-0 md:flex-col md:items-start relative w-full">
-                  <div className="relative w-14 h-14 md:w-16 md:h-16 md:mb-4 flex items-center justify-center shrink-0">
-                    <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-                      <circle
-                        className="text-indigo-100"
-                        strokeWidth="4"
-                        stroke="currentColor"
-                        fill="transparent"
-                        r={radius}
-                        cx="50%"
-                        cy="50%"
-                      />
-                      <circle
-                        className="text-indigo-500 drop-shadow-sm transition-all duration-1000"
-                        strokeWidth="4"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={strokeDashoffset}
-                        strokeLinecap="round"
-                        stroke="currentColor"
-                        fill="transparent"
-                        r={radius}
-                        cx="50%"
-                        cy="50%"
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center text-indigo-700 font-bold text-xs">
-                       {totalQuizProgress}%
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] md:text-xs font-bold text-indigo-500 mb-0.5 md:mb-1">اختبار سريع (الكويز)</p>
-                    <h4 className="font-bold text-slate-800 text-sm md:text-lg leading-tight">تدرب الآن</h4>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 text-[10px] md:text-xs text-indigo-600 font-bold bg-indigo-50 px-3 py-1.5 rounded-lg mt-0 md:mt-4 group-hover:bg-indigo-100 transition-colors relative">
-                   <PlayCircle size={14} />
-                  <span>ابدأ الكويز</span>
-                </div>
-              </motion.button>
-            ) : (
-              <motion.div 
-                key="gami-card"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="absolute inset-0 w-full h-full glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col items-center justify-center bg-gradient-to-br from-white to-orange-50/40 relative overflow-hidden group shadow-sm border border-orange-100/50"
-              >
-                <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-orange-400/20 rounded-full blur-2xl transition-all pointer-events-none" />
-                <div className="absolute -right-5 -top-5 w-24 h-24 bg-blue-400/20 rounded-full blur-2xl transition-all pointer-events-none" />
-                <div className="flex w-full h-full items-center justify-around relative">
-                   <div className="flex flex-col items-center gap-1">
-                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-full glass border border-orange-100 flex items-center justify-center text-2xl md:text-3xl shadow-sm bg-white/60 text-orange-500 mb-1 relative overflow-hidden">
-                        <Flame size={32} fill="currentColor" className="text-orange-500 drop-shadow-sm z-10" />
-                        <div className="absolute inset-0 bg-orange-400/20 w-full h-full blur-xl" />
-                      </div>
-                      <span className="font-black text-slate-800 text-lg md:text-xl line-clamp-1">{streak}</span>
-                      <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">يوم متتالي</span>
-                   </div>
-                   <div className="w-px h-16 bg-slate-200/60" />
-                   <div className="flex flex-col items-center gap-1">
-                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-full glass border border-blue-100 flex items-center justify-center text-2xl md:text-3xl shadow-sm bg-white/60 text-blue-500 mb-1 relative overflow-hidden">
-                        <Trophy size={32} fill="currentColor" className="text-blue-500 drop-shadow-sm z-10" />
-                        <div className="absolute inset-0 bg-blue-400/20 w-full h-full blur-xl" />
-                      </div>
-                      <span className="font-black text-slate-800 text-lg md:text-xl line-clamp-1">{xp}</span>
-                      <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">نقطة خبرة</span>
-                   </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-          {/* Pagination Indicators */}
-          <div className="absolute -bottom-5 md:-bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-             <div className={`w-1.5 h-1.5 rounded-full transition-all cursor-pointer hover:scale-110 ${currentSlide === 0 ? 'bg-indigo-500 w-3' : 'bg-slate-300'}`} onClick={() => setCurrentSlide(0)} />
-             <div className={`w-1.5 h-1.5 rounded-full transition-all cursor-pointer hover:scale-110 ${currentSlide === 1 ? 'bg-orange-500 w-3' : 'bg-slate-300'}`} onClick={() => setCurrentSlide(1)} />
+        <button 
+          onClick={onStartQuiz}
+          className="col-span-1 md:col-span-1 min-h-[120px] md:min-h-[160px] relative w-full h-full glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col items-center justify-center bg-gradient-to-br from-white to-indigo-50/50 group hover:shadow-lg transition-all overflow-hidden border border-indigo-100/50 text-center"
+        >
+          <div className="absolute -left-10 -top-10 w-32 h-32 bg-indigo-400/20 rounded-full blur-2xl group-hover:bg-indigo-400/30 transition-all pointer-events-none" />
+          <div className="flex flex-col items-center gap-2 relative w-full z-10">
+            <div className="relative w-12 h-12 md:w-16 md:h-16 flex items-center justify-center shrink-0">
+              <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                <circle
+                  className="text-indigo-100"
+                  strokeWidth="4"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r={radius}
+                  cx="50%"
+                  cy="50%"
+                />
+                <circle
+                  className="text-indigo-500 drop-shadow-sm transition-all duration-1000"
+                  strokeWidth="4"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r={radius}
+                  cx="50%"
+                  cy="50%"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center text-indigo-700 font-bold text-xs">
+                  {totalQuizProgress}%
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] md:text-sm font-bold text-indigo-500 mb-0.5">اختبار سريع</p>
+              <h4 className="font-bold text-slate-800 text-sm md:text-lg leading-tight">تدرب الآن</h4>
+            </div>
+          </div>
+        </button>
+
+        <div className="col-span-1 md:col-span-2 flex flex-col md:flex-row gap-3 md:gap-6 min-h-[120px] md:min-h-[160px]">
+          <div className="flex-1 relative w-full h-full glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 flex flex-row md:flex-col items-center justify-center md:gap-1 bg-gradient-to-br from-white to-amber-50/40 overflow-hidden group shadow-sm border border-amber-100/50">
+            <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-amber-400/20 rounded-full blur-2xl transition-all pointer-events-none" />
+            <div className="flex items-center md:flex-col gap-2 md:gap-1 relative z-10 text-center">
+              <div className="w-8 h-8 md:w-16 md:h-16 rounded-full glass border border-amber-100 flex items-center justify-center text-lg md:text-3xl shadow-sm bg-white/60 text-amber-500 shrink-0 relative overflow-hidden">
+                <Star size={24} fill="currentColor" className="text-amber-500 drop-shadow-sm z-10 w-5 h-5 md:w-8 md:h-8" />
+                <div className="absolute inset-0 bg-amber-400/20 w-full h-full blur-xl" />
+              </div>
+              <div className="flex flex-col md:items-center items-start">
+                <span className="font-black text-slate-800 text-base md:text-xl line-clamp-1 leading-none mb-0.5">{xp}</span>
+                <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">نقطة خبرة</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 relative w-full h-full glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 flex flex-row md:flex-col items-center justify-center md:gap-1 bg-gradient-to-br from-white to-orange-50/40 overflow-hidden group shadow-sm border border-orange-100/50">
+            <div className="absolute -right-5 -top-5 w-24 h-24 bg-orange-400/20 rounded-full blur-2xl transition-all pointer-events-none" />
+            <div className="flex items-center md:flex-col gap-2 md:gap-1 relative z-10 text-center">
+              <div className="w-8 h-8 md:w-16 md:h-16 rounded-full glass border border-orange-100 flex items-center justify-center text-lg md:text-3xl shadow-sm bg-white/60 text-orange-500 shrink-0 relative overflow-hidden">
+                <Flame size={24} fill="currentColor" className="text-orange-500 drop-shadow-sm z-10 w-5 h-5 md:w-8 md:h-8" />
+                <div className="absolute inset-0 bg-orange-400/20 w-full h-full blur-xl" />
+              </div>
+              <div className="flex flex-col md:items-center items-start">
+                <span className="font-black text-slate-800 text-base md:text-xl line-clamp-1 leading-none mb-0.5">{streak}</span>
+                <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">يوم متتالي</span>
+              </div>
+            </div>
           </div>
         </div>
+
       </div>
 
       <div>
@@ -707,16 +717,16 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
             المواد الدراسية
           </h3>
           
-          <div className="flex bg-slate-100/80 p-1.5 rounded-xl w-full md:w-auto shadow-inner border border-slate-200/60">
+          <div className="flex bg-slate-100/80 dark:bg-slate-800/50 p-1.5 rounded-xl w-full md:w-auto shadow-inner border border-slate-200/60 dark:border-slate-700/50">
             <button 
               onClick={() => setActiveTab('lessons')}
-              className={`flex-1 flex justify-center items-center gap-2 md:w-36 py-2.5 rounded-lg text-sm font-extrabold transition-all duration-200 ${activeTab === 'lessons' ? 'bg-white text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
+              className={`flex-1 flex justify-center items-center gap-2 md:w-36 py-2.5 rounded-lg text-sm font-extrabold transition-all duration-200 ${activeTab === 'lessons' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}
             >
               <PlayCircle size={16} /> الدروس
             </button>
             <button 
               onClick={() => setActiveTab('exercises')}
-              className={`flex-1 flex justify-center items-center gap-2 md:w-36 py-2.5 rounded-lg text-sm font-extrabold transition-all duration-200 ${activeTab === 'exercises' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
+              className={`flex-1 flex justify-center items-center gap-2 md:w-36 py-2.5 rounded-lg text-sm font-extrabold transition-all duration-200 ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}
             >
               <ClipboardList size={16} /> التمارين
             </button>
@@ -767,491 +777,3 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
     </div>
   )
 }
-
-function SubjectTypeView({ subject, onBack, onSelectType }: { subject: any, onBack: () => void, onSelectType: (t: 'lessons' | 'exercises') => void }) {
-  return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
-        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold hover:scale-[1.05] active:scale-95">
-          <ChevronRight size={18} className="md:w-5 md:h-5" />
-        </button>
-        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl ${subject.bg} ${subject.color} flex items-center justify-center shadow-sm`}>
-           <subject.icon size={16} className="md:w-5 md:h-5" />
-        </div>
-        <div>
-          <h2 className="font-bold text-base md:text-xl text-slate-800">{subject.name}</h2>
-          <p className="text-[10px] md:text-xs text-slate-500 font-medium">اختر نوع المحتوى</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-6">
-        <div 
-           onClick={() => onSelectType('lessons')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-blue-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-blue-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
-        >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-sm">
-             <PlayCircle size={28} className="md:w-10 md:h-10" />
-           </div>
-           <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-blue-700 transition-colors">الدروس</h3>
-           <p className="text-[10px] md:text-sm text-slate-500 leading-tight">مشاهدة الدروس والملخصات</p>
-        </div>
-
-        <div 
-           onClick={() => onSelectType('exercises')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
-        >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:-rotate-3 transition-transform shadow-sm">
-             <ClipboardList size={28} className="md:w-10 md:h-10" />
-           </div>
-           <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-emerald-700 transition-colors">التمارين</h3>
-           <p className="text-[10px] md:text-sm text-slate-500 leading-tight">حل تمارين تطبيقية مع التصحيح</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject: any, listType?: 'lessons' | 'exercises', onBack: () => void, onUnitClick: (u: any) => void }) {
-  const isLessons = listType === 'lessons';
-
-  return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
-        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
-          <ChevronRight size={18} className="md:w-5 md:h-5" />
-        </button>
-        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl ${isLessons ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'} flex items-center justify-center shadow-sm`}>
-           {isLessons ? <PlayCircle size={16} className="md:w-5 md:h-5"/> : <ClipboardList size={16} className="md:w-5 md:h-5"/>}
-        </div>
-        <div>
-          <h2 className="font-bold text-base md:text-xl text-slate-800">{subject.name} - الوحدات</h2>
-          <p className="text-[10px] md:text-xs text-slate-500 font-medium">حدد الوحدة لفتح {isLessons ? 'الدروس' : 'التمارين'}</p>
-        </div>
-      </div>
-
-      <div className="space-y-8">
-        {[1, 2, 3].map(trimestreNum => {
-          const trimUnits = subject.units.filter((u: any) => u.trimestre === trimestreNum || (!u.trimestre && trimestreNum === 1));
-          if (trimUnits.length === 0) return null;
-          
-          return (
-            <div key={`trim-${trimestreNum}`} className="space-y-4">
-              <h3 className="font-bold text-lg md:text-xl text-slate-800 flex items-center gap-2">
-                <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${trimestreNum === 1 ? 'bg-indigo-100 text-indigo-600' : trimestreNum === 2 ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>
-                  {trimestreNum}
-                </span>
-                الفصل {trimestreNum === 1 ? 'الأول' : trimestreNum === 2 ? 'الثاني' : 'الثالث'}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                {trimUnits.map((unit: any, index: number) => {
-                  let progress = 0;
-                  const total = (unit.lessons?.length || 0) + (unit.exercises?.length || 0);
-                  if (total > 0) {
-                    let completed = 0;
-                    unit.lessons?.forEach((l: any) => {
-                      if (getProgressSync('completed_lesson', l.id) === 1) completed++;
-                    });
-                    unit.exercises?.forEach((e: any) => {
-                      if (getProgressSync('completed_exercise', e.id) === 1) completed++;
-                    });
-                    progress = Math.round((completed / total) * 100);
-                  }
-                  
-                  return (
-                  <div 
-                    key={unit.id}
-                    onClick={() => onUnitClick(unit)}
-                    className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300 hover:scale-[1.01] active:scale-[0.98]"
-                  >
-                    <div className="flex justify-between items-start">
-              <div className="w-full pl-6">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] md:text-xs font-bold text-slate-400 block">الوحدة {index + 1}</span>
-                  <span className="text-[10px] md:text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{progress}%</span>
-                </div>
-                <h3 className="font-bold text-sm md:text-lg text-slate-800 group-hover:text-blue-600 transition-colors line-clamp-1">{unit.name}</h3>
-                <div className="flex gap-3 md:gap-4 mt-2 md:mt-4 text-xs md:text-sm text-slate-500 font-medium">
-                  <span className="flex items-center gap-1 md:gap-1.5"><FileText size={14} className="text-blue-400"/> {unit.lessons?.length || 0} دروس</span>
-                  <span className="flex items-center gap-1 md:gap-1.5"><ClipboardList size={14} className="text-emerald-400"/> {unit.exercises?.length || 0} تمارين</span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-1 mt-4 overflow-hidden">
-                   <div className="h-full rounded-full bg-blue-500 transition-all duration-1000" style={{ width: `${progress}%` }} />
-                </div>
-              </div>
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all shrink-0">
-                <ChevronLeft size={16} className="md:w-5 md:h-5" />
-              </div>
-            </div>
-          </div>
-        )})}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  )
-}
-
-function UnitDetailsView({ subject, unit, onBack, onSelectType }: { subject: any, unit: any, onBack: () => void, onSelectType: (t: 'lessons' | 'exercises') => void }) {
-  return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
-        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold hover:scale-[1.05] active:scale-95">
-          <ChevronRight size={18} className="md:w-5 md:h-5" />
-        </button>
-        <div>
-          <h2 className="font-bold text-base md:text-xl text-slate-800">{unit.name}</h2>
-          <p className="text-[10px] md:text-xs text-slate-500 font-medium">{subject.name}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-6">
-        <div 
-           onClick={() => onSelectType('lessons')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-blue-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-blue-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
-        >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-sm">
-             <PlayCircle size={28} className="md:w-10 md:h-10" />
-           </div>
-           <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-blue-700 transition-colors">الدروس</h3>
-           <p className="text-[10px] md:text-sm text-slate-500 leading-tight">مشاهدة الدروس والملخصات</p>
-        </div>
-
-        <div 
-           onClick={() => onSelectType('exercises')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
-        >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:-rotate-3 transition-transform shadow-sm">
-             <ClipboardList size={28} className="md:w-10 md:h-10" />
-           </div>
-           <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-emerald-700 transition-colors">التمارين</h3>
-           <p className="text-[10px] md:text-sm text-slate-500 leading-tight">حل تمارين تطبيقية مع التصحيح</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function ContentListView({ subject, unit, listType, onBack, onSelectItem }: { subject: any, unit: any, listType: 'lessons' | 'exercises', onBack: () => void, onSelectItem?: (item: any) => void }) {
-  const items = listType === 'lessons' ? unit.lessons : unit.exercises;
-  const isLessons = listType === 'lessons';
-
-  return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center justify-between mb-2 md:mb-4">
-        <div className="flex items-center gap-3 md:gap-4">
-          <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
-            <ChevronRight size={18} className="md:w-5 md:h-5" />
-          </button>
-          <div>
-            <h2 className="font-bold text-base md:text-xl text-slate-800">{isLessons ? 'قائمة الدروس' : 'قائمة التمارين'}</h2>
-            <p className="text-[10px] md:text-xs text-slate-500 font-medium">{unit.name}</p>
-          </div>
-        </div>
-        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl ${isLessons ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'} flex items-center justify-center shadow-sm`}>
-           {isLessons ? <PlayCircle size={16} className="md:w-5 md:h-5"/> : <ClipboardList size={16} className="md:w-5 md:h-5"/>}
-        </div>
-      </div>
-
-      <div className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 shadow-sm">
-        {items.length === 0 ? (
-          <div className="text-center py-10 text-slate-500 font-bold text-sm md:text-base">لا يوجد محتوى حالياً</div>
-        ) : (
-          <div className="space-y-2 md:space-y-3">
-            {isLessons ? (
-              items.map((item: any, idx: number) => (
-                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-5 bg-white/70 hover:bg-white rounded-2xl md:rounded-3xl border border-slate-100 transition-all group">
-                  <div className="flex items-center gap-3 md:gap-4 mb-3 sm:mb-0">
-                    <div className={"w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full flex items-center justify-center font-bold text-xs md:text-sm shadow-sm bg-blue-50 text-blue-600 border border-blue-100"}>
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-800 text-xs md:text-base">{item.title}</h4>
-                      <p className="text-[10px] md:text-xs font-bold text-slate-400 mt-1 md:mt-1.5 flex items-center gap-1 md:gap-1.5">
-                        <ClipboardList size={10} className="text-emerald-500 md:w-3 md:h-3"/>
-                        {`يقابله: ${unit.exercises[idx]?.title || 'لا يوجد تمرين'}`}
-                      </p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => onSelectItem && onSelectItem(item)}
-                    className="px-4 py-2 md:px-6 md:py-2.5 rounded-xl text-[10px] md:text-sm font-bold text-white transition-all shadow-sm w-full sm:w-auto flex justify-center items-center gap-1.5 md:gap-2 bg-blue-600 hover:bg-blue-700 hover:shadow-md"
-                  >
-                    شاهد الدرس
-                    <ChevronLeft size={14} className="opacity-70 md:w-4 md:h-4" />
-                  </button>
-                </div>
-              ))
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                {items.map((item: any, idx: number) => (
-                  <div 
-                    key={item.id} 
-                    onClick={() => onSelectItem && onSelectItem(item)}
-                    className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300 relative overflow-hidden flex flex-col min-h-[140px]"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
-                        <ClipboardList size={20} className="md:w-6 md:h-6"/>
-                      </div>
-                      <span className="text-[10px] md:text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md">تمرين {idx + 1}</span>
-                    </div>
-                    <h3 className="font-bold text-sm md:text-lg text-slate-800 group-hover:text-emerald-600 transition-colors line-clamp-2 leading-tight flex-1">{item.title}</h3>
-                    <div className="mt-4 flex items-center justify-between text-[10px] md:text-xs font-bold text-slate-500 relative z-10 w-full">
-                       <span>اضغط للبدء</span>
-                       <ChevronLeft size={14} className="text-emerald-500 group-hover:-translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function LessonDetailsView({ subject, unit, lesson, onBack }: { subject: any, unit: any, lesson: any, onBack: () => void }) {
-  useEffect(() => {
-    if (lesson?.id) {
-      if (getProgressSync('completed_lesson', lesson.id) === 0) {
-        addXP(10);
-      }
-      saveProgress('completed_lesson', lesson.id, 1);
-    }
-  }, [lesson?.id]);
-
-  const getLessonContent = () => {
-    if (lesson?.content) return lesson.content;
-    return `### محتوى الدرس
-هذا هو المحتوى التجريبي للدرس: **${lesson?.title || 'بلا عنوان'}**.
-
-يمكنك هنا قراءة المفاهيم، التعرف على القوانين الأساسية والملاحظات الهامة.
-    `;
-  };
-
-  return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
-        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
-          <ChevronRight size={18} className="md:w-5 md:h-5" />
-        </button>
-        <div>
-          <h2 className="font-bold text-base md:text-xl text-slate-800">{lesson?.title}</h2>
-          <p className="text-[10px] md:text-xs text-slate-500 font-medium">{subject?.name} - {unit?.name}</p>
-        </div>
-      </div>
-
-      <div className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8">
-        <div className="prose prose-sm md:prose-base prose-slate max-w-none text-right" dir="rtl">
-           <div className="markdown-body">
-             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-               {preprocessMath(getLessonContent())}
-             </ReactMarkdown>
-           </div>
-        </div>
-        <div className="mt-8 flex justify-center">
-           <div className="inline-flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl text-sm font-bold">
-             <CheckCircle size={18} />
-             <span>تم تحديث نسبة الإنجاز تلقائياً</span>
-           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject: any, unit: any, exercise: any, onBack: () => void }) {
-  const [showAnswers, setShowAnswers] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const solutionRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    if (showAnswers && solutionRef.current) {
-      setTimeout(() => {
-        const element = solutionRef.current;
-        if (element) {
-          const y = element.getBoundingClientRect().top + window.scrollY - 30;
-          window.scrollTo({ top: y, behavior: 'smooth' });
-        }
-      }, 300);
-    }
-  }, [showAnswers]);
-  
-  const getExerciseData = () => {
-    if (exercise?.content) {
-      try {
-        const parsed = JSON.parse(exercise.content);
-        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].exam) {
-           return parsed[0];
-        }
-      } catch (e) {
-        console.error("Failed to parse exercise content", e);
-      }
-    }
-    
-    // Default fallback
-    return {
-       exam: "لم يتم العثور على نص التمرين أو حدث خطأ في التحميل.",
-       solution: "لم يتم العثور على التصحيح النموذجي."
-    };
-  };
-
-  const [currentExercise, setCurrentExercise] = useState(() => getExerciseData());
-
-  const generateNewExercise = async () => {
-    setErrorMsg(null);
-    let apiKey = '';
-    let aiModel = 'gemini-2.5-flash';
-    if (supabase) {
-      const { data } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
-      if (data && data.api_key) {
-        apiKey = data.api_key;
-        aiModel = data.ai_model || 'gemini-2.5-flash';
-      }
-    }
-
-    if (!apiKey) {
-      setErrorMsg("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
-      return;
-    }
-
-    setIsGenerating(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const prompt = getSubjectPrompt(subject?.name || '', unit?.name || '', exercise?.title || '');
-      const newPrompt = prompt + "\n\nملاحظة مهمة: يرجى توليد تمرين مشابه للتمرين السابق من حيث الفكرة، لكن بمعطيات جديدة أو أرقام مختلفة تماماً، لكي يتدرب الطالب بشكل أفضل.";
-
-      const response = await ai.models.generateContent({
-        model: aiModel,
-        contents: newPrompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              exam: { type: Type.STRING, description: "نص موضوع الامتحان بتنسيق Markdown. لا تضع الحل هنا." },
-              solution: { type: Type.STRING, description: "نص التصحيح النموذجي للامتحان بتنسيق Markdown" }
-            },
-            required: ["exam", "solution"]
-          }
-        }
-      });
-      
-      if (response.text) {
-        const jsonStr = response.text.trim();
-        const parsedData = JSON.parse(jsonStr);
-        setCurrentExercise(parsedData);
-        setShowAnswers(false);
-      } else {
-        throw new Error("لم يتم إرجاع أي استجابة من المولد.");
-      }
-    } catch (e: any) {
-      setErrorMsg("حدث خطأ أثناء التوليد: " + e.message);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 print:hidden gap-4">
-        <button onClick={onBack} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 shadow-sm border border-slate-100 shrink-0">
-          <ChevronRight size={20} />
-        </button>
-        <div className="flex flex-wrap gap-2 w-full md:w-auto">
-           <button 
-             onClick={generateNewExercise}
-             disabled={isGenerating}
-             className="px-4 md:px-5 py-2 bg-blue-100 text-blue-700 font-bold rounded-xl hover:bg-blue-200 transition flex items-center justify-center gap-2 text-sm shadow-sm flex-1 md:flex-none disabled:opacity-50"
-           >
-             <RefreshCw size={16} className={isGenerating ? "animate-spin" : ""} /> 
-             <span>{isGenerating ? 'جاري التوليد...' : 'تمرين جديد'}</span>
-           </button>
-           <button 
-             onClick={() => {
-               setShowAnswers(!showAnswers);
-               if (!showAnswers && exercise?.id) {
-                 if (getProgressSync('completed_exercise', exercise.id) === 0) {
-                   addXP(15);
-                 }
-                 saveProgress('completed_exercise', exercise.id, 1);
-               }
-             }} 
-             className="px-4 md:px-5 py-2 bg-emerald-100 text-emerald-700 font-bold rounded-xl hover:bg-emerald-200 transition text-sm shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
-           >
-             <CheckCircle size={16} /> <span>{showAnswers ? 'إخفاء الحل' : 'عرض الحل'}</span>
-           </button>
-        </div>
-      </div>
-
-      {errorMsg && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 text-sm font-bold flex items-center gap-2">
-          <X className="shrink-0" />
-          <p>{errorMsg}</p>
-        </div>
-      )}
-
-      <div className="bg-white mx-auto shadow-sm border border-slate-200 print:shadow-none print:border-none p-6 md:p-12 lg:p-16 text-slate-900 border-t-[12px] border-t-slate-800 relative z-10 font-[Traditional_Arabic,serif] text-base md:text-lg" style={{ minHeight: '29.7cm' }}>
-         <div className="text-center mb-10 border-b border-slate-300 pb-8">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-y-4 gap-x-2 text-right mb-6 bg-slate-50 p-4 border border-slate-200">
-               <div className="md:col-span-2"><span className="font-bold">المادة:</span> {subject?.name || 'غير محدد'}</div>
-               <div className="md:col-span-2"><span className="font-bold">الوحدة:</span> {unit?.name || 'غير محدد'}</div>
-               <div className="col-span-1 md:col-span-4 mt-2"><span className="font-bold">الموضوع:</span> {exercise?.title || 'تمرين عام'}</div>
-            </div>
-         </div>
-
-         <div className="markdown-body rtl prose max-w-none text-right">
-           <ReactMarkdown 
-             remarkPlugins={[remarkGfm, remarkMath]}
-             rehypePlugins={[rehypeKatex]}
-             components={{
-               table: ({node, ...props}: any) => (
-                 <div className="overflow-x-auto w-full mb-6 relative" dir="auto">
-                   <table {...props} className="w-full text-center border-collapse border border-slate-300" />
-                 </div>
-               ),
-               th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
-               td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
-             }}
-           >
-             {preprocessMath(currentExercise.exam?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2'))}
-           </ReactMarkdown>
-         </div>
-
-         {showAnswers && currentExercise.solution && (
-            <div ref={solutionRef} className="mt-8 border-t-2 border-emerald-500 pt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-               <div className="text-center mb-6">
-                 <h3 className="text-xl font-bold text-emerald-700 bg-emerald-50 inline-block px-6 py-2 rounded-full border border-emerald-200">التصحيح النموذجي</h3>
-               </div>
-               <div className="markdown-body rtl prose max-w-none text-right">
-                 <ReactMarkdown 
-                  remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
-                  components={{
-                    table: ({node, ...props}: any) => (
-                      <div className="overflow-x-auto w-full mb-6 relative" dir="auto">
-                        <table {...props} className="w-full text-center border-collapse border border-slate-300" />
-                      </div>
-                    ),
-                    th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
-                    td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
-                  }}
-                 >
-                  {preprocessMath(currentExercise.solution?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2'))}
-                 </ReactMarkdown>
-               </div>
-            </div>
-         )}
-         
-         <div className="mt-20 pt-8 border-t border-slate-300 text-center text-sm font-bold text-slate-600 block">
-            — بالتوفيق والنجاح —
-         </div>
-      </div>
-    </div>
-  )
-}
-
