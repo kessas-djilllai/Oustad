@@ -3,8 +3,6 @@ import { motion } from 'framer-motion';
 import { ChevronRight, Target, CheckCircle, ChevronLeft } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
-
 export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => void }) {
   const [step, setStep] = useState(0);
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
@@ -18,12 +16,22 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
 
   const handleGenerateQuiz = async () => {
     if (!selectedSubject || !selectedUnit) return;
+
+    const apiKey = localStorage.getItem('admin_api_key');
+    if (!apiKey) {
+      alert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
+      return;
+    }
+
     setLoading(true);
     try {
-      const prompt = `أنت أستاذ خبير يضع كويز (اختبار قصير) للطلاب. المادة: ${selectedSubject.name}. الوحدة: ${selectedUnit.name}. قم بإنشاء 10 أسئلة دقيقة (QCM) حول هذه الوحدة. يجب أن يكون هناك 4 خيارات لكل سؤال، مع تحديد الإجابة الصحيحة (رقم الفهرس من 0 إلى 3). تأكد من صحة المعلومات وأن الأسئلة في المستوى المناسب.`;
+      const ai = new GoogleGenAI({ apiKey });
+      const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-2.5-flash';
+
+      const prompt = `أنت أستاذ خبير يضع كويز (اختبار قصير) للطلاب. المادة: ${selectedSubject.name}. الوحدة: ${selectedUnit.name}. قم بإنشاء 10 أسئلة دقيقة (QCM) حول هذه الوحدة. يجب أن يكون هناك 4 خيارات لكل سؤال، مع تحديد الإجابة الصحيحة (رقم الفهرس من 0 إلى 3). تأكد من صحة المعلومات وأن الأسئلة في المستوى المناسب.\n\nتنبيه حرج جداً: إذا احتجت لكتابة معادلات رياضية أو فيزيائية، استخدم صيغ LaTeX الصحيحة واستخدم $ أو $$، وبما أن المخرجات ستكون بصيغة JSON، يجب عليك عمل هروب (Escape) لكل علامة مائلة عكسية (Backslash) عن طريق مضاعفتها، مثلاً اكتب \\\\frac بدلاً من \\frac. الإغلاق الخاطئ للمعادلات سيؤدي لتعطل التطبيق.`;
       
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: aiModel,
         contents: prompt,
         config: {
             responseMimeType: "application/json",
