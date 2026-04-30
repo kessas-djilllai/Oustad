@@ -1014,11 +1014,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
 
       <div className="bg-white mx-auto shadow-sm border border-slate-200 print:shadow-none print:border-none p-6 md:p-12 lg:p-16 text-slate-900 border-t-[12px] border-t-slate-800 relative z-10 font-[Traditional_Arabic,serif] text-base md:text-lg" style={{ minHeight: '29.7cm' }}>
          <div className="text-center mb-10 border-b border-slate-300 pb-8">
-            <h1 className="text-lg md:text-xl font-bold mb-2">الجمهورية الجزائرية الديمقراطية الشعبية</h1>
-            <h2 className="text-md md:text-lg font-bold mb-8">وزارة التربية الوطنية</h2>
-            
             <div className="grid grid-cols-1 md:grid-cols-4 gap-y-4 gap-x-2 text-right mb-6 bg-slate-50 p-4 border border-slate-200">
-               <div className="col-span-1 md:col-span-4 text-center font-bold text-xl md:text-2xl mb-4 text-slate-800 border-b border-slate-200 pb-4">تدريب إضافي (تمرين مقترح من الذكاء الاصطناعي)</div>
                <div className="md:col-span-2"><span className="font-bold">المادة:</span> {subject?.name || 'غير محدد'}</div>
                <div className="md:col-span-2"><span className="font-bold">الوحدة:</span> {unit?.name || 'غير محدد'}</div>
                <div className="col-span-1 md:col-span-4 mt-2"><span className="font-bold">الموضوع:</span> {exercise?.title || 'تمرين عام'}</div>
@@ -1031,7 +1027,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
              rehypePlugins={[rehypeKatex]}
              components={{
                table: ({node, ...props}: any) => (
-                 <div className="overflow-x-auto w-full mb-6 relative" dir="ltr">
+                 <div className="overflow-x-auto w-full mb-6 relative" dir="rtl">
                    <table {...props} className="w-full text-center border-collapse border border-slate-300" />
                  </div>
                ),
@@ -1054,7 +1050,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                   rehypePlugins={[rehypeKatex]}
                   components={{
                     table: ({node, ...props}: any) => (
-                      <div className="overflow-x-auto w-full mb-6 relative" dir="ltr">
+                      <div className="overflow-x-auto w-full mb-6 relative" dir="rtl">
                         <table {...props} className="w-full text-center border-collapse border border-slate-300" />
                       </div>
                     ),
