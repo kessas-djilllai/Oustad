@@ -896,8 +896,16 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
   const [currentExercise, setCurrentExercise] = useState(() => getExerciseData());
 
   const generateNewExercise = async () => {
-    const apiKey = localStorage.getItem('admin_api_key');
-    const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-2.5-flash';
+    let apiKey = '';
+    let aiModel = 'gemini-2.5-flash';
+    if (supabase) {
+      const { data } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
+      if (data && data.api_key) {
+        apiKey = data.api_key;
+        aiModel = data.ai_model || 'gemini-2.5-flash';
+      }
+    }
+
     if (!apiKey) {
       alert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
       return;

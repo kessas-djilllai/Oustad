@@ -8,6 +8,7 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { getQuizPrompt } from "../lib/promptQuiz";
+import { supabase } from "../lib/supabase";
 
 export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => void }) {
   const [step, setStep] = useState(0);
@@ -23,7 +24,16 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
   const handleGenerateQuiz = async () => {
     if (!selectedSubject || !selectedUnit) return;
 
-    const apiKey = localStorage.getItem('admin_api_key');
+    let apiKey = '';
+    let aiModel = 'gemini-2.5-flash';
+    if (supabase) {
+      const { data } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
+      if (data && data.api_key) {
+        apiKey = data.api_key;
+        aiModel = data.ai_model || 'gemini-2.5-flash';
+      }
+    }
+
     if (!apiKey) {
       alert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
       return;
@@ -32,7 +42,6 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
     setLoading(true);
     try {
       const ai = new GoogleGenAI({ apiKey });
-      const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-2.5-flash';
 
       const prompt = getQuizPrompt(selectedSubject.name, selectedUnit.name);
       

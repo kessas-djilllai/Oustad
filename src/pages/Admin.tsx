@@ -64,19 +64,13 @@ function AlertModal() {
   );
 }
 
-function StatCard({ title, value, trend, icon }: { title: string, value: string, trend: string, icon: React.ReactNode }) {
-  const isPositive = trend.startsWith('+');
+function StatCard({ title, value, icon }: { title: string, value: string, icon: React.ReactNode }) {
   return (
-    <div className="glass rounded-2xl p-4 md:p-5 flex flex-col justify-between aspect-square md:aspect-auto md:h-32">
-      <div className="flex justify-between items-start mb-2 md:mb-4">
-        <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
-          {icon}
-        </div>
-        <span className={`text-[10px] md:text-xs font-bold px-2 py-1 rounded-lg ${isPositive ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-          {trend}
-        </span>
+    <div className="glass rounded-2xl p-3 md:p-4 flex flex-col gap-2 relative overflow-hidden">
+      <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-white/60 flex items-center justify-center shadow-sm">
+        {icon}
       </div>
-      <div>
+      <div className="mt-1">
         <h4 className="text-[10px] md:text-xs text-slate-500 font-bold mb-1">{title}</h4>
         <div className="text-xl md:text-2xl font-black text-slate-800">{value}</div>
       </div>
@@ -200,6 +194,8 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [title, setTitle] = useState('');
+  const [jsonInput, setJsonInput] = useState('');
+  const [isBulkMode, setIsBulkMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -225,29 +221,81 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase || !selectedUnitId || !title) {
-       triggerAlert('الرجاء التأكد من تعبئة جميع الحقول وإعداد قاعدة البيانات (Supabase).', 'error');
-       return;
+    if (!supabase || !selectedUnitId) {
+      triggerAlert('الرجاء اختيار الوحدة.', 'error');
+      return;
     }
-    setIsSubmitting(true);
-    try {
-      const lesson_id = 'l_' + Math.random().toString(36).substr(2, 9);
-      const { error } = await supabase.from('lessons').insert([{
-        id: lesson_id,
-        unit_id: selectedUnitId,
-        title: title,
-        lesson_order: 99 // simplistic order for demo
-      }]);
-      if (!error) {
-        triggerAlert('تمت إضافة الدرس بنجاح!', 'success');
-        onBack();
-      } else {
-        triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
+
+    if (isBulkMode) {
+      if (!jsonInput) {
+        triggerAlert('الرجاء إدخال نص JSON صالحة.', 'error');
+        return;
       }
-    } catch (err: any) {
-      triggerAlert('حدث خطأ غير متوقع: ' + err.message, 'error');
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(true);
+      try {
+        let items: any[] = [];
+        try {
+          items = JSON.parse(jsonInput);
+        } catch (e) {
+          triggerAlert('صيغة JSON غير صحيحة.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!Array.isArray(items)) {
+          triggerAlert('يجب أن يكون JSON عبارة عن مصفوفة (Array).', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const inserts = items.map((item, index) => {
+          const titleStr = typeof item === 'string' ? item : item.title || item.name;
+          if (!titleStr) throw new Error('لا يمكن العثور على عنوان في أحد العناصر.');
+          return {
+            id: 'l_' + Math.random().toString(36).substr(2, 9) + index,
+            unit_id: selectedUnitId,
+            title: titleStr,
+            lesson_order: 99
+          };
+        });
+
+        const { error } = await supabase.from('lessons').insert(inserts);
+        if (!error) {
+          triggerAlert(`تم إضافة ${inserts.length} درس بنجاح!`, 'success');
+          onBack();
+        } else {
+          triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
+        }
+      } catch (err: any) {
+        triggerAlert('حدث خطأ: ' + err.message, 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      if (!title) {
+         triggerAlert('الرجاء كتابة عنوان الدرس.', 'error');
+         return;
+      }
+      setIsSubmitting(true);
+      try {
+        const lesson_id = 'l_' + Math.random().toString(36).substr(2, 9);
+        const { error } = await supabase.from('lessons').insert([{
+          id: lesson_id,
+          unit_id: selectedUnitId,
+          title: title,
+          lesson_order: 99 // simplistic order for demo
+        }]);
+        if (!error) {
+          triggerAlert('تمت إضافة الدرس بنجاح!', 'success');
+          onBack();
+        } else {
+          triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
+        }
+      } catch (err: any) {
+        triggerAlert('حدث خطأ غير متوقع: ' + err.message, 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -294,17 +342,48 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
             </select>
         </div>
 
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-2">عنوان الدرس</label>
-          <input 
-            type="text" 
-            value={title} 
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="مثال: الاستمرارية والاشتقاقية"
-            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
-            required
-          />
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setIsBulkMode(false)}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!isBulkMode ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            إضافة فردية
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsBulkMode(true)}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${isBulkMode ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            إضافة متعددة (JSON)
+          </button>
         </div>
+
+        {!isBulkMode ? (
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">عنوان الدرس</label>
+            <input 
+              type="text" 
+              value={title} 
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="مثال: الاستمرارية والاشتقاقية"
+              className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+              required={!isBulkMode}
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">النص (JSON Array)</label>
+            <textarea 
+              value={jsonInput} 
+              onChange={(e) => setJsonInput(e.target.value)}
+              placeholder='مثال:&#10;["الدرس الأول", "الدرس الثاني"]&#10;أو&#10;[{"title": "الدرس الأول"}, {"title": "الدرس الثاني"}]'
+              className="w-full h-32 bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono"
+              dir="ltr"
+              required={isBulkMode}
+            />
+          </div>
+        )}
 
         <button 
           type="submit" 
@@ -354,8 +433,16 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
   }, [selectedSubjectId]);
 
   const generateWithAI = async () => {
-    const apiKey = localStorage.getItem('admin_api_key');
-    const aiModel = localStorage.getItem('admin_ai_model') || 'gemini-2.5-flash';
+    let apiKey = '';
+    let aiModel = 'gemini-2.5-flash';
+    if (supabase) {
+      const { data } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
+      if (data && data.api_key) {
+        apiKey = data.api_key;
+        aiModel = data.ai_model || 'gemini-2.5-flash';
+      }
+    }
+    
     if (!apiKey) {
       triggerAlert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات أولاً.", 'error');
       return;
@@ -615,6 +702,8 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [name, setName] = useState('');
+  const [jsonInput, setJsonInput] = useState('');
+  const [isBulkMode, setIsBulkMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -628,26 +717,75 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase || !name || !selectedSubjectId) return;
-    setIsSubmitting(true);
-    try {
-      const id = 'u_' + Math.random().toString(36).substr(2, 9);
-      const { error } = await supabase.from('units').insert([{
-        id,
-        subject_id: selectedSubjectId,
-        name,
-        unit_order: 99
-      }]);
-      if (!error) {
-        triggerAlert('تمت إضافة الوحدة بنجاح!', 'success');
-        onBack();
-      } else {
-        triggerAlert('حدث خطأ: ' + error.message, 'error');
+    if (!supabase || !selectedSubjectId) return;
+
+    if (isBulkMode) {
+      if (!jsonInput) {
+        triggerAlert('الرجاء إدخال نص JSON صالحة.', 'error');
+        return;
       }
-    } catch (err: any) {
-      triggerAlert('خطأ: ' + err.message, 'error');
-    } finally {
-      setIsSubmitting(false);
+      setIsSubmitting(true);
+      try {
+        let items: any[] = [];
+        try {
+          items = JSON.parse(jsonInput);
+        } catch (e) {
+          triggerAlert('صيغة JSON غير صحيحة.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (!Array.isArray(items)) {
+          triggerAlert('يجب أن يكون JSON عبارة عن مصفوفة (Array).', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const inserts = items.map((item, index) => {
+          const nameStr = typeof item === 'string' ? item : item.name || item.title;
+          if (!nameStr) throw new Error('لا يمكن العثور على اسم في أحد العناصر.');
+          return {
+            id: 'u_' + Math.random().toString(36).substr(2, 9) + index,
+            subject_id: selectedSubjectId,
+            name: nameStr,
+            unit_order: 99
+          };
+        });
+
+        const { error } = await supabase.from('units').insert(inserts);
+        if (!error) {
+          triggerAlert(`تم إضافة ${inserts.length} وحدة بنجاح!`, 'success');
+          onBack();
+        } else {
+          triggerAlert('حدث خطأ: ' + error.message, 'error');
+        }
+      } catch (err: any) {
+        triggerAlert('خطأ: ' + err.message, 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      if (!name) return;
+      setIsSubmitting(true);
+      try {
+        const id = 'u_' + Math.random().toString(36).substr(2, 9);
+        const { error } = await supabase.from('units').insert([{
+          id,
+          subject_id: selectedSubjectId,
+          name,
+          unit_order: 99
+        }]);
+        if (!error) {
+          triggerAlert('تمت إضافة الوحدة بنجاح!', 'success');
+          onBack();
+        } else {
+          triggerAlert('حدث خطأ: ' + error.message, 'error');
+        }
+      } catch (err: any) {
+        triggerAlert('خطأ: ' + err.message, 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -680,17 +818,48 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
           </select>
         </div>
 
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-2">اسم الوحدة</label>
-          <input 
-            type="text" 
-            value={name} 
-            onChange={(e) => setName(e.target.value)}
-            placeholder="مثال: الميكانيك الكلاسيكية"
-            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-            required
-          />
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setIsBulkMode(false)}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${!isBulkMode ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            إضافة فردية
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsBulkMode(true)}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${isBulkMode ? 'bg-white text-purple-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            إضافة متعددة (JSON)
+          </button>
         </div>
+
+        {!isBulkMode ? (
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">اسم الوحدة</label>
+            <input 
+              type="text" 
+              value={name} 
+              onChange={(e) => setName(e.target.value)}
+              placeholder="مثال: الميكانيك الكلاسيكية"
+              className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+              required={!isBulkMode}
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">النص (JSON Array)</label>
+            <textarea 
+              value={jsonInput} 
+              onChange={(e) => setJsonInput(e.target.value)}
+              placeholder='مثال:&#10;["الوحدة الأولى", "الوحدة الثانية"]&#10;أو&#10;[{"name": "الوحدة الأولى"}, {"name": "الوحدة الثانية"}]'
+              className="w-full h-32 bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm text-left focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-mono"
+              dir="ltr"
+              required={isBulkMode}
+            />
+          </div>
+        )}
 
         <button 
           type="submit" 
@@ -719,21 +888,20 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
   
   useEffect(() => {
     async function loadSettings() {
-      const savedModel = localStorage.getItem('admin_ai_model') || 'gemini-2.5-flash';
-      let currentKey = localStorage.getItem('admin_api_key') || '';
+      let currentKey = '';
+      let savedModel = 'gemini-2.5-flash';
       
-      setSelectedModel(savedModel);
-
       if (supabase) {
         try {
           const { data } = await supabase.from('admin_settings').select('*').limit(1).single();
           if (data && data.api_key) {
             currentKey = data.api_key;
-            setSelectedModel(data.ai_model || savedModel);
+            savedModel = data.ai_model || savedModel;
           }
         } catch (e) { }
       }
       
+      setSelectedModel(savedModel);
       setApiKey(currentKey);
       
       if (currentKey) {
@@ -828,16 +996,16 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
     }
     setIsSaving(true);
     try {
-      localStorage.setItem('admin_api_key', apiKey);
-      localStorage.setItem('admin_ai_model', selectedModel);
-      
       if (supabase) {
-        await supabase.from('admin_settings').upsert({ id: 1, api_key: apiKey, ai_model: selectedModel });
+        const { error } = await supabase.from('admin_settings').upsert({ id: 1, api_key: apiKey, ai_model: selectedModel });
+        if (error) throw error;
+        triggerAlert("تم حفظ الإعدادات بنجاح!", 'success');
+        onBack();
+      } else {
+        triggerAlert("يرجى إعداد قاعدة البيانات لحفظ الإعدادات.", 'error');
       }
-      triggerAlert("تم حفظ الإعدادات بنجاح!", 'success');
-      onBack();
     } catch (err: any) {
-      triggerAlert("حدث خطأ أثناء الحفظ في قاعدة البيانات: " + err.message + "\nتم الحفظ محلياً.", 'error');
+      triggerAlert("حدث خطأ أثناء الحفظ في قاعدة البيانات: " + err.message, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -1042,10 +1210,10 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <StatCard title="إجمالي المواد" value={stats.subjects.toString() || "0"} trend="+1" icon={<BookOpen size={20} className="text-blue-500"/>} />
-        <StatCard title="إجمالي الوحدات" value={stats.units.toString() || "0"} trend="+2" icon={<Target size={20} className="text-indigo-500"/>} />
-        <StatCard title="الدروس المضافة" value={stats.lessons.toString() || "0"} trend="+5" icon={<PlayCircle size={20} className="text-emerald-500"/>} />
-        <StatCard title="التمارين المتوفرة" value={stats.exercises.toString() || "0"} trend="+12" icon={<PenTool size={20} className="text-orange-500"/>} />
+        <StatCard title="إجمالي المواد" value={stats.subjects.toString() || "0"} icon={<BookOpen size={20} className="text-blue-500"/>} />
+        <StatCard title="إجمالي الوحدات" value={stats.units.toString() || "0"} icon={<Target size={20} className="text-indigo-500"/>} />
+        <StatCard title="الدروس المضافة" value={stats.lessons.toString() || "0"} icon={<PlayCircle size={20} className="text-emerald-500"/>} />
+        <StatCard title="التمارين المتوفرة" value={stats.exercises.toString() || "0"} icon={<PenTool size={20} className="text-orange-500"/>} />
       </div>
 
       {/* Main Admin Area */}
