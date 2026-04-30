@@ -9,6 +9,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { getQuizPrompt } from "../lib/promptQuiz";
 import { supabase } from "../lib/supabase";
+import { preprocessMath } from "../lib/utils";
 
 export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => void }) {
   const [step, setStep] = useState(0);
@@ -217,7 +218,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
             </div>
             <div className="text-lg md:text-2xl font-bold text-slate-800 mb-8 md:mb-10 leading-relaxed text-center markdown-body quiz-markdown prose max-w-none" dir="rtl">
               <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                {questions[currentQuestionIdx].q}
+                {preprocessMath(questions[currentQuestionIdx].q)}
               </ReactMarkdown>
             </div>
             
@@ -243,7 +244,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                       dir="rtl"
                     >
                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                          {opt}
+                          {preprocessMath(opt)}
                       </ReactMarkdown>
                     </button>
                     {isAnswerChecked && idx === questions[currentQuestionIdx].correct && questions[currentQuestionIdx].justification && (
@@ -253,7 +254,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                         </h4>
                         <div className="text-sm md:text-base markdown-body quiz-markdown" dir="rtl">
                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                              {questions[currentQuestionIdx].justification}
+                              {preprocessMath(questions[currentQuestionIdx].justification)}
                            </ReactMarkdown>
                         </div>
                       </div>

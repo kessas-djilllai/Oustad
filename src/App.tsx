@@ -10,6 +10,7 @@ import { AdminLayout, AdminLogin } from "./pages/Admin";
 import { QuizView } from "./components/QuizView";
 import { GoogleGenAI, Type } from "@google/genai";
 import { getSubjectPrompt } from "./lib/prompts";
+import { preprocessMath } from "./lib/utils";
 import { 
   BookOpen,
   Target, 
@@ -909,7 +910,7 @@ function LessonDetailsView({ subject, unit, lesson, onBack }: { subject: any, un
         <div className="prose prose-sm md:prose-base prose-slate max-w-none text-right" dir="rtl">
            <div className="markdown-body">
              <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-               {getLessonContent()}
+               {preprocessMath(getLessonContent())}
              </ReactMarkdown>
            </div>
         </div>
@@ -1077,7 +1078,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
              }}
            >
-             {currentExercise.exam?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
+             {preprocessMath(currentExercise.exam?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2'))}
            </ReactMarkdown>
          </div>
 
@@ -1100,7 +1101,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                     td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
                   }}
                  >
-                  {currentExercise.solution?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2')}
+                  {preprocessMath(currentExercise.solution?.replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2'))}
                  </ReactMarkdown>
                </div>
             </div>

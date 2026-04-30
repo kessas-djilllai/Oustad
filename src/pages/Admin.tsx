@@ -22,7 +22,8 @@ import {
   Menu,
   X,
   Wand2,
-  Cpu
+  Cpu,
+  Calendar
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -877,10 +878,103 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
   )
 }
 
+function AdminBacDate({ onBack }: { onBack: () => void }) {
+  const [bacDate, setBacDate] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    async function loadSettings() {
+      if (supabase) {
+        try {
+          const { data } = await supabase.from('admin_settings').select('bac_date').limit(1).single();
+          if (data && data.bac_date) {
+            setBacDate(data.bac_date);
+          }
+        } catch (e) { }
+      }
+    }
+    loadSettings();
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      if (supabase) {
+        const { data: currentData } = await supabase.from('admin_settings').select('*').limit(1).single();
+        const updateData = currentData ? { ...currentData, id: 1, bac_date: bacDate || null } : { id: 1, bac_date: bacDate || null };
+
+        const { error } = await supabase.from('admin_settings').upsert(updateData);
+        if (error) {
+           if (error.message.includes('bac_date')) {
+             throw new Error("يرجى تحديث قاعدة البيانات وتشغيل: ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS bac_date TEXT;");
+           }
+           throw error;
+        }
+        window.dispatchEvent(new CustomEvent('show-admin-alert', { detail: { message: "تم حفظ تاريخ البكالوريا بنجاح!", type: 'success' }}));
+        onBack();
+      } else {
+        window.dispatchEvent(new CustomEvent('show-admin-alert', { detail: { message: "يرجى إعداد قاعدة البيانات لحفظ الإعدادات.", type: 'error' }}));
+      }
+    } catch (err: any) {
+      window.dispatchEvent(new CustomEvent('show-admin-alert', { detail: { message: "حدث خطأ أثناء الحفظ: " + err.message, type: 'error' }}));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-[2rem] p-6 max-w-2xl mx-auto shadow-sm border border-slate-100">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
+          <ChevronRight size={20} />
+        </button>
+        <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center">
+           <Calendar size={24} />
+        </div>
+        <div>
+          <h2 className="font-bold text-xl text-slate-800">تاريخ البكالوريا</h2>
+          <p className="text-xs text-slate-500 font-bold mt-1">تحديد تاريخ الامتحان لإظهار العداد التنازلي للطلاب.</p>
+        </div>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-6">
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">تاريخ الامتحان القادم</label>
+          <input 
+            type="date" 
+            value={bacDate} 
+            onChange={(e) => setBacDate(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono"
+            dir="auto"
+          />
+        </div>
+
+        <button 
+          type="submit" 
+          disabled={isSaving}
+          className="w-full h-12 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold transition-all shadow-md flex items-center justify-center gap-2 disabled:bg-slate-300"
+        >
+          {isSaving ? (
+             <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                <span>جاري الحفظ...</span>
+             </div>
+          ) : (
+            <>
+               <Save size={20} />
+               حفظ الإعدادات
+            </>
+          )}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function AdminSettings({ onBack }: { onBack: () => void }) {
   const [apiKey, setApiKey] = useState('');
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
-  const [bacDate, setBacDate] = useState<string>('');
   const [availableModels, setAvailableModels] = useState<{id: string, name: string}[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -898,9 +992,6 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
           if (data && data.api_key) {
             currentKey = data.api_key;
             savedModel = data.ai_model || savedModel;
-          }
-          if (data && data.bac_date) {
-            setBacDate(data.bac_date);
           }
         } catch (e) { }
       }
@@ -1001,18 +1092,8 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
     setIsSaving(true);
     try {
       if (supabase) {
-        let updateData: any = { id: 1, api_key: apiKey, ai_model: selectedModel };
-        if (bacDate) {
-          updateData.bac_date = bacDate;
-        } else {
-          updateData.bac_date = null;
-        }
-        
-        const { error } = await supabase.from('admin_settings').upsert(updateData);
+        const { error } = await supabase.from('admin_settings').upsert({ id: 1, api_key: apiKey, ai_model: selectedModel });
         if (error) {
-           if (error.message.includes('bac_date')) {
-             throw new Error("يرجى تحديث قاعدة البيانات وتشغيل: ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS bac_date TEXT;");
-           }
            throw error;
         }
         triggerAlert("تم حفظ الإعدادات بنجاح!", 'success');
@@ -1043,16 +1124,6 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="space-y-6">
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-2">تاريخ البكالوريا</label>
-          <input 
-            type="date" 
-            value={bacDate} 
-            onChange={(e) => setBacDate(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono"
-            dir="auto"
-          />
-        </div>
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-2">مفتاح API الخاص بـ Gemini</label>
           <div className="flex gap-2">
@@ -1459,6 +1530,12 @@ export function AdminLayout() {
                <Cpu size={18} /> إعدادات الذكاء الاصطناعي
             </button>
             <button 
+              onClick={() => { setView('bac_date'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'bac_date' ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20' : 'text-slate-500 hover:bg-white/60'}`}
+            >
+               <Calendar size={18} /> تعيين تاريخ البكالوريا
+            </button>
+            <button 
               onClick={() => navigate('/')}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm text-slate-500 hover:bg-white/60"
             >
@@ -1508,6 +1585,7 @@ export function AdminLayout() {
              {view === 'manage_subjects' && <AdminAddSubject onBack={() => setView('dashboard')} />}
              {view === 'manage_units' && <AdminAddUnit onBack={() => setView('dashboard')} />}
              {view === 'settings' && <AdminSettings onBack={() => setView('dashboard')} />}
+             {view === 'bac_date' && <AdminBacDate onBack={() => setView('dashboard')} />}
           </div>
         )}
 
