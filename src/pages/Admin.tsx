@@ -703,6 +703,7 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [name, setName] = useState('');
+  const [trimestre, setTrimestre] = useState('1');
   const [jsonInput, setJsonInput] = useState('');
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -749,6 +750,7 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
             id: 'u_' + Math.random().toString(36).substr(2, 9) + index,
             subject_id: selectedSubjectId,
             name: nameStr,
+            trimestre: parseInt(trimestre),
             unit_order: 99
           };
         });
@@ -774,6 +776,7 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
           id,
           subject_id: selectedSubjectId,
           name,
+          trimestre: parseInt(trimestre),
           unit_order: 99
         }]);
         if (!error) {
@@ -837,17 +840,32 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
         </div>
 
         {!isBulkMode ? (
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">اسم الوحدة</label>
-            <input 
-              type="text" 
-              value={name} 
-              onChange={(e) => setName(e.target.value)}
-              placeholder="مثال: الميكانيك الكلاسيكية"
-              className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-              required={!isBulkMode}
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">اسم الوحدة</label>
+              <input 
+                type="text" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)}
+                placeholder="مثال: الميكانيك الكلاسيكية"
+                className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                required={!isBulkMode}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">الفصل الدراسي</label>
+              <select 
+                value={trimestre} 
+                onChange={(e) => setTrimestre(e.target.value)}
+                className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                required={!isBulkMode}
+              >
+                <option value="1">الفصل الأول</option>
+                <option value="2">الفصل الثاني</option>
+                <option value="3">الفصل الثالث</option>
+              </select>
+            </div>
+          </>
         ) : (
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">النص (JSON Array)</label>

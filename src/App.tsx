@@ -46,7 +46,9 @@ import {
   Printer,
   CheckCircle,
   RefreshCw,
-  X
+  X,
+  Flame,
+  Trophy
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -99,20 +101,8 @@ function StudentLayout({ session }: { session: any }) {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
-  const [xp, setXP] = useState(0);
-  const [streak, setStreak] = useState(0);
 
   const userName = session?.user?.user_metadata?.full_name || 'الطالب';
-
-  useEffect(() => {
-    const handleGamification = () => {
-      setXP(getXP());
-      setStreak(getStreak());
-    };
-    handleGamification(); // Initial load
-    window.addEventListener('progress_updated', handleGamification);
-    return () => window.removeEventListener('progress_updated', handleGamification);
-  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 2000);
@@ -142,14 +132,6 @@ function StudentLayout({ session }: { session: any }) {
             </div>
           </div>
           <div className="flex gap-2 relative">
-            <div className="flex items-center justify-center gap-1.5 h-10 glass rounded-2xl px-3 font-bold text-orange-500 shadow-sm border border-orange-100 bg-white/50">
-              <span className="text-sm leading-none mt-1" dir="ltr">{streak}</span>
-              <span className="leading-none">🔥</span>
-            </div>
-            <div className="flex items-center justify-center gap-1.5 h-10 glass rounded-2xl px-3 font-bold text-blue-500 shadow-sm border border-blue-100 bg-white/50">
-              <span className="text-sm leading-none mt-1" dir="ltr">{xp} XP</span>
-              <span className="leading-none">🏆</span>
-            </div>
             <button className="w-10 h-10 hidden sm:flex rounded-2xl glass glass-hover justify-center items-center text-slate-600 transition-all shrink-0">
               <Bell size={20} />
             </button>
@@ -524,6 +506,26 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
   });
 
   const [timeLeft, setTimeLeft] = useState<{days: number, hours: number, minutes: number} | null>(null);
+  const [xp, setXP] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  useEffect(() => {
+    const handleGamification = () => {
+      setXP(getXP());
+      setStreak(getStreak());
+    };
+    handleGamification();
+    window.addEventListener('progress_updated', handleGamification);
+    return () => window.removeEventListener('progress_updated', handleGamification);
+  }, []);
+
+  useEffect(() => {
+    const slideInterval = setInterval(() => {
+      setCurrentSlide((prev) => (prev === 0 ? 1 : 0));
+    }, 4000);
+    return () => clearInterval(slideInterval);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('dashboard_active_tab', activeTab);
@@ -605,49 +607,97 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
           </div>
         </div>
 
-        <button 
-           onClick={onStartQuiz}
-           className="col-span-1 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-row md:flex-col items-center md:items-start justify-between bg-gradient-to-br from-white to-blue-50/50 group text-right hover:shadow-lg transition-all"
-        >
-           <div className="flex items-center gap-3 md:gap-0 md:flex-col md:items-start">
-             <div className="relative w-14 h-14 md:w-16 md:h-16 md:mb-4 flex items-center justify-center">
-                <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-                  <circle
-                    className="text-indigo-100"
-                    strokeWidth="4"
-                    stroke="currentColor"
-                    fill="transparent"
-                    r={radius}
-                    cx="50%"
-                    cy="50%"
-                  />
-                  <circle
-                    className="text-indigo-500 drop-shadow-sm transition-all duration-1000"
-                    strokeWidth="4"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="transparent"
-                    r={radius}
-                    cx="50%"
-                    cy="50%"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center text-indigo-700 font-bold text-xs">
-                   {totalQuizProgress}%
+        <div className="col-span-1 min-h-[120px] md:min-h-[160px] relative">
+          <AnimatePresence mode="wait">
+            {currentSlide === 0 ? (
+              <motion.button 
+                key="quiz-card"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                onClick={onStartQuiz}
+                className="absolute inset-0 w-full h-full glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-row md:flex-col items-center md:items-start justify-between bg-gradient-to-br from-white to-indigo-50/50 group text-right hover:shadow-lg transition-all overflow-hidden border border-indigo-100/50"
+              >
+                <div className="absolute -left-10 -top-10 w-32 h-32 bg-indigo-400/20 rounded-full blur-2xl group-hover:bg-indigo-400/30 transition-all pointer-events-none" />
+                <div className="flex items-center gap-3 md:gap-0 md:flex-col md:items-start relative w-full">
+                  <div className="relative w-14 h-14 md:w-16 md:h-16 md:mb-4 flex items-center justify-center shrink-0">
+                    <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                      <circle
+                        className="text-indigo-100"
+                        strokeWidth="4"
+                        stroke="currentColor"
+                        fill="transparent"
+                        r={radius}
+                        cx="50%"
+                        cy="50%"
+                      />
+                      <circle
+                        className="text-indigo-500 drop-shadow-sm transition-all duration-1000"
+                        strokeWidth="4"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={strokeDashoffset}
+                        strokeLinecap="round"
+                        stroke="currentColor"
+                        fill="transparent"
+                        r={radius}
+                        cx="50%"
+                        cy="50%"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center text-indigo-700 font-bold text-xs">
+                       {totalQuizProgress}%
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] md:text-xs font-bold text-indigo-500 mb-0.5 md:mb-1">اختبار سريع (الكويز)</p>
+                    <h4 className="font-bold text-slate-800 text-sm md:text-lg leading-tight">تدرب الآن</h4>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <p className="text-[10px] md:text-xs font-bold text-indigo-500 mb-0.5 md:mb-1">اختبار سريع (الكويز)</p>
-                <h4 className="font-bold text-slate-800 text-sm md:text-lg leading-tight">تدرب الآن</h4>
-              </div>
-           </div>
-           <div className="flex items-center gap-1 text-[10px] md:text-xs text-indigo-600 font-bold bg-indigo-50 px-3 py-1.5 rounded-lg mt-0 md:mt-4 group-hover:bg-indigo-100 transition-colors">
-              <PlayCircle size={14} />
-             <span>ابدأ الكويز</span>
-           </div>
-        </button>
+                <div className="flex items-center gap-1 text-[10px] md:text-xs text-indigo-600 font-bold bg-indigo-50 px-3 py-1.5 rounded-lg mt-0 md:mt-4 group-hover:bg-indigo-100 transition-colors relative">
+                   <PlayCircle size={14} />
+                  <span>ابدأ الكويز</span>
+                </div>
+              </motion.button>
+            ) : (
+              <motion.div 
+                key="gami-card"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="absolute inset-0 w-full h-full glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col items-center justify-center bg-gradient-to-br from-white to-orange-50/40 relative overflow-hidden group shadow-sm border border-orange-100/50"
+              >
+                <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-orange-400/20 rounded-full blur-2xl transition-all pointer-events-none" />
+                <div className="absolute -right-5 -top-5 w-24 h-24 bg-blue-400/20 rounded-full blur-2xl transition-all pointer-events-none" />
+                <div className="flex w-full h-full items-center justify-around relative">
+                   <div className="flex flex-col items-center gap-1">
+                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-full glass border border-orange-100 flex items-center justify-center text-2xl md:text-3xl shadow-sm bg-white/60 text-orange-500 mb-1 relative overflow-hidden">
+                        <Flame size={32} fill="currentColor" className="text-orange-500 drop-shadow-sm z-10" />
+                        <div className="absolute inset-0 bg-orange-400/20 w-full h-full blur-xl" />
+                      </div>
+                      <span className="font-black text-slate-800 text-lg md:text-xl line-clamp-1">{streak}</span>
+                      <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">يوم متتالي</span>
+                   </div>
+                   <div className="w-px h-16 bg-slate-200/60" />
+                   <div className="flex flex-col items-center gap-1">
+                      <div className="w-12 h-12 md:w-16 md:h-16 rounded-full glass border border-blue-100 flex items-center justify-center text-2xl md:text-3xl shadow-sm bg-white/60 text-blue-500 mb-1 relative overflow-hidden">
+                        <Trophy size={32} fill="currentColor" className="text-blue-500 drop-shadow-sm z-10" />
+                        <div className="absolute inset-0 bg-blue-400/20 w-full h-full blur-xl" />
+                      </div>
+                      <span className="font-black text-slate-800 text-lg md:text-xl line-clamp-1">{xp}</span>
+                      <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">نقطة خبرة</span>
+                   </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {/* Pagination Indicators */}
+          <div className="absolute -bottom-5 md:-bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+             <div className={`w-1.5 h-1.5 rounded-full transition-all cursor-pointer hover:scale-110 ${currentSlide === 0 ? 'bg-indigo-500 w-3' : 'bg-slate-300'}`} onClick={() => setCurrentSlide(0)} />
+             <div className={`w-1.5 h-1.5 rounded-full transition-all cursor-pointer hover:scale-110 ${currentSlide === 1 ? 'bg-orange-500 w-3' : 'bg-slate-300'}`} onClick={() => setCurrentSlide(1)} />
+          </div>
+        </div>
       </div>
 
       <div>
@@ -691,9 +741,10 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => onSubjectClick(sub, activeTab)}
-                className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover"
+                className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover relative overflow-hidden"
               >
-                <div className="flex justify-between items-start mb-3 md:mb-6">
+                <div className={`absolute -left-10 -top-10 w-24 h-24 rounded-full blur-2xl opacity-10 group-hover:opacity-20 transition-all pointer-events-none ${sub.barColor}`} />
+                <div className="flex justify-between items-start mb-3 md:mb-6 relative">
                    <div className={`w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${sub.bg} ${sub.color} flex items-center justify-center shadow-sm`}>
                      <sub.icon size={18} className="md:w-6 md:h-6" />
                    </div>
@@ -778,28 +829,41 @@ function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject:
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-        {subject.units.map((unit: any, index: number) => {
-          let progress = 0;
-          const total = (unit.lessons?.length || 0) + (unit.exercises?.length || 0);
-          if (total > 0) {
-            let completed = 0;
-            unit.lessons?.forEach((l: any) => {
-              if (getProgressSync('completed_lesson', l.id) === 1) completed++;
-            });
-            unit.exercises?.forEach((e: any) => {
-              if (getProgressSync('completed_exercise', e.id) === 1) completed++;
-            });
-            progress = Math.round((completed / total) * 100);
-          }
+      <div className="space-y-8">
+        {[1, 2, 3].map(trimestreNum => {
+          const trimUnits = subject.units.filter((u: any) => u.trimestre === trimestreNum || (!u.trimestre && trimestreNum === 1));
+          if (trimUnits.length === 0) return null;
           
           return (
-          <div 
-            key={unit.id}
-            onClick={() => onUnitClick(unit)}
-            className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300 hover:scale-[1.01] active:scale-[0.98]"
-          >
-            <div className="flex justify-between items-start">
+            <div key={`trim-${trimestreNum}`} className="space-y-4">
+              <h3 className="font-bold text-lg md:text-xl text-slate-800 flex items-center gap-2">
+                <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm ${trimestreNum === 1 ? 'bg-indigo-100 text-indigo-600' : trimestreNum === 2 ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>
+                  {trimestreNum}
+                </span>
+                الفصل {trimestreNum === 1 ? 'الأول' : trimestreNum === 2 ? 'الثاني' : 'الثالث'}
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                {trimUnits.map((unit: any, index: number) => {
+                  let progress = 0;
+                  const total = (unit.lessons?.length || 0) + (unit.exercises?.length || 0);
+                  if (total > 0) {
+                    let completed = 0;
+                    unit.lessons?.forEach((l: any) => {
+                      if (getProgressSync('completed_lesson', l.id) === 1) completed++;
+                    });
+                    unit.exercises?.forEach((e: any) => {
+                      if (getProgressSync('completed_exercise', e.id) === 1) completed++;
+                    });
+                    progress = Math.round((completed / total) * 100);
+                  }
+                  
+                  return (
+                  <div 
+                    key={unit.id}
+                    onClick={() => onUnitClick(unit)}
+                    className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300 hover:scale-[1.01] active:scale-[0.98]"
+                  >
+                    <div className="flex justify-between items-start">
               <div className="w-full pl-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] md:text-xs font-bold text-slate-400 block">الوحدة {index + 1}</span>
@@ -820,6 +884,10 @@ function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject:
             </div>
           </div>
         )})}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   )
