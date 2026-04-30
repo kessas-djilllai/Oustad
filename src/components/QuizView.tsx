@@ -20,10 +20,12 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [isAnswerChecked, setIsAnswerChecked] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleGenerateQuiz = async () => {
     if (!selectedSubject || !selectedUnit) return;
 
+    setErrorMsg(null);
     let apiKey = '';
     let aiModel = 'gemini-2.5-flash';
     if (supabase) {
@@ -35,7 +37,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
     }
 
     if (!apiKey) {
-      alert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
+      setErrorMsg("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
       return;
     }
 
@@ -72,10 +74,12 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
       if (generated && generated.length > 0) {
         setQuestions(generated);
         setStep(2);
+      } else {
+        throw new Error("لم يتم إرجاع أي أسئلة.");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert('حدث خطأ أثناء توليد الكويز. أعد المحاولة.');
+      setErrorMsg('حدث خطأ أثناء توليد الكويز: ' + e.message);
     } finally {
       setLoading(false);
     }
@@ -180,6 +184,13 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
               ))}
               {(!selectedSubject?.units || selectedSubject.units.length === 0) && <div className="col-span-full text-center text-sm text-slate-400 py-4">لا توجد وحدات.</div>}
             </div>
+
+            {errorMsg && (
+              <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 text-sm font-bold flex items-center gap-2 mb-8 text-right text-right w-full">
+                <span className="shrink-0 font-bold">!</span>
+                <p>{errorMsg}</p>
+              </div>
+            )}
 
             <button 
               onClick={handleNext}

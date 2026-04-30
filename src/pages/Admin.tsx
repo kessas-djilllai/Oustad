@@ -880,6 +880,7 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
 function AdminSettings({ onBack }: { onBack: () => void }) {
   const [apiKey, setApiKey] = useState('');
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [bacDate, setBacDate] = useState<string>('');
   const [availableModels, setAvailableModels] = useState<{id: string, name: string}[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -897,6 +898,9 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
           if (data && data.api_key) {
             currentKey = data.api_key;
             savedModel = data.ai_model || savedModel;
+          }
+          if (data && data.bac_date) {
+            setBacDate(data.bac_date);
           }
         } catch (e) { }
       }
@@ -997,15 +1001,27 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
     setIsSaving(true);
     try {
       if (supabase) {
-        const { error } = await supabase.from('admin_settings').upsert({ id: 1, api_key: apiKey, ai_model: selectedModel });
-        if (error) throw error;
+        let updateData: any = { id: 1, api_key: apiKey, ai_model: selectedModel };
+        if (bacDate) {
+          updateData.bac_date = bacDate;
+        } else {
+          updateData.bac_date = null;
+        }
+        
+        const { error } = await supabase.from('admin_settings').upsert(updateData);
+        if (error) {
+           if (error.message.includes('bac_date')) {
+             throw new Error("يرجى تحديث قاعدة البيانات وتشغيل: ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS bac_date TEXT;");
+           }
+           throw error;
+        }
         triggerAlert("تم حفظ الإعدادات بنجاح!", 'success');
         onBack();
       } else {
         triggerAlert("يرجى إعداد قاعدة البيانات لحفظ الإعدادات.", 'error');
       }
     } catch (err: any) {
-      triggerAlert("حدث خطأ أثناء الحفظ في قاعدة البيانات: " + err.message, 'error');
+      triggerAlert("حدث خطأ أثناء الحفظ: " + err.message, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -1027,6 +1043,16 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="space-y-6">
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">تاريخ البكالوريا</label>
+          <input 
+            type="date" 
+            value={bacDate} 
+            onChange={(e) => setBacDate(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all font-mono"
+            dir="auto"
+          />
+        </div>
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-2">مفتاح API الخاص بـ Gemini</label>
           <div className="flex gap-2">

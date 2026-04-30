@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -245,6 +245,7 @@ function StudentPortal({ loading }: { loading: boolean }) {
   
   const [dbLoading, setDbLoading] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [bacDate, setBacDate] = useState<string | null>(null);
 
   useEffect(() => {
     const handleProgressUpdate = () => {
@@ -286,11 +287,12 @@ function StudentPortal({ loading }: { loading: boolean }) {
           setDbLoading(true);
         }
         // Fetch all data separately to ensure everything is caught regardless of PostgREST join constraints
-        const [subRes, unitRes, lessRes, exRes] = await Promise.all([
+        const [subRes, unitRes, lessRes, exRes, adminRes] = await Promise.all([
           supabase.from('subjects').select('*').order('created_at', { ascending: true }),
           supabase.from('units').select('*').order('created_at', { ascending: true }),
           supabase.from('lessons').select('*').order('created_at', { ascending: true }),
           supabase.from('exercises').select('*').order('created_at', { ascending: true }),
+          supabase.from('admin_settings').select('*').limit(1).single()
         ]);
         
         if (subRes.error) throw subRes.error;
@@ -299,6 +301,10 @@ function StudentPortal({ loading }: { loading: boolean }) {
         const unitsData = unitRes.data || [];
         const lessonsData = lessRes.data || [];
         const exercisesData = exRes.data || [];
+
+        if (adminRes.data && adminRes.data.bac_date) {
+            setBacDate(adminRes.data.bac_date);
+        }
 
         if (subjectsData.length > 0) {
           // Format the data to match our UI state format
@@ -425,7 +431,7 @@ function StudentPortal({ loading }: { loading: boolean }) {
            exit={{ opacity: 0, x: 10 }}
            transition={{ duration: 0.2 }}
         >
-          {view.type === 'dashboard' && <DashboardView subjects={subjects} onSubjectClick={(s, type) => setView({ type: 'subject_units', subject: s, listType: type })} onStartQuiz={() => setView({ type: 'quiz' })} />}
+          {view.type === 'dashboard' && <DashboardView subjects={subjects} bacDate={bacDate} onSubjectClick={(s, type) => setView({ type: 'subject_units', subject: s, listType: type })} onStartQuiz={() => setView({ type: 'quiz' })} />}
           {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
           {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
             if (view.listType === 'exercises') {
@@ -443,14 +449,45 @@ function StudentPortal({ loading }: { loading: boolean }) {
   );
 }
 
-function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: any[], onSubjectClick: (s: any, listType: 'lessons' | 'exercises') => void, onStartQuiz: () => void }) {
+function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { subjects: any[], bacDate?: string | null, onSubjectClick: (s: any, listType: 'lessons' | 'exercises') => void, onStartQuiz: () => void }) {
   const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>(() => {
     return (localStorage.getItem('dashboard_active_tab') as 'lessons' | 'exercises') || 'lessons';
   });
 
+  const [timeLeft, setTimeLeft] = useState<{days: number, hours: number, minutes: number} | null>(null);
+
   useEffect(() => {
     localStorage.setItem('dashboard_active_tab', activeTab);
   }, [activeTab]);
+
+  useEffect(() => {
+    if (!bacDate) {
+      setTimeLeft(null);
+      return;
+    }
+    
+    const calculateTimeLeft = () => {
+      const target = new Date(bacDate);
+      target.setHours(0, 0, 0, 0); // Start of the day
+      const now = new Date();
+      
+      const diff = target.getTime() - now.getTime();
+      if (diff <= 0) {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0 });
+        return;
+      }
+      
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      setTimeLeft({ days, hours, minutes });
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 60000); // update every minute
+    return () => clearInterval(interval);
+  }, [bacDate]);
 
   const totalQuizProgress = Math.round(subjects.reduce((sum, s) => {
     return sum + parseInt(localStorage.getItem('quiz_progress_' + s.id) || '0', 10);
@@ -472,12 +509,29 @@ function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: an
                 الامتحان القادم
               </div>
               <h2 className="text-xl md:text-3xl font-black text-slate-800 mb-2">
-                بكالوريا تجريبي
+                البكالوريا
               </h2>
-              <p className="text-xs md:text-sm text-slate-500 font-medium flex items-center gap-1.5">
-                <Clock size={16} />
-                متبقي 14 يوماً على الامتحان
-              </p>
+              {timeLeft ? (
+                <div className="text-sm md:text-base text-slate-600 font-bold flex flex-wrap items-center gap-2 mt-3" dir="rtl">
+                  <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-orange-200 text-orange-600 shadow-sm">
+                    <span className="text-lg">{timeLeft.days}</span>
+                    <span className="text-xs">يوم</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-orange-200 text-orange-600 shadow-sm">
+                    <span className="text-lg">{timeLeft.hours}</span>
+                    <span className="text-xs">ساعة</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-orange-200 text-orange-600 shadow-sm">
+                    <span className="text-lg">{timeLeft.minutes}</span>
+                    <span className="text-xs">دقيقة</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs md:text-sm text-slate-500 font-medium flex items-center gap-1.5">
+                  <Clock size={16} />
+                  لم يتم تحديد تاريخ البكالوريا بعد
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -534,36 +588,41 @@ function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: an
             المواد الدراسية
           </h3>
           
-          <div className="flex bg-slate-100 p-1 rounded-xl w-full md:w-auto">
+          <div className="flex bg-slate-100/80 p-1.5 rounded-xl w-full md:w-auto shadow-inner border border-slate-200/60">
             <button 
               onClick={() => setActiveTab('lessons')}
-              className={`flex-1 md:w-32 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'lessons' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 flex justify-center items-center gap-2 md:w-36 py-2.5 rounded-lg text-sm font-extrabold transition-all duration-200 ${activeTab === 'lessons' ? 'bg-white text-blue-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
             >
-              الدروس
+              <PlayCircle size={16} /> الدروس
             </button>
             <button 
               onClick={() => setActiveTab('exercises')}
-              className={`flex-1 md:w-32 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'exercises' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`flex-1 flex justify-center items-center gap-2 md:w-36 py-2.5 rounded-lg text-sm font-extrabold transition-all duration-200 ${activeTab === 'exercises' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
             >
-              التمارين
+              <ClipboardList size={16} /> التمارين
             </button>
           </div>
         </div>
-        <AnimatePresence mode="wait">
-          <motion.div 
-            key={activeTab}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4"
-          >
-            {subjects.map((sub) => (
+        <motion.div layout className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
+          <AnimatePresence mode="popLayout">
+            {subjects.map((sub, index) => (
               <motion.div 
-                key={sub.id} 
+                key={`${activeTab}-${sub.id}`}
+                layout
+                initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                transition={{ 
+                  duration: 0.3,
+                  type: "spring", 
+                  stiffness: 300, 
+                  damping: 25,
+                  delay: index * 0.05
+                }}
                 whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => onSubjectClick(sub, activeTab)}
-                className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 flex flex-col justify-between cursor-pointer group glass-hover"
+                className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover"
               >
                 <div className="flex justify-between items-start mb-3 md:mb-6">
                    <div className={`w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${sub.bg} ${sub.color} flex items-center justify-center shadow-sm`}>
@@ -582,8 +641,8 @@ function DashboardView({ subjects, onSubjectClick, onStartQuiz }: { subjects: an
                 </div>
               </motion.div>
             ))}
-          </motion.div>
-        </AnimatePresence>
+          </AnimatePresence>
+        </motion.div>
       </div>
     </div>
   )
@@ -593,7 +652,7 @@ function SubjectTypeView({ subject, onBack, onSelectType }: { subject: any, onBa
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
-        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
+        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold hover:scale-[1.05] active:scale-95">
           <ChevronRight size={18} className="md:w-5 md:h-5" />
         </button>
         <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl ${subject.bg} ${subject.color} flex items-center justify-center shadow-sm`}>
@@ -606,29 +665,27 @@ function SubjectTypeView({ subject, onBack, onSelectType }: { subject: any, onBa
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-6">
-        <motion.div 
-           whileHover={{ scale: 1.02 }}
+        <div 
            onClick={() => onSelectType('lessons')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-blue-50/50 transition-all border-2 border-transparent hover:border-blue-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
+           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-blue-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-blue-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
         >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 transition-transform shadow-sm">
+           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-sm">
              <PlayCircle size={28} className="md:w-10 md:h-10" />
            </div>
            <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-blue-700 transition-colors">الدروس</h3>
            <p className="text-[10px] md:text-sm text-slate-500 leading-tight">مشاهدة الدروس والملخصات</p>
-        </motion.div>
+        </div>
 
-        <motion.div 
-           whileHover={{ scale: 1.02 }}
+        <div 
            onClick={() => onSelectType('exercises')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 transition-all border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
+           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
         >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 transition-transform shadow-sm">
+           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:-rotate-3 transition-transform shadow-sm">
              <ClipboardList size={28} className="md:w-10 md:h-10" />
            </div>
            <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-emerald-700 transition-colors">التمارين</h3>
            <p className="text-[10px] md:text-sm text-slate-500 leading-tight">حل تمارين تطبيقية مع التصحيح</p>
-        </motion.div>
+        </div>
       </div>
     </div>
   )
@@ -668,11 +725,10 @@ function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject:
           }
           
           return (
-          <motion.div 
+          <div 
             key={unit.id}
-            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1 }}
             onClick={() => onUnitClick(unit)}
-            className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300"
+            className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300 hover:scale-[1.01] active:scale-[0.98]"
           >
             <div className="flex justify-between items-start">
               <div className="w-full pl-6">
@@ -693,7 +749,7 @@ function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject:
                 <ChevronLeft size={16} className="md:w-5 md:h-5" />
               </div>
             </div>
-          </motion.div>
+          </div>
         )})}
       </div>
     </div>
@@ -704,7 +760,7 @@ function UnitDetailsView({ subject, unit, onBack, onSelectType }: { subject: any
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
-        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
+        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold hover:scale-[1.05] active:scale-95">
           <ChevronRight size={18} className="md:w-5 md:h-5" />
         </button>
         <div>
@@ -714,29 +770,27 @@ function UnitDetailsView({ subject, unit, onBack, onSelectType }: { subject: any
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-6">
-        <motion.div 
-           whileHover={{ scale: 1.02 }}
+        <div 
            onClick={() => onSelectType('lessons')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-blue-50/50 transition-all border-2 border-transparent hover:border-blue-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
+           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-blue-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-blue-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
         >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 transition-transform shadow-sm">
+           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-sm">
              <PlayCircle size={28} className="md:w-10 md:h-10" />
            </div>
            <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-blue-700 transition-colors">الدروس</h3>
            <p className="text-[10px] md:text-sm text-slate-500 leading-tight">مشاهدة الدروس والملخصات</p>
-        </motion.div>
+        </div>
 
-        <motion.div 
-           whileHover={{ scale: 1.02 }}
+        <div 
            onClick={() => onSelectType('exercises')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 transition-all border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
+           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
         >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 transition-transform shadow-sm">
+           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:-rotate-3 transition-transform shadow-sm">
              <ClipboardList size={28} className="md:w-10 md:h-10" />
            </div>
            <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-emerald-700 transition-colors">التمارين</h3>
            <p className="text-[10px] md:text-sm text-slate-500 leading-tight">حل تمارين تطبيقية مع التصحيح</p>
-        </motion.div>
+        </div>
       </div>
     </div>
   )
@@ -873,6 +927,20 @@ function LessonDetailsView({ subject, unit, lesson, onBack }: { subject: any, un
 function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject: any, unit: any, exercise: any, onBack: () => void }) {
   const [showAnswers, setShowAnswers] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const solutionRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    if (showAnswers && solutionRef.current) {
+      setTimeout(() => {
+        const element = solutionRef.current;
+        if (element) {
+          const y = element.getBoundingClientRect().top + window.scrollY - 30;
+          window.scrollTo({ top: y, behavior: 'smooth' });
+        }
+      }, 300);
+    }
+  }, [showAnswers]);
   
   const getExerciseData = () => {
     if (exercise?.content) {
@@ -896,6 +964,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
   const [currentExercise, setCurrentExercise] = useState(() => getExerciseData());
 
   const generateNewExercise = async () => {
+    setErrorMsg(null);
     let apiKey = '';
     let aiModel = 'gemini-2.5-flash';
     if (supabase) {
@@ -907,7 +976,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
     }
 
     if (!apiKey) {
-      alert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
+      setErrorMsg("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات (في لوحة الإدارة) أولاً.");
       return;
     }
 
@@ -938,9 +1007,11 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
         const parsedData = JSON.parse(jsonStr);
         setCurrentExercise(parsedData);
         setShowAnswers(false);
+      } else {
+        throw new Error("لم يتم إرجاع أي استجابة من المولد.");
       }
     } catch (e: any) {
-      alert("حدث خطأ أثناء التوليد: " + e.message);
+      setErrorMsg("حدث خطأ أثناء التوليد: " + e.message);
     } finally {
       setIsGenerating(false);
     }
@@ -976,6 +1047,13 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
         </div>
       </div>
 
+      {errorMsg && (
+        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 text-sm font-bold flex items-center gap-2">
+          <X className="shrink-0" />
+          <p>{errorMsg}</p>
+        </div>
+      )}
+
       <div className="bg-white mx-auto shadow-sm border border-slate-200 print:shadow-none print:border-none p-6 md:p-12 lg:p-16 text-slate-900 border-t-[12px] border-t-slate-800 relative z-10 font-[Traditional_Arabic,serif] text-base md:text-lg" style={{ minHeight: '29.7cm' }}>
          <div className="text-center mb-10 border-b border-slate-300 pb-8">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-y-4 gap-x-2 text-right mb-6 bg-slate-50 p-4 border border-slate-200">
@@ -991,7 +1069,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
              rehypePlugins={[rehypeKatex]}
              components={{
                table: ({node, ...props}: any) => (
-                 <div className="overflow-x-auto w-full mb-6 relative" dir="rtl">
+                 <div className="overflow-x-auto w-full mb-6 relative" dir="auto">
                    <table {...props} className="w-full text-center border-collapse border border-slate-300" />
                  </div>
                ),
@@ -1004,7 +1082,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
          </div>
 
          {showAnswers && currentExercise.solution && (
-            <div className="mt-8 border-t-2 border-emerald-500 pt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div ref={solutionRef} className="mt-8 border-t-2 border-emerald-500 pt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                <div className="text-center mb-6">
                  <h3 className="text-xl font-bold text-emerald-700 bg-emerald-50 inline-block px-6 py-2 rounded-full border border-emerald-200">التصحيح النموذجي</h3>
                </div>
@@ -1014,7 +1092,7 @@ function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject:
                   rehypePlugins={[rehypeKatex]}
                   components={{
                     table: ({node, ...props}: any) => (
-                      <div className="overflow-x-auto w-full mb-6 relative" dir="rtl">
+                      <div className="overflow-x-auto w-full mb-6 relative" dir="auto">
                         <table {...props} className="w-full text-center border-collapse border border-slate-300" />
                       </div>
                     ),

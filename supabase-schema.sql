@@ -83,7 +83,8 @@ VALUES
 CREATE TABLE admin_settings (
   id INTEGER PRIMARY KEY DEFAULT 1,
   api_key TEXT,
-  ai_model TEXT
+  ai_model TEXT,
+  bac_date TEXT
 );
 
 -- Set up Row Level Security (RLS) if you add users later. 
