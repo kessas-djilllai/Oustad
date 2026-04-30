@@ -174,58 +174,47 @@ function StudentLayout({ session }: { session: any }) {
       </div>
 
       {/* Sidebar Drawer */}
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsSidebarOpen(false)}
-              transition={{ duration: 0.15 }}
-              className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm z-40"
-            />
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'tween', duration: 0.2 }}
-              className="fixed top-0 right-0 bottom-0 w-64 glass !bg-white/95 dark:!bg-slate-900/95 !backdrop-blur-2xl z-50 p-6 flex flex-col border-l border-white/50 dark:border-slate-800 shadow-2xl rounded-l-[2rem]"
-            >
-              <div className="flex justify-between items-center mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                    {userName.substring(0, 1)}
-                  </div>
-                  <h2 className="font-bold text-lg text-slate-800">القائمة</h2>
-                </div>
-                <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                  <ChevronRight size={18} />
-                </button>
-              </div>
+      {/* Mobile Overlay */}
+      <div 
+        onClick={() => setIsSidebarOpen(false)}
+        className={`fixed inset-0 bg-slate-900/40 z-40 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+      />
+      
+      {/* Sidebar */}
+      <div
+        className={`fixed top-0 right-0 bottom-0 w-64 bg-white dark:bg-slate-900 z-50 p-6 flex flex-col border-l border-slate-100 dark:border-slate-800 shadow-2xl rounded-l-[2rem] transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex justify-between items-center mb-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+              {userName.substring(0, 1)}
+            </div>
+            <h2 className="font-bold text-lg text-slate-800">القائمة</h2>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+            <ChevronRight size={18} />
+          </button>
+        </div>
 
-              <div className="flex-1 space-y-2">
-                <SidebarItem icon={<BookOpen size={18} />} title="الرئيسية" active />
-                <SidebarItem icon={<Calendar size={18} />} title="جدول المراجعة" />
-                <SidebarItem icon={<Target size={18} />} title="الإمتحانات" badge="2" />
-                <SidebarItem icon={<MessageCircle size={18} />} title="المجتمع" />
-              </div>
+        <div className="flex-1 space-y-2">
+          <SidebarItem icon={<BookOpen size={18} />} title="الرئيسية" active />
+          <SidebarItem icon={<Calendar size={18} />} title="جدول المراجعة" />
+          <SidebarItem icon={<Target size={18} />} title="الإمتحانات" badge="2" />
+          <SidebarItem icon={<MessageCircle size={18} />} title="المجتمع" />
+        </div>
 
-              <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-2">
-                <SidebarItem icon={<Settings size={18} />} title="الإعدادات" />
-                <div onClick={() => navigate('/admin')} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 cursor-pointer">
-                  <Target size={18} />
-                  <span>لوحة التحكم (للتجريب)</span>
-                </div>
-                <div onClick={handleLogout} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 cursor-pointer">
-                  <LogOut size={18} />
-                  <span>تسجيل الخروج</span>
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+        <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-2">
+          <SidebarItem icon={<Settings size={18} />} title="الإعدادات" />
+          <div onClick={() => navigate('/admin')} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 cursor-pointer">
+            <Target size={18} />
+            <span>لوحة التحكم (للتجريب)</span>
+          </div>
+          <div onClick={handleLogout} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 cursor-pointer">
+            <LogOut size={18} />
+            <span>تسجيل الخروج</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
