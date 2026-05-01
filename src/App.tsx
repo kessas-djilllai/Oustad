@@ -143,7 +143,7 @@ function StudentLayout({ session }: { session: any }) {
       <div className="fixed top-0 left-0 w-[60vw] h-[60vh] rounded-full bg-blue-300/20 dark:bg-blue-600/10 blur-[120px] pointer-events-none z-0 -translate-x-1/2 -translate-y-1/2" />
       <div className="fixed bottom-0 right-0 w-[60vw] h-[60vh] rounded-full bg-indigo-300/20 dark:bg-indigo-600/10 blur-[120px] pointer-events-none z-0 translate-x-1/3 translate-y-1/3" />
       
-      <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10 relative">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10 relative">
         
         <header className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">

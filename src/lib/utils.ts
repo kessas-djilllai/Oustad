@@ -19,9 +19,6 @@ export const preprocessMath = (text: string) => {
   // Single backticks wrapped around math formulas
   processed = processed.replace(/`(\$[^`]+\$)`/g, '$1');
 
-  // Ensure tables have a newline before them if they don't
-  processed = processed.replace(/([^\n])\n(\s*\|.*\|.*\|)/g, '$1\n\n$2');
-
   // Prevent accidental code blocks in markdown due to 4+ spaces or tabs indentation
   // Only remove 4 spaces at the very beginning of the line if it is not part of a list
   processed = processed.replace(/^(?!\s*[-*0-9]+[.)]) {4,}/gm, '  ');

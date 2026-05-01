@@ -392,8 +392,8 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
                         </div>
 
                         {(expandedExercise === solKey && res.exam) && (
-                          <div className="p-4 md:p-6 bg-white border-t border-slate-200 animate-in slide-in-from-top-2 fade-in space-y-6">
-                               <div className="prose prose-slate prose-lg md:prose-xl max-w-none text-right leading-loose overflow-x-auto w-full px-2" dir="rtl">
+                          <div className="p-2 md:p-6 bg-white border-t border-slate-200 animate-in slide-in-from-top-2 fade-in space-y-8">
+                               <div className="markdown-container prose prose-slate prose-base md:prose-lg max-w-none text-right leading-loose w-full" dir="rtl">
                                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{preprocessMath(String(res.exam))}</ReactMarkdown>
                                </div>
                                
