@@ -30,14 +30,19 @@ import {
   Cpu,
   Calendar,
   FileText,
-  Upload
+  Upload,
+  Users
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
+import AdminUsers from "./users";
 
 export type AlertEventPayload = { message: string, type?: 'success' | 'error' | 'info' };
 
 export const triggerAlert = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
   window.dispatchEvent(new CustomEvent<AlertEventPayload>('show-admin-alert', { detail: { message, type } }));
+  if (type === 'success') {
+    window.dispatchEvent(new CustomEvent('refresh-admin-view'));
+  }
 };
 
 function AlertModal() {
@@ -119,16 +124,27 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
 
   const [confirmDelete, setConfirmDelete] = useState<{id: string, name: string} | null>(null);
 
+  const [unitsMap, setUnitsMap] = useState<Record<string, {name: string, subject_id: string}>>({});
+
   const fetchItems = async () => {
     if (!supabase) return;
     setLoading(true);
     try {
-      if (type === 'units') {
+      if (type !== 'subjects') {
         const { data: subData } = await supabase.from('subjects').select('id, name');
         if (subData) {
           const map: Record<string, string> = {};
           subData.forEach((s: any) => map[s.id] = s.name);
           setSubjectsMap(map);
+        }
+      }
+
+      if (type === 'lessons' || type === 'exercises') {
+        const { data: unitData } = await supabase.from('units').select('id, name, subject_id');
+        if (unitData) {
+          const map: Record<string, {name: string, subject_id: string}> = {};
+          unitData.forEach((u: any) => map[u.id] = { name: u.name, subject_id: u.subject_id });
+          setUnitsMap(map);
         }
       }
 
@@ -182,7 +198,7 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
   return (
     <div className="mt-10 pt-8 border-t border-slate-200 relative">
       {confirmDelete && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm -m-6 rounded-[2rem]">
+         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
             <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-xl text-center">
                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Trash size={32} />
@@ -204,29 +220,56 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
           {items.length === 0 ? (
             <p className="text-center text-slate-500 py-8 font-bold text-sm">لا توجد عناصر حالياً</p>
           ) : (
-            type === 'units' ? (
-              Object.entries(
-                items.reduce((acc: any, item: any) => {
-                  const subjectName = subjectsMap[item.subject_id] || 'مادة غير معروفة';
-                  if (!acc[subjectName]) acc[subjectName] = [];
-                  acc[subjectName].push(item);
-                  return acc;
-                }, {})
-              ).map(([subject, subItems]: any) => (
-                <div key={subject} className="mb-6 last:mb-0 bg-white p-4 rounded-2xl border border-slate-200">
-                  <h5 className="font-bold text-slate-700 mb-4 text-sm px-3 flex items-center border-r-4 border-indigo-500">{subject}</h5>
+            (() => {
+              const groupedItems = items.reduce((acc: any, item: any) => {
+                let groupName = "غير مصنف";
+                if (type === 'subjects') {
+                  const match = item.name.match(/\((.*?)\)$/);
+                  groupName = match ? match[1] : 'غير مصنف';
+                } else if (type === 'units') {
+                  groupName = subjectsMap[item.subject_id] || 'مادة غير معروفة';
+                } else if (type === 'lessons' || type === 'exercises') {
+                  const unitData = unitsMap[item.unit_id];
+                  if (unitData) {
+                    groupName = subjectsMap[unitData.subject_id] || 'مادة غير معروفة';
+                  } else {
+                    groupName = 'مادة غير معروفة';
+                  }
+                }
+                
+                if (!acc[groupName]) acc[groupName] = [];
+                acc[groupName].push(item);
+                return acc;
+              }, {});
+
+              return Object.entries(groupedItems).map(([groupName, groupItems]: any) => (
+                <div key={groupName} className="mb-6 last:mb-0 bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm">
+                  <h5 className="font-bold text-slate-700 mb-4 text-sm px-3 flex items-center border-r-4 border-indigo-500">{groupName}</h5>
                   <div className="space-y-3">
-                    {subItems.map((item: any) => (
-                      <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm">
-                        <div>
-                          <h4 className="font-bold text-slate-800 text-sm md:text-base">{item.title || item.name}</h4>
+                    {groupItems.map((item: any) => {
+                       let displayTitle = item.title || item.name;
+                       let subtitle = "";
+                       if (type === 'lessons' || type === 'exercises') {
+                           const uData = unitsMap[item.unit_id];
+                           subtitle = uData ? `الوحدة: ${uData.name}` : "";
+                       }
+                       if (type === 'subjects') {
+                           const match = item.name.match(/^(.*?)\s*\(.*?\)$/);
+                           displayTitle = match ? match[1].trim() : item.name;
+                       }
+                       
+                       return (
+                      <div key={item.id} className="flex justify-between items-start md:items-center p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm gap-2 md:gap-4">
+                        <div className="flex-1">
+                          <h4 className="font-bold text-slate-800 text-sm md:text-base break-words">{displayTitle}</h4>
+                          {subtitle && <p className="text-xs text-indigo-600 mt-1">{subtitle}</p>}
                           <p className="text-[10px] text-slate-400 mt-1">{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-DZ') : ''}</p>
                         </div>
                         <button 
                           type="button"
                           onClick={() => setConfirmDelete({id: item.id, name: item.title || item.name || 'العنصر'})} 
                           disabled={deletingId === item.id}
-                          className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                         >
                           {deletingId === item.id ? (
                             <div className="w-4 h-4 border-2 border-red-200 border-t-red-500 rounded-full animate-spin"></div>
@@ -235,32 +278,11 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
                           )}
                         </button>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
-              ))
-            ) : (
-              items.map(item => (
-                <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm">
-                  <div>
-                    <h4 className="font-bold text-slate-800 text-sm md:text-base">{item.title || item.name}</h4>
-                    <p className="text-[10px] text-slate-400 mt-1">{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-DZ') : ''}</p>
-                  </div>
-                  <button 
-                    type="button"
-                    onClick={() => setConfirmDelete({id: item.id, name: item.title || item.name || 'العنصر'})} 
-                    disabled={deletingId === item.id}
-                    className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {deletingId === item.id ? (
-                      <div className="w-4 h-4 border-2 border-red-200 border-t-red-500 rounded-full animate-spin"></div>
-                    ) : (
-                      <Trash size={16} />
-                    )}
-                  </button>
-                </div>
-              ))
-            )
+              ));
+            })()
           )}
         </div>
       )}
@@ -269,6 +291,7 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
 }
 
 function AdminAddLesson({ onBack }: { onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<'add' | 'list'>('add');
   const [subjects, setSubjects] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -342,6 +365,7 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
         const { error } = await supabase.from('lessons').insert(inserts);
         if (!error) {
           triggerAlert(`تم إضافة ${inserts.length} درس بنجاح!`, 'success');
+          setJsonInput('');
         } else {
           triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
         }
@@ -366,6 +390,7 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
         }]);
         if (!error) {
           triggerAlert('تمت إضافة الدرس بنجاح!', 'success');
+          setTitle('');
         } else {
           triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
         }
@@ -378,20 +403,26 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="glass rounded-[2rem] p-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
+    <div className="glass rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm">
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0">
           <ChevronRight size={20} />
         </button>
-        <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm">
+        <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shadow-sm shrink-0">
            <PlayCircle size={24} />
         </div>
         <div>
-          <h2 className="font-bold text-xl text-slate-800">إضافة درس جديد</h2>
-          <p className="text-xs text-slate-500 font-medium">قم بتعبئة تفاصيل الدرس ليتم نشره للطلاب.</p>
+          <h2 className="font-bold text-xl text-slate-800">إدارة الدروس</h2>
+          <p className="text-xs text-slate-500 font-medium">قم بإضافة وعرض وتعديل الدروس.</p>
         </div>
       </div>
 
+      <div className="flex gap-2 border-b border-slate-100 pb-4 mb-6 mt-4">
+        <button onClick={() => setActiveTab('add')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'add' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>إضافة درس</button>
+        <button onClick={() => setActiveTab('list')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'list' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>عرض الدروس</button>
+      </div>
+
+      {activeTab === 'add' ? (
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-2">اختر المادة</label>
@@ -475,11 +506,15 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
           )}
         </button>
       </form>
+      ) : (
+        <AdminEntityList type="lessons" title="قائمة الدروس" />
+      )}
     </div>
   )
 }
 
 function AdminAddExercise({ onBack }: { onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<'add' | 'list'>('add');
   const [subjects, setSubjects] = useState<any[]>([]);
   const [units, setUnits] = useState<any[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
@@ -590,6 +625,8 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
       }]);
       if (!error) {
         triggerAlert('تمت إضافة التمرين بنجاح!', 'success');
+        setTitle('');
+        setGeneratedQuestions([]);
       } else {
         triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
       }
@@ -601,20 +638,26 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="glass rounded-[2rem] p-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
+    <div className="glass rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm">
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0">
           <ChevronRight size={20} />
         </button>
-        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm shrink-0">
            <PenTool size={24} />
         </div>
         <div>
-          <h2 className="font-bold text-xl text-slate-800">إضافة تمرين جديد</h2>
-          <p className="text-xs text-slate-500 font-medium">قم بإضافة تمرين تفاعلي للوحدة المحددة.</p>
+          <h2 className="font-bold text-xl text-slate-800">إدارة التمارين</h2>
+          <p className="text-xs text-slate-500 font-medium">قم بإضافة وعرض وتعديل التمارين التفاعلية.</p>
         </div>
       </div>
 
+      <div className="flex gap-2 border-b border-slate-100 pb-4 mb-6 mt-4">
+        <button onClick={() => setActiveTab('add')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'add' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>إضافة تمرين</button>
+        <button onClick={() => setActiveTab('list')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'list' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>عرض التمارين</button>
+      </div>
+
+      {activeTab === 'add' ? (
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-2">اختر المادة</label>
@@ -695,11 +738,15 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
           </div>
         )}
       </form>
+      ) : (
+        <AdminEntityList type="exercises" title="قائمة التمارين" />
+      )}
     </div>
   )
 }
 
 function AdminAddSubject({ onBack }: { onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<'add' | 'list'>('add');
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState('indigo');
   const [specialization, setSpecialization] = useState('جميع الشعب');
@@ -748,6 +795,9 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
       }]);
       if (!error) {
         triggerAlert('تمت إضافة المادة بنجاح!', 'success');
+        setName('');
+        setSpecialization('جميع الشعب');
+        setSelectedColor('indigo');
       } else {
         triggerAlert('حدث خطأ: ' + error.message, 'error');
       }
@@ -759,20 +809,26 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="glass rounded-[2rem] p-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
+    <div className="glass rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm">
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0">
           <ChevronRight size={20} />
         </button>
-        <div className={`w-12 h-12 rounded-2xl bg-${selectedColor}-100 text-${selectedColor}-600 flex items-center justify-center shadow-sm`}>
+        <div className={`w-12 h-12 rounded-2xl bg-${selectedColor}-100 text-${selectedColor}-600 flex items-center justify-center shadow-sm shrink-0`}>
            <BookOpen size={24} />
         </div>
         <div>
-          <h2 className="font-bold text-xl text-slate-800">إضافة مادة جديدة</h2>
-          <p className="text-xs text-slate-500 font-medium">قم بإضافة مادة لتنظيم الوحدات بداخلها.</p>
+          <h2 className="font-bold text-xl text-slate-800">إدارة المواد</h2>
+          <p className="text-xs text-slate-500 font-medium">قم بإضافة وعرض وتعديل المواد الدراسية.</p>
         </div>
       </div>
 
+      <div className="flex gap-2 border-b border-slate-100 pb-4 mb-6 mt-4">
+        <button onClick={() => setActiveTab('add')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'add' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>إضافة مادة</button>
+        <button onClick={() => setActiveTab('list')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'list' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>عرض المواد</button>
+      </div>
+
+      {activeTab === 'add' ? (
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-2">اسم المادة</label>
@@ -826,11 +882,15 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
           )}
         </button>
       </form>
+      ) : (
+        <AdminEntityList type="subjects" title="قائمة المواد الدراسية" />
+      )}
     </div>
   )
 }
 
 function AdminAddUnit({ onBack }: { onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<'add' | 'list'>('add');
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [name, setName] = useState('');
@@ -889,6 +949,7 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
         const { error } = await supabase.from('units').insert(inserts);
         if (!error) {
           triggerAlert(`تم إضافة ${inserts.length} وحدة بنجاح!`, 'success');
+          setJsonInput('');
         } else {
           triggerAlert('حدث خطأ: ' + error.message, 'error');
         }
@@ -911,6 +972,7 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
         }]);
         if (!error) {
           triggerAlert('تمت إضافة الوحدة بنجاح!', 'success');
+          setName('');
         } else {
           triggerAlert('حدث خطأ: ' + error.message, 'error');
         }
@@ -923,20 +985,26 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="glass rounded-[2rem] p-6 max-w-2xl mx-auto">
-      <div className="flex items-center gap-4 mb-8">
-        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm">
+    <div className="glass rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm">
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0">
           <ChevronRight size={20} />
         </button>
-        <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center shadow-sm">
+        <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center shadow-sm shrink-0">
            <Target size={24} />
         </div>
         <div>
-          <h2 className="font-bold text-xl text-slate-800">إضافة وحدة جديدة</h2>
-          <p className="text-xs text-slate-500 font-medium">قم بإضافة وحدة داخل مادة معينة.</p>
+          <h2 className="font-bold text-xl text-slate-800">إدارة الوحدات</h2>
+          <p className="text-xs text-slate-500 font-medium">قم بإضافة وعرض وتعديل الوحدات الدراسية.</p>
         </div>
       </div>
 
+      <div className="flex gap-2 border-b border-slate-100 pb-4 mb-6 mt-4">
+        <button onClick={() => setActiveTab('add')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'add' ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>إضافة وحدة</button>
+        <button onClick={() => setActiveTab('list')} className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'list' ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>عرض الوحدات</button>
+      </div>
+
+      {activeTab === 'add' ? (
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-bold text-slate-700 mb-2">اختر المادة</label>
@@ -1020,6 +1088,9 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
           )}
         </button>
       </form>
+      ) : (
+        <AdminEntityList type="units" title="قائمة الوحدات الدراسية" />
+      )}
     </div>
   )
 }
@@ -1057,19 +1128,19 @@ function AdminBacDate({ onBack }: { onBack: () => void }) {
            }
            throw error;
         }
-        window.dispatchEvent(new CustomEvent('show-admin-alert', { detail: { message: "تم حفظ تاريخ البكالوريا بنجاح!", type: 'success' }}));
+        triggerAlert("تم حفظ تاريخ البكالوريا بنجاح!", 'success');
       } else {
-        window.dispatchEvent(new CustomEvent('show-admin-alert', { detail: { message: "يرجى إعداد قاعدة البيانات لحفظ الإعدادات.", type: 'error' }}));
+        triggerAlert("يرجى إعداد قاعدة البيانات لحفظ الإعدادات.", 'error');
       }
     } catch (err: any) {
-      window.dispatchEvent(new CustomEvent('show-admin-alert', { detail: { message: "حدث خطأ أثناء الحفظ: " + err.message, type: 'error' }}));
+      triggerAlert("حدث خطأ أثناء الحفظ: " + err.message, 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-[2rem] p-6 max-w-2xl mx-auto shadow-sm border border-slate-100">
+    <div className="bg-white rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm border border-slate-100">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
           <ChevronRight size={20} />
@@ -1253,7 +1324,7 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="bg-white rounded-[2rem] p-6 max-w-2xl mx-auto shadow-sm border border-slate-100">
+    <div className="bg-white rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm border border-slate-100">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
           <ChevronRight size={20} />
@@ -1734,7 +1805,7 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-4">
+    <div className="bg-white rounded-[2rem] p-4 md:p-6 shadow-sm border border-slate-100 animate-in fade-in">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
           <ChevronRight size={20} />
@@ -1880,11 +1951,19 @@ export function AdminLayout() {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [view, setView] = useState('dashboard');
+  const [isContentMenuOpen, setIsContentMenuOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const handleRefresh = () => setRefreshKey(prev => prev + 1);
+    window.addEventListener('refresh-admin-view', handleRefresh);
+    return () => window.removeEventListener('refresh-admin-view', handleRefresh);
   }, []);
 
   const closeSidebar = () => setIsSidebarOpen(false);
@@ -1926,40 +2005,60 @@ export function AdminLayout() {
                <BookOpen size={18} /> لوحة الإحصائيات
             </button>
             <button 
-              onClick={() => { setView('manage_content'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_content' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
-            >
-               <BookOpen size={18} /> عرض ومسح المحتوى
-            </button>
-            <button 
               onClick={() => { setView('analyze_pdf'); closeSidebar(); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'analyze_pdf' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
                <FileText size={18} /> تحليل ملف PDF
             </button>
             <button 
-              onClick={() => { setView('manage_subjects'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_subjects' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+              onClick={() => setIsContentMenuOpen(!isContentMenuOpen)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all font-bold text-sm ${['manage_subjects', 'manage_units', 'add_lesson', 'add_exercise'].includes(view) && !isContentMenuOpen ? 'bg-slate-100 text-slate-800 shadow-sm' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <BookOpen size={18} /> إدارة المواد
+               <div className="flex flex-row items-center gap-3">
+                 <BookOpen size={18} /> إدارة المواد
+               </div>
+               <ChevronRight size={16} className={`transition-transform duration-200 ${isContentMenuOpen ? 'rotate-90 text-indigo-600' : 'text-slate-400'}`} />
             </button>
+            <AnimatePresence>
+               {isContentMenuOpen && (
+                 <motion.div
+                   initial={{ height: 0, opacity: 0 }}
+                   animate={{ height: 'auto', opacity: 1 }}
+                   exit={{ height: 0, opacity: 0 }}
+                   className="overflow-hidden flex flex-col gap-1 pr-4 pl-2 border-r-2 border-slate-200 mr-2"
+                 >
+                   <button 
+                     onClick={() => { setView('manage_subjects'); closeSidebar(); }}
+                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all font-bold text-sm ${view === 'manage_subjects' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-slate-100'}`}
+                   >
+                     <BookOpen size={16} /> المواد والتخصصات
+                   </button>
+                   <button 
+                     onClick={() => { setView('manage_units'); closeSidebar(); }}
+                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all font-bold text-sm ${view === 'manage_units' ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-600 hover:bg-slate-100'}`}
+                   >
+                     <Target size={16} /> إدارة الوحدات
+                   </button>
+                   <button 
+                     onClick={() => { setView('add_lesson'); closeSidebar(); }}
+                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all font-bold text-sm ${view === 'add_lesson' ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-slate-100'}`}
+                   >
+                     <PlayCircle size={16} /> إدارة الدروس
+                   </button>
+                   <button 
+                     onClick={() => { setView('add_exercise'); closeSidebar(); }}
+                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all font-bold text-sm ${view === 'add_exercise' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'text-slate-600 hover:bg-slate-100'}`}
+                   >
+                     <PenTool size={16} /> إدارة التمارين
+                   </button>
+                 </motion.div>
+               )}
+            </AnimatePresence>
             <button 
-              onClick={() => { setView('manage_units'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_units' ? 'bg-purple-500 text-white shadow-md shadow-purple-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+              onClick={() => { setView('users'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'users' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <Target size={18} /> إدارة الوحدات
-            </button>
-            <button 
-              onClick={() => { setView('add_lesson'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_lesson' ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-white/60'}`}
-            >
-               <PlayCircle size={18} /> إدارة الدروس
-            </button>
-            <button 
-              onClick={() => { setView('add_exercise'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'add_exercise' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'text-slate-600 hover:bg-white/60'}`}
-            >
-               <PenTool size={18} /> إدارة التمارين
+               <Users size={18} /> إدارة المستخدمين
             </button>
           </nav>
           
@@ -2018,7 +2117,7 @@ export function AdminLayout() {
                 <div className="h-64 rounded-[2rem] bg-slate-200 animate-pulse w-full"></div>
              </div>
         ) : (
-          <div className="animate-in fade-in duration-300 slide-in-from-bottom-4">
+          <div key={refreshKey} className="animate-in fade-in duration-300">
              {view === 'dashboard' && <AdminDashboard setView={setView} />}
              {view === 'manage_content' && <AdminManageContent onBack={() => setView('dashboard')} />}
              {view === 'analyze_pdf' && <AdminAnalyzePdf onBack={() => setView('dashboard')} />}
@@ -2028,6 +2127,7 @@ export function AdminLayout() {
              {view === 'manage_units' && <AdminAddUnit onBack={() => setView('dashboard')} />}
              {view === 'settings' && <AdminSettings onBack={() => setView('dashboard')} />}
              {view === 'bac_date' && <AdminBacDate onBack={() => setView('dashboard')} />}
+             {view === 'users' && <AdminUsers />}
           </div>
         )}
 
