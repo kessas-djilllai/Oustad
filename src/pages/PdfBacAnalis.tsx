@@ -243,7 +243,7 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
       }]);
 
       if (error) throw error;
-      triggerAlert("تمت إضافة التمرين إلى قاعدة البيانات بنجاح!", "success");
+      triggerAlert("تمت إضافة التمرين إلى قاعدة البيانات بنجاح!", "success", false);
       setAddedState(prev => ({ ...prev, [stateKey]: true }));
     } catch (e: any) {
       triggerAlert("حدث خطأ أثناء حفظ التمرين: " + e.message, "error");
@@ -361,62 +361,59 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
                     ) : topicGroup.exercises.map((res: any, idx: number) => {
                       if (!res) return null;
                       const solKey = `${tIdx}-${idx}`;
-                      const isExpanded = expandedExercise === solKey;
 
                       return (
-                      <div key={idx} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+                      <div key={idx} className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden mb-6 shadow-sm">
                         <div 
                           className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-slate-100 transition-colors"
                           onClick={() => toggleSolution(tIdx, idx)}
                         >
                            <div className="flex items-center gap-3">
-                             <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 font-black text-sm">
+                             <span className="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 font-black text-lg shadow-sm">
                                {res.exercise_number || (idx + 1)}
                              </span>
                              <div>
                                <span className="text-xs text-slate-500 font-bold block mb-1">المادة</span>
-                               <span className="font-bold text-slate-800">{res.subject || 'غير محدد'}</span>
+                               <span className="font-bold text-slate-800 text-lg">{res.subject || 'غير محدد'}</span>
                              </div>
                            </div>
                            <div className="flex items-center gap-4">
-                             <div className="bg-white px-4 py-2 rounded-lg border border-slate-200 flex-1 md:text-left text-right">
+                             <div className="bg-white px-5 py-2.5 rounded-xl border border-slate-200 flex-1 md:text-left text-right shadow-sm">
                                <span className="text-xs text-slate-500 font-bold block mb-1">الوحدة الدراسية</span>
                                <span className="font-bold text-emerald-600">{res.unit || 'غير محدد'}</span>
                              </div>
                              {res.exam && (
-                               <button className={`h-10 px-4 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'}`}>
-                                  {isExpanded ? <ChevronRight size={16} className="-rotate-90" /> : <ChevronRight size={16} className="rotate-90" />}
-                                  {isExpanded ? 'إخفاء التمرين' : 'عرض التمرين'}
+                               <button className={`h-10 px-4 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors ${expandedExercise === solKey ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'}`}>
+                                  {expandedExercise === solKey ? <ChevronRight size={16} className="-rotate-90" /> : <ChevronRight size={16} className="rotate-90" />}
+                                  {expandedExercise === solKey ? 'إخفاء التمرين' : 'عرض التمرين'}
                                </button>
                              )}
                            </div>
                         </div>
 
-                        {(isExpanded && res.exam) && (
-                          <div className="p-4 md:p-6 bg-white border-t border-slate-100 animate-in slide-in-from-top-2 fade-in space-y-4">
-                               {res.exam && (
-                                   <div className="prose prose-slate max-w-none text-right leading-relaxed overflow-x-auto w-full" dir="rtl">
-                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{preprocessMath(String(res.exam))}</ReactMarkdown>
-                                   </div>
-                               )}
+                        {(expandedExercise === solKey && res.exam) && (
+                          <div className="p-4 md:p-6 bg-white border-t border-slate-200 animate-in slide-in-from-top-2 fade-in space-y-6">
+                               <div className="prose prose-slate prose-lg md:prose-xl max-w-none text-right leading-loose overflow-x-auto w-full px-2" dir="rtl">
+                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{preprocessMath(String(res.exam))}</ReactMarkdown>
+                               </div>
                                
-                               <div className="pt-4 border-t border-slate-100 flex justify-end">
+                               <div className="pt-6 border-t border-slate-100 flex justify-end">
                                  {addedState[solKey] ? (
-                                    <div className="bg-emerald-50 text-emerald-600 px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 border border-emerald-200">
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                      تمت الإضافة بنجاح
+                                    <div className="bg-emerald-50 text-emerald-600 px-6 py-3 rounded-xl font-bold flex items-center gap-2 border border-emerald-200 shadow-sm transition-all">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                      تمت إضافة التمرين بنجاح
                                     </div>
                                   ) : (
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleAddExerciseToUnit(res, tIdx, idx, topicGroup); }}
                                       disabled={savingState[solKey]}
-                                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
+                                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-md hover:shadow-lg disabled:opacity-50"
                                     >
                                       {savingState[solKey] ? (
                                         <span>جاري الإضافة...</span>
                                       ) : (
                                         <>
-                                          <Plus size={18} />
+                                          <Plus size={20} />
                                           إضافة التمرين إلى قاعدة البيانات
                                         </>
                                       )}

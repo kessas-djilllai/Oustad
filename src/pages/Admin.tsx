@@ -40,9 +40,9 @@ import { PdfBacAnalis } from "./PdfBacAnalis";
 
 export type AlertEventPayload = { message: string, type?: 'success' | 'error' | 'info' };
 
-export const triggerAlert = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+export const triggerAlert = (message: string, type: 'success' | 'error' | 'info' = 'info', refresh: boolean = true) => {
   window.dispatchEvent(new CustomEvent<AlertEventPayload>('show-admin-alert', { detail: { message, type } }));
-  if (type === 'success') {
+  if (type === 'success' && refresh) {
     window.dispatchEvent(new CustomEvent('refresh-admin-view'));
   }
 };
