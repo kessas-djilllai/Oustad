@@ -8,6 +8,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { supabase } from "../lib/supabase";
 import { triggerAlert, AlertModal } from "./Admin";
 import { ChevronRight, FileText, Wand2, Plus, Upload, AlertCircle } from "lucide-react";
+import { getAnalyzePrompt } from "../lib/promptAnalys";
+import { preprocessMath } from "../lib/utils";
 
 export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) {
   const navigate = useNavigate();
@@ -78,45 +80,7 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
         return `- المادة: ${sub.name} (الوحدات: ${subUnits || 'لا يوجد وحدات'})`;
       }).join('\n');
 
-      const prompt = `أنت خبير في المناهج التعليمية وتحليل مواضيع البكالوريا. تم إرفاق ملف PDF أو أكثر.
-الموضوع يحتوي عادة على موضوعين (الموضوع الأول والموضوع الثاني).
-مهمتك هي استخراج كل التمارين من الموضوع، وتحديد المادة التي ينتمي إليها، والوحدة الدراسية لكل تمرين بناءً على محتوى التمرين، بالإضافة إلى استخراج سنة البكالوريا والتخصص (الشعبة).
-
-قائمة المواد والوحدات المتاحة في قاعدة البيانات:
-${availableSubjectsContext}
-
-تلميح مهم: يجب تحديد "المادة" (subject) و"الوحدة الدراسية" (unit) لكل تمرين بدقة بحيث يتطابق تماماً مع الأسماء في القائمة المتاحة أعلاه إن أمكن.
-
-يجب إرجاع النتيجة بصيغة JSON فقط بالتنسيق التالي:
-{
-  "bac_year": "2023",
-  "specialization": "شعبة علوم تجريبية",
-  "topics": [
-    {
-      "topic": "الموضوع الأول",
-      "exercises": [
-        { 
-          "exercise_number": 1, 
-          "subject": "اسم المادة", 
-          "unit": "اسم الوحدة",
-          "exam": "قم بكتابة نص التمرين كاملا المستخرج من ملف الأسئلة المرفق باستخدام تنسيق Markdown. لا تقم بالحل."
-        }
-      ]
-    },
-    {
-      "topic": "الموضوع الثاني",
-      "exercises": [
-         { 
-           "exercise_number": 1, 
-           "subject": "اسم المادة", 
-           "unit": "اسم الوحدة",
-           "exam": "قم بكتابة نص التمرين كاملا المستخرج من ملف الأسئلة المرفق باستخدام تنسيق Markdown. لا تقم بالحل."
-         }
-      ]
-    }
-  ]
-}
-بدون أي نص إضافي أو شروحات، فقط الـ JSON.`;
+      const prompt = getAnalyzePrompt(availableSubjectsContext);
 
       const response = await ai.models.generateContent({
         model: settingsData.ai_model || 'gemini-2.5-flash',
@@ -429,11 +393,10 @@ ${availableSubjectsContext}
                         </div>
 
                         {(isExpanded && res.exam) && (
-                          <div className="p-6 bg-white border-t border-slate-100 animate-in slide-in-from-top-2 fade-in space-y-4">
+                          <div className="p-4 md:p-6 bg-white border-t border-slate-100 animate-in slide-in-from-top-2 fade-in space-y-4">
                                {res.exam && (
-                                   <div className="prose prose-slate max-w-none p-4 bg-slate-50 rounded-xl border border-slate-100 text-right leading-relaxed overflow-x-auto" dir="rtl">
-                                     <h5 className="font-bold text-slate-700 mb-2">نص التمرين:</h5>
-                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{String(res.exam)}</ReactMarkdown>
+                                   <div className="prose prose-slate max-w-none text-right leading-relaxed overflow-x-auto w-full" dir="rtl">
+                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{preprocessMath(String(res.exam))}</ReactMarkdown>
                                    </div>
                                )}
                                
