@@ -348,6 +348,7 @@ function StudentPortal({ session }: { session: any }) {
         if (JSON.stringify(computedSubjects) !== JSON.stringify(subjects)) {
             setSubjects(computedSubjects);
         }
+        setDbLoading(false);
         return;
       }
       
@@ -563,6 +564,10 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
   const [streak, setStreak] = useState(0);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     const handleGamification = () => {
       setXP(getXP());
       setStreak(getStreak());
@@ -749,7 +754,7 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
             {subjects.map((sub, index) => (
               <div 
-                key={`${activeTab}-${sub.id}`}
+                key={`${sub.id}`}
                 onClick={() => onSubjectClick(sub, activeTab)}
                 className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover relative overflow-hidden transition-transform hover:scale-[1.02] active:scale-[0.98]"
               >

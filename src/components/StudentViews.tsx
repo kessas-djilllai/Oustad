@@ -57,6 +57,10 @@ export function SubjectTypeView({ subject, onBack, onSelectType }: { subject: an
 export function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject: any, listType?: 'lessons' | 'exercises', onBack: () => void, onUnitClick: (u: any) => void }) {
   const isLessons = listType === 'lessons';
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
@@ -85,6 +89,7 @@ export function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { s
                 الفصل {trimestreNum === 1 ? 'الأول' : trimestreNum === 2 ? 'الثاني' : 'الثالث'}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                <AnimatePresence>
                 {trimUnits.map((unit: any, index: number) => {
                   let progress = 0;
                   const total = (unit.lessons?.length || 0) + (unit.exercises?.length || 0);
@@ -100,8 +105,18 @@ export function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { s
                   }
                   
                   return (
-                  <div 
+                  <motion.div 
                     key={unit.id}
+                    initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                    transition={{ 
+                      duration: 0.3,
+                      type: "spring", 
+                      stiffness: 300, 
+                      damping: 25,
+                      delay: index * 0.05
+                    }}
                     onClick={() => onUnitClick(unit)}
                     className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300 hover:scale-[1.01] active:scale-[0.98]"
                   >
@@ -124,8 +139,9 @@ export function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { s
                 <ChevronLeft size={16} className="md:w-5 md:h-5" />
               </div>
             </div>
-          </div>
+          </motion.div>
         )})}
+              </AnimatePresence>
               </div>
             </div>
           );
@@ -178,6 +194,10 @@ export function UnitDetailsView({ subject, unit, onBack, onSelectType }: { subje
 export function ContentListView({ subject, unit, listType, onBack, onSelectItem }: { subject: any, unit: any, listType: 'lessons' | 'exercises', onBack: () => void, onSelectItem?: (item: any) => void }) {
   const items = listType === 'lessons' ? unit.lessons : unit.exercises;
   const isLessons = listType === 'lessons';
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -257,6 +277,7 @@ export function ContentListView({ subject, unit, listType, onBack, onSelectItem 
 
 export function LessonDetailsView({ subject, unit, lesson, onBack }: { subject: any, unit: any, lesson: any, onBack: () => void }) {
   useEffect(() => {
+    window.scrollTo(0, 0);
     if (lesson?.id) {
       if (getProgressSync('completed_lesson', lesson.id) === 0) {
         addXP(10);
@@ -311,6 +332,10 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack }: { s
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const solutionRef = useRef<HTMLDivElement>(null);
   
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   useEffect(() => {
     if (showAnswers && solutionRef.current) {
       setTimeout(() => {

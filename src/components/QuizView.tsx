@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronRight, Target, CheckCircle, ChevronLeft } from 'lucide-react';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -13,6 +13,10 @@ import { preprocessMath } from "../lib/utils";
 import { getProgressSync, saveProgress, addXP } from "../lib/progress";
 
 export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => void }) {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+  
   const [step, setStep] = useState(0);
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [selectedUnit, setSelectedUnit] = useState<any>(null);
