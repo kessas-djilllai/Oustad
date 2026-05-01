@@ -31,7 +31,8 @@ import {
   Calendar,
   FileText,
   Upload,
-  Users
+  Users,
+  AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import AdminUsers from "./users";
@@ -594,11 +595,13 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
       setGeneratedQuestions([{ exam: parsedData.exam, solution: parsedData.solution }]);
       triggerAlert("تم توليد الموضوع بنجاح!", 'success');
     } catch (err: any) {
-      if (err.message && err.message.includes('503')) {
-         triggerAlert("خوادم جوجل (Gemini) تواجه ضغطاً كبيراً حالياً (خطأ 503). الرجاء المحاولة مرة أخرى بعد قليل.", 'error');
-      } else {
-         triggerAlert("حدث خطأ أثناء التوليد: " + err.message, 'error');
-      }
+      console.error(err);
+      let errMsg = err.message || String(err);
+      if (errMsg.includes('504') || errMsg.includes('503')) errMsg = "الخادم يواجه ضغطاً (503/504). المحاولة لاحقاً.";
+      else if (errMsg.includes('Failed to fetch')) errMsg = "انقطع الاتصال بالإنترنت أو الخادم أثناء التحليل.";
+      else if (errMsg.includes('token limit')) errMsg = "تجاوز التوليد الحد الأقصى للنصوص المسموح بها.";
+      else if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) errMsg = "لقد استنفدت الحصة المجانية لمفتاح Gemini API هذا (Quota Exceeded). يرجى التحقق من خطة الدفع الخاصة بك أو إضافة مفتاح API جديد.";
+      triggerAlert("حدث خطأ أثناء التوليد: " + errMsg, 'error');
     } finally {
       setIsGenerating(false);
     }
@@ -1668,8 +1671,8 @@ function AdminManageContent({ onBack }: { onBack: () => void }) {
 
 function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
   const [examFile, setExamFile] = useState<File | null>(null);
-  const [correctionFile, setCorrectionFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [results, setResults] = useState<any[]>([]);
   const [bacInfo, setBacInfo] = useState<{year: string, specialization: string} | null>(null);
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
@@ -1694,12 +1697,6 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const handleCorrectionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setCorrectionFile(e.target.files[0]);
-    }
-  };
-
   const getBase64 = (fileObj: File): Promise<string> => new Promise((resolve) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
@@ -1707,18 +1704,19 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
   });
 
   const handleAnalyze = async () => {
-    if (!examFile || !correctionFile) {
-      triggerAlert("يرجى اختيار ملف الموضوع وملف التصحيح أولاً", "error");
+    if (!examFile) {
+      triggerAlert("يرجى اختيار ملف الموضوع أولاً", "error");
       return;
     }
     
-    if (examFile.size > 5 * 1024 * 1024 || correctionFile.size > 5 * 1024 * 1024) {
-      triggerAlert("حجم كل ملف يجب أن لا يتجاوز 5MB", "error");
+    if (examFile.size > 5 * 1024 * 1024) {
+      triggerAlert("حجم الملف يجب أن لا يتجاوز 5MB", "error");
       return;
     }
 
     try {
       setIsAnalyzing(true);
+      setErrorMsg(null);
       setResults([]);
       setBacInfo(null);
       setExpandedExercise(null);
@@ -1729,7 +1727,6 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
       }
 
       const examBase64Data = await getBase64(examFile);
-      const correctionBase64Data = await getBase64(correctionFile);
       const ai = new GoogleGenAI({ apiKey: settingsData.api_key });
 
       const availableSubjectsContext = dbSubjects.map(sub => {
@@ -1737,14 +1734,15 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
         return `- المادة: ${sub.name} (الوحدات: ${subUnits || 'لا يوجد وحدات'})`;
       }).join('\n');
 
-      const prompt = `أنت خبير في المناهج التعليمية وتحليل مواضيع البكالوريا. تم إرفاق ملفي PDF. الأول هو موضوع بكالوريا، والثاني هو التصحيح الوزاري النموذجي لنفس الموضوع.
+      const prompt = `أنت خبير في المناهج التعليمية وتحليل مواضيع البكالوريا. تم إرفاق ملف PDF أو أكثر.
 الموضوع يحتوي عادة على موضوعين (الموضوع الأول والموضوع الثاني).
-مهمتك هي استخراج كل التمارين من الموضوع، وتحديد المادة التي ينتمي إليها، والوحدة الدراسية لكل تمرين، ثم **استخراج الحل النموذجي الحرفي والخاص بكل تمرين من ملف التصحيح المرفق** وربطه به، بالإضافة إلى استخراج سنة البكالوريا والتخصص (الشعبة).
+مهمتك هي استخراج كل التمارين من الموضوع، وتحديد المادة التي ينتمي إليها، والوحدة الدراسية لكل تمرين بناءً على محتوى التمرين، بالإضافة إلى استخراج سنة البكالوريا والتخصص (الشعبة).
 
 قائمة المواد والوحدات المتاحة في قاعدة البيانات:
 ${availableSubjectsContext}
 
 تلميح مهم: يجب تحديد "المادة" (subject) و"الوحدة الدراسية" (unit) لكل تمرين بدقة بحيث يتطابق تماماً مع الأسماء في القائمة المتاحة أعلاه إن أمكن.
+
 يجب إرجاع النتيجة بصيغة JSON فقط بالتنسيق التالي:
 {
   "bac_year": "2023",
@@ -1757,8 +1755,7 @@ ${availableSubjectsContext}
           "exercise_number": 1, 
           "subject": "اسم المادة", 
           "unit": "اسم الوحدة",
-          "exam": "قم بكتابة نص التمرين كاملا المستخرج من ملف الأسئلة المرفق باستخدام تنسيق Markdown",
-          "solution": "قم بكتابة الحل النموذجي المستخرج من ملف التصحيح المرفق لهذا التمرين باستخدام تنسيق Markdown"
+          "exam": "قم بكتابة نص التمرين كاملا المستخرج من ملف الأسئلة المرفق باستخدام تنسيق Markdown. لا تقم بالحل."
         }
       ]
     },
@@ -1769,8 +1766,7 @@ ${availableSubjectsContext}
            "exercise_number": 1, 
            "subject": "اسم المادة", 
            "unit": "اسم الوحدة",
-           "exam": "قم بكتابة نص التمرين كاملا المستخرج من ملف الأسئلة المرفق باستخدام تنسيق Markdown",
-           "solution": "قم بكتابة الحل النموذجي المستخرج من ملف التصحيح المرفق لهذا التمرين باستخدام تنسيق Markdown"
+           "exam": "قم بكتابة نص التمرين كاملا المستخرج من ملف الأسئلة المرفق باستخدام تنسيق Markdown. لا تقم بالحل."
          }
       ]
     }
@@ -1786,8 +1782,6 @@ ${availableSubjectsContext}
               parts: [
                 { text: 'هذا هو ملف موضوع الامتحان:' },
                 { inlineData: { data: examBase64Data, mimeType: examFile.type } },
-                { text: 'وهذا هو ملف التصحيح الوزاري النموذجي:' },
-                { inlineData: { data: correctionBase64Data, mimeType: correctionFile.type } },
                 { text: prompt }
               ]
             }
@@ -1813,15 +1807,17 @@ ${availableSubjectsContext}
                           exercise_number: { type: Type.NUMBER },
                           subject: { type: Type.STRING },
                           unit: { type: Type.STRING },
-                          exam: { type: Type.STRING, description: "نص التمرين بتنسيق Markdown. لا تضع الحل هنا." },
-                          solution: { type: Type.STRING }
-                        }
+                          exam: { type: Type.STRING, description: "نص التمرين بتنسيق Markdown." }
+                        },
+                        required: ["exercise_number", "subject", "unit", "exam"]
                       }
                     }
-                  }
+                  },
+                  required: ["topic", "exercises"]
                 }
               }
-            }
+            },
+            required: ["topics", "bac_year", "specialization"]
           }
         }
       });
@@ -1847,11 +1843,19 @@ ${availableSubjectsContext}
              throw new Error("لم يتم العثور على أي تمارين. قد يكون النموذج غير قادر على قراءة هذه الملفات.");
           }
       } catch(e: any) {
-          throw new Error("فشل في استخراج البيانات: " + e.message);
+          console.error("Parse Error Details:", { cleanedJson, originalText: textResponse });
+          throw new Error("فشل في استخراج البيانات. قد يكون المخرج طويلاً جداً أو غير مكتمل. تفاصيل الخطأ: " + e.message);
       }
 
     } catch (e: any) {
-      triggerAlert("حدث خطأ أثناء التحليل: " + e.message, "error");
+      console.error("Full Error:", e);
+      let errMsg = e.message || String(e);
+      if (errMsg.includes('504') || errMsg.includes('503')) errMsg = "الخادم يواجه ضغطاً (503/504). المحاولة لاحقاً.";
+      else if (errMsg.includes('Failed to fetch')) errMsg = "انقطع الاتصال بالإنترنت أو الخادم أثناء التحليل.";
+      else if (errMsg.includes('token limit')) errMsg = "تجاوز التحليل الحد الأقصى للنصوص المسموح بها.";
+      else if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) errMsg = "لقد استنفدت الحصة المجانية لمفتاح Gemini API هذا (Quota Exceeded). يرجى التحقق من خطة الدفع الخاصة بك أو إضافة مفتاح API جديد.";
+      setErrorMsg("حدث خطأ أثناء التحليل: " + errMsg);
+      triggerAlert("حدث خطأ أثناء التحليل: " + errMsg, "error");
     } finally {
       setIsAnalyzing(false);
     }
@@ -1892,8 +1896,7 @@ ${availableSubjectsContext}
       const title = `تمرين ${exerciseData.exercise_number} - باك ${bYear} ${bSpec} (${tName})`;
       
       const contentArr = [{
-        exam: exerciseData.exam,
-        solution: exerciseData.solution
+        exam: exerciseData.exam
       }];
 
       const { error } = await supabase.from('exercises').insert([{
@@ -1929,7 +1932,7 @@ ${availableSubjectsContext}
       </div>
 
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 max-w-xl mx-auto w-full">
           <div className="glass rounded-2xl p-6 border-2 border-dashed border-indigo-200 bg-indigo-50/30 text-center relative hover:bg-indigo-50/50 transition-colors">
             <input 
               type="file" 
@@ -1947,30 +1950,12 @@ ${availableSubjectsContext}
                </div>
             </div>
           </div>
-
-          <div className="glass rounded-2xl p-6 border-2 border-dashed border-emerald-200 bg-emerald-50/30 text-center relative hover:bg-emerald-50/50 transition-colors">
-            <input 
-              type="file" 
-              accept="application/pdf"
-              onChange={handleCorrectionFileChange}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            />
-            <div className="flex flex-col items-center justify-center gap-3">
-               <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center shadow-inner">
-                 {correctionFile ? <FileText size={32} /> : <Upload size={32} />}
-               </div>
-               <div>
-                 <p className="font-bold text-slate-700">{correctionFile ? correctionFile.name : "رفع التصحيح النموذجي (PDF)"}</p>
-                 <p className="text-xs text-slate-500 mt-1">الحد الأقصى 5MB</p>
-               </div>
-            </div>
-          </div>
         </div>
 
         <button 
           onClick={handleAnalyze} 
-          disabled={!examFile || !correctionFile || isAnalyzing}
-          className="w-full bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white font-bold rounded-xl py-4 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          disabled={!examFile || isAnalyzing}
+          className="w-full max-w-xl mx-auto block bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white font-bold rounded-xl py-4 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isAnalyzing ? (
             <>
@@ -1984,6 +1969,13 @@ ${availableSubjectsContext}
              </>
           )}
         </button>
+
+        {errorMsg && (
+          <div className="mt-4 p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl whitespace-pre-wrap" dir="rtl">
+            <h4 className="font-bold flex items-center gap-2 mb-2"><AlertCircle size={18} /> حدث خطأ</h4>
+            <p className="text-sm">{errorMsg}</p>
+          </div>
+        )}
 
         {results.length > 0 && (
           <div className="mt-8 space-y-8 animate-in fade-in">
@@ -2002,10 +1994,13 @@ ${availableSubjectsContext}
                 <div key={tIdx} className="space-y-4">
                   <h4 className="font-bold text-md text-indigo-700 bg-indigo-50 inline-block px-4 py-2 rounded-xl border border-indigo-100">{topicGroup.topic}</h4>
                   <div className="grid gap-4">
-                    {topicGroup.exercises?.map((res: any, idx: number) => {
+                    {(!topicGroup.exercises || topicGroup.exercises.length === 0) ? (
+                       <div className="text-center p-4 text-slate-500 bg-slate-50 rounded-xl border border-slate-100">
+                          لم يتم استخراج أي تمارين في هذا الموضوع.
+                       </div>
+                    ) : topicGroup.exercises.map((res: any, idx: number) => {
                       const solKey = `${tIdx}-${idx}`;
                       const isExpanded = expandedExercise === solKey;
-                      const solution = res.solution;
 
                       return (
                       <div key={idx} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
@@ -2027,27 +2022,21 @@ ${availableSubjectsContext}
                                <span className="text-xs text-slate-500 font-bold block mb-1">الوحدة الدراسية</span>
                                <span className="font-bold text-emerald-600">{res.unit || 'غير محدد'}</span>
                              </div>
-                             {solution && (
+                             {res.exam && (
                                <button className={`h-10 px-4 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'}`}>
                                   {isExpanded ? <ChevronRight size={16} className="-rotate-90" /> : <ChevronRight size={16} className="rotate-90" />}
-                                  {isExpanded ? 'إخفاء الحل' : 'عرض الحل'}
+                                  {isExpanded ? 'إخفاء التمرين' : 'عرض التمرين'}
                                </button>
                              )}
                            </div>
                         </div>
 
-                        {(isExpanded && (solution || res.exam)) && (
+                        {(isExpanded && res.exam) && (
                           <div className="p-6 bg-white border-t border-slate-100 animate-in slide-in-from-top-2 fade-in space-y-4">
                                {res.exam && (
                                    <div className="prose prose-slate max-w-none p-4 bg-slate-50 rounded-xl border border-slate-100 text-right leading-relaxed overflow-x-auto" dir="rtl">
                                      <h5 className="font-bold text-slate-700 mb-2">نص التمرين:</h5>
                                      <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{res.exam}</ReactMarkdown>
-                                   </div>
-                               )}
-                               {solution && (
-                                   <div className="prose prose-slate max-w-none p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-right leading-relaxed overflow-x-auto" dir="rtl">
-                                     <h5 className="font-bold text-emerald-700 mb-2">الحل النموذجي:</h5>
-                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{solution}</ReactMarkdown>
                                    </div>
                                )}
                                

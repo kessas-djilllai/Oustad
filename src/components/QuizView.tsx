@@ -100,7 +100,12 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
       }
     } catch (e: any) {
       console.error(e);
-      setErrorMsg('حدث خطأ أثناء توليد الكويز: ' + e.message);
+      let errMsg = e.message || String(e);
+      if (errMsg.includes('504') || errMsg.includes('503')) errMsg = "الخادم يواجه ضغطاً (503/504). المحاولة لاحقاً.";
+      else if (errMsg.includes('Failed to fetch')) errMsg = "انقطع الاتصال بالإنترنت أو الخادم أثناء التحليل.";
+      else if (errMsg.includes('token limit')) errMsg = "تجاوز التوليد الحد الأقصى للنصوص المسموح بها.";
+      else if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) errMsg = "لقد استنفدت الحصة المجانية لمفتاح Gemini API هذا (Quota Exceeded). يرجى التحقق من خطة الدفع الخاصة بك أو إضافة مفتاح API جديد.";
+      setErrorMsg('حدث خطأ أثناء توليد الكويز: ' + errMsg);
     } finally {
       setLoading(false);
     }
