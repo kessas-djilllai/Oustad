@@ -6,12 +6,12 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { GoogleGenAI, Type } from "@google/genai";
 import { supabase } from "../lib/supabase";
-import { triggerAlert } from "./Admin";
+import { triggerAlert, AlertModal } from "./Admin";
 import { ChevronRight, FileText, Wand2, Plus, Upload, AlertCircle } from "lucide-react";
 
-export function PdfBacAnalis() {
+export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) {
   const navigate = useNavigate();
-  const onBack = () => navigate(-1);
+  const onBack = customOnBack || (() => navigate(-1));
   const [examFile, setExamFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -21,6 +21,7 @@ export function PdfBacAnalis() {
   const [dbSubjects, setDbSubjects] = useState<any[]>([]);
   const [dbUnits, setDbUnits] = useState<any[]>([]);
   const [savingState, setSavingState] = useState<Record<string, boolean>>({});
+  const [addedState, setAddedState] = useState<Record<string, boolean>>({});
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
@@ -279,6 +280,7 @@ ${availableSubjectsContext}
 
       if (error) throw error;
       triggerAlert("تمت إضافة التمرين إلى قاعدة البيانات بنجاح!", "success");
+      setAddedState(prev => ({ ...prev, [stateKey]: true }));
     } catch (e: any) {
       triggerAlert("حدث خطأ أثناء حفظ التمرين: " + e.message, "error");
     } finally {
@@ -288,6 +290,7 @@ ${availableSubjectsContext}
 
   return (
     <div className="bg-white rounded-[2rem] p-4 md:p-6 shadow-sm border border-slate-100 animate-in fade-in relative">
+      <AlertModal />
       {showSuccessModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowSuccessModal(false)} />
@@ -435,20 +438,27 @@ ${availableSubjectsContext}
                                )}
                                
                                <div className="pt-4 border-t border-slate-100 flex justify-end">
-                                 <button
-                                   onClick={(e) => { e.stopPropagation(); handleAddExerciseToUnit(res, tIdx, idx, topicGroup); }}
-                                   disabled={savingState[solKey]}
-                                   className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
-                                 >
-                                   {savingState[solKey] ? (
-                                     <span>جاري الإضافة...</span>
-                                   ) : (
-                                     <>
-                                       <Plus size={18} />
-                                       إضافة التمرين إلى قاعدة البيانات
-                                     </>
-                                   )}
-                                 </button>
+                                 {addedState[solKey] ? (
+                                    <div className="bg-emerald-50 text-emerald-600 px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 border border-emerald-200">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                      تمت الإضافة بنجاح
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleAddExerciseToUnit(res, tIdx, idx, topicGroup); }}
+                                      disabled={savingState[solKey]}
+                                      className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
+                                    >
+                                      {savingState[solKey] ? (
+                                        <span>جاري الإضافة...</span>
+                                      ) : (
+                                        <>
+                                          <Plus size={18} />
+                                          إضافة التمرين إلى قاعدة البيانات
+                                        </>
+                                      )}
+                                    </button>
+                                  )}
                                </div>
                           </div>
                         )}

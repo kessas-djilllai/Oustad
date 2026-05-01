@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import AdminUsers from "./users";
+import { PdfBacAnalis } from "./PdfBacAnalis";
 
 export type AlertEventPayload = { message: string, type?: 'success' | 'error' | 'info' };
 
@@ -46,7 +47,7 @@ export const triggerAlert = (message: string, type: 'success' | 'error' | 'info'
   }
 };
 
-function AlertModal() {
+export function AlertModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [alertData, setAlertData] = useState<AlertEventPayload>({ message: '', type: 'info' });
 
@@ -1578,7 +1579,7 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
         <div className="col-span-1 glass rounded-[2rem] p-6 hidden lg:block">
           <h3 className="font-bold text-lg text-slate-800 mb-6">إجراءات سريعة</h3>
           <div className="space-y-3">
-            <button onClick={() => window.open('/analyze', '_blank')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-violet-50 border-transparent hover:border-violet-100 transition-all text-right group border">
+            <button onClick={() => setView('analyze_pdf')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-violet-50 border-transparent hover:border-violet-100 transition-all text-right group border">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform"><FileText size={20}/></div>
                 <div className="text-right">
@@ -1728,8 +1729,8 @@ export function AdminLayout() {
                <BookOpen size={18} /> لوحة الإحصائيات
             </button>
             <button 
-              onClick={() => { window.open('/analyze', '_blank'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm text-slate-600 hover:bg-white/60`}
+              onClick={() => { setView('analyze_pdf'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'analyze_pdf' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
                <FileText size={18} /> تحليل ملف PDF
             </button>
@@ -1843,6 +1844,7 @@ export function AdminLayout() {
           <div key={refreshKey} className="animate-in fade-in duration-300">
              {view === 'dashboard' && <AdminDashboard setView={setView} />}
              {view === 'manage_content' && <AdminManageContent onBack={() => setView('dashboard')} />}
+             {view === 'analyze_pdf' && <PdfBacAnalis onBack={() => setView('dashboard')} />}
              {view === 'add_lesson' && <AdminAddLesson onBack={() => setView('dashboard')} />}
              {view === 'add_exercise' && <AdminAddExercise onBack={() => setView('dashboard')} />}
              {view === 'manage_subjects' && <AdminAddSubject onBack={() => setView('dashboard')} />}

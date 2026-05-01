@@ -101,7 +101,6 @@ export default function App() {
         <Route path="/" element={session ? <StudentLayout session={session} /> : <Navigate to="/auth" replace />} />
         <Route path="/admin" element={<AdminLayout />} />
         <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/analyze" element={<PdfBacAnalis />} />
       </Routes>
     </BrowserRouter>
   );
