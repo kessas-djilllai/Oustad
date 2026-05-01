@@ -45,24 +45,49 @@ function AlertModal() {
   const [alertData, setAlertData] = useState<AlertEventPayload>({ message: '', type: 'info' });
 
   useEffect(() => {
+    let timeoutId: any;
     const handler = (e: any) => {
       setAlertData(e.detail);
       setIsOpen(true);
+      if (e.detail.type === 'success') {
+        timeoutId = setTimeout(() => setIsOpen(false), 3000);
+      }
     };
     window.addEventListener('show-admin-alert', handler as EventListener);
-    return () => window.removeEventListener('show-admin-alert', handler as EventListener);
+    return () => {
+      window.removeEventListener('show-admin-alert', handler as EventListener);
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   if (!isOpen) return null;
+
+  if (alertData.type === 'success') {
+    return (
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 w-full max-w-sm pointer-events-none">
+        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-2xl p-4 shadow-lg flex items-center justify-between gap-3 pointer-events-auto">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <p className="font-bold text-sm text-right leading-loose whitespace-pre-wrap">{alertData.message}</p>
+          </div>
+          <button onClick={() => setIsOpen(false)} className="text-emerald-500 hover:text-emerald-700 shrink-0">
+            <X size={20} />
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
       <motion.div initial={{scale: 0.95, opacity: 0}} animate={{scale: 1, opacity: 1}} className="relative bg-white rounded-[2rem] p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center">
-         <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${alertData.type === 'error' ? 'bg-red-100 text-red-600' : alertData.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
-            {alertData.type === 'error' ? <X size={32} /> : alertData.type === 'success' ? <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> : <Menu size={32} />}
+         <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${alertData.type === 'error' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+            {alertData.type === 'error' ? <X size={32} /> : <Menu size={32} />}
          </div>
-         <h3 className="text-xl font-bold text-slate-800 mb-2">{alertData.type === 'error' ? 'خطأ' : alertData.type === 'success' ? 'نجاح' : 'تنبيه'}</h3>
+         <h3 className="text-xl font-bold text-slate-800 mb-2">{alertData.type === 'error' ? 'خطأ' : 'تنبيه'}</h3>
          <div className="text-slate-600 font-medium mb-6 text-sm break-words whitespace-pre-wrap w-full border-t border-slate-100 pt-4 overflow-y-auto max-h-60" style={{userSelect: 'text'}}>
            {alertData.message}
          </div>
@@ -88,6 +113,7 @@ function StatCard({ title, value, icon }: { title: string, value: string, icon: 
 
 function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lessons' | 'exercises', title: string }) {
   const [items, setItems] = useState<any[]>([]);
+  const [subjectsMap, setSubjectsMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -97,6 +123,15 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
     if (!supabase) return;
     setLoading(true);
     try {
+      if (type === 'units') {
+        const { data: subData } = await supabase.from('subjects').select('id, name');
+        if (subData) {
+          const map: Record<string, string> = {};
+          subData.forEach((s: any) => map[s.id] = s.name);
+          setSubjectsMap(map);
+        }
+      }
+
       const { data, error } = await supabase.from(type).select('*');
       if (error) {
         triggerAlert("خطأ في جلب البيانات: " + error.message, "error");
@@ -169,26 +204,63 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
           {items.length === 0 ? (
             <p className="text-center text-slate-500 py-8 font-bold text-sm">لا توجد عناصر حالياً</p>
           ) : (
-            items.map(item => (
-              <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm">
-                <div>
-                  <h4 className="font-bold text-slate-800 text-sm md:text-base">{item.title || item.name}</h4>
-                  <p className="text-[10px] text-slate-400 mt-1">{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-DZ') : ''}</p>
+            type === 'units' ? (
+              Object.entries(
+                items.reduce((acc: any, item: any) => {
+                  const subjectName = subjectsMap[item.subject_id] || 'مادة غير معروفة';
+                  if (!acc[subjectName]) acc[subjectName] = [];
+                  acc[subjectName].push(item);
+                  return acc;
+                }, {})
+              ).map(([subject, subItems]: any) => (
+                <div key={subject} className="mb-6 last:mb-0 bg-white p-4 rounded-2xl border border-slate-200">
+                  <h5 className="font-bold text-slate-700 mb-4 text-sm px-3 flex items-center border-r-4 border-indigo-500">{subject}</h5>
+                  <div className="space-y-3">
+                    {subItems.map((item: any) => (
+                      <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm">
+                        <div>
+                          <h4 className="font-bold text-slate-800 text-sm md:text-base">{item.title || item.name}</h4>
+                          <p className="text-[10px] text-slate-400 mt-1">{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-DZ') : ''}</p>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => setConfirmDelete({id: item.id, name: item.title || item.name || 'العنصر'})} 
+                          disabled={deletingId === item.id}
+                          className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {deletingId === item.id ? (
+                            <div className="w-4 h-4 border-2 border-red-200 border-t-red-500 rounded-full animate-spin"></div>
+                          ) : (
+                            <Trash size={16} />
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <button 
-                  type="button"
-                  onClick={() => setConfirmDelete({id: item.id, name: item.title || item.name || 'العنصر'})} 
-                  disabled={deletingId === item.id}
-                  className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {deletingId === item.id ? (
-                    <div className="w-4 h-4 border-2 border-red-200 border-t-red-500 rounded-full animate-spin"></div>
-                  ) : (
-                    <Trash size={16} />
-                  )}
-                </button>
-              </div>
-            ))
+              ))
+            ) : (
+              items.map(item => (
+                <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm">
+                  <div>
+                    <h4 className="font-bold text-slate-800 text-sm md:text-base">{item.title || item.name}</h4>
+                    <p className="text-[10px] text-slate-400 mt-1">{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-DZ') : ''}</p>
+                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setConfirmDelete({id: item.id, name: item.title || item.name || 'العنصر'})} 
+                    disabled={deletingId === item.id}
+                    className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deletingId === item.id ? (
+                      <div className="w-4 h-4 border-2 border-red-200 border-t-red-500 rounded-full animate-spin"></div>
+                    ) : (
+                      <Trash size={16} />
+                    )}
+                  </button>
+                </div>
+              ))
+            )
           )}
         </div>
       )}
@@ -270,7 +342,6 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
         const { error } = await supabase.from('lessons').insert(inserts);
         if (!error) {
           triggerAlert(`تم إضافة ${inserts.length} درس بنجاح!`, 'success');
-          onBack();
         } else {
           triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
         }
@@ -295,7 +366,6 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
         }]);
         if (!error) {
           triggerAlert('تمت إضافة الدرس بنجاح!', 'success');
-          onBack();
         } else {
           triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
         }
@@ -520,7 +590,6 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
       }]);
       if (!error) {
         triggerAlert('تمت إضافة التمرين بنجاح!', 'success');
-        onBack();
       } else {
         triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
       }
@@ -633,7 +702,18 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
 function AdminAddSubject({ onBack }: { onBack: () => void }) {
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState('indigo');
+  const [specialization, setSpecialization] = useState('جميع الشعب');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const specializations = [
+    'جميع الشعب',
+    'علوم تجريبية',
+    'رياضيات',
+    'تقني رياضي',
+    'تسيير واقتصاد',
+    'آداب وفلسفة',
+    'لغات أجنبية'
+  ];
 
   const colors = [
     { id: 'indigo', name: 'نيلي', bg: 'bg-indigo-500' },
@@ -651,10 +731,15 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
     if (!supabase || !name) return;
     setIsSubmitting(true);
     try {
+      // NOTE: Instead of relying on a DB migration that might fail and block the user, 
+      // we append the specialization to the subject name if it's not "جميع الشعب".
+      // This is robust and doesn't require modifying the `subjects` table.
+      const finalName = specialization === 'جميع الشعب' ? name : `${name} (${specialization})`;
+      
       const id = 's_' + Math.random().toString(36).substr(2, 9);
       const { error } = await supabase.from('subjects').insert([{
         id,
-        name,
+        name: finalName,
         color: `text-${selectedColor}-500`,
         bg: `bg-${selectedColor}-100`,
         bar_color: `bg-${selectedColor}-500`,
@@ -663,7 +748,6 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
       }]);
       if (!error) {
         triggerAlert('تمت إضافة المادة بنجاح!', 'success');
-        onBack();
       } else {
         triggerAlert('حدث خطأ: ' + error.message, 'error');
       }
@@ -700,6 +784,19 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
             className={`w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-${selectedColor}-500/50 transition-all`}
             required
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">الشعبة (التخصص)</label>
+          <select 
+            value={specialization} 
+            onChange={(e) => setSpecialization(e.target.value)}
+            className={`w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-${selectedColor}-500/50 transition-all`}
+          >
+            {specializations.map(spec => (
+              <option key={spec} value={spec}>{spec}</option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -792,7 +889,6 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
         const { error } = await supabase.from('units').insert(inserts);
         if (!error) {
           triggerAlert(`تم إضافة ${inserts.length} وحدة بنجاح!`, 'success');
-          onBack();
         } else {
           triggerAlert('حدث خطأ: ' + error.message, 'error');
         }
@@ -815,7 +911,6 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
         }]);
         if (!error) {
           triggerAlert('تمت إضافة الوحدة بنجاح!', 'success');
-          onBack();
         } else {
           triggerAlert('حدث خطأ: ' + error.message, 'error');
         }
@@ -874,32 +969,17 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
         </div>
 
         {!isBulkMode ? (
-          <>
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">اسم الوحدة</label>
-              <input 
-                type="text" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)}
-                placeholder="مثال: الميكانيك الكلاسيكية"
-                className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                required={!isBulkMode}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">الفصل الدراسي</label>
-              <select 
-                value={trimestre} 
-                onChange={(e) => setTrimestre(e.target.value)}
-                className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-                required={!isBulkMode}
-              >
-                <option value="1">الفصل الأول</option>
-                <option value="2">الفصل الثاني</option>
-                <option value="3">الفصل الثالث</option>
-              </select>
-            </div>
-          </>
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">اسم الوحدة</label>
+            <input 
+              type="text" 
+              value={name} 
+              onChange={(e) => setName(e.target.value)}
+              placeholder="مثال: الميكانيك الكلاسيكية"
+              className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+              required={!isBulkMode}
+            />
+          </div>
         ) : (
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">النص (JSON Array)</label>
@@ -913,6 +993,20 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
             />
           </div>
         )}
+
+        <div>
+          <label className="block text-sm font-bold text-slate-700 mb-2">الفصل الدراسي</label>
+          <select 
+            value={trimestre} 
+            onChange={(e) => setTrimestre(e.target.value)}
+            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+            required
+          >
+            <option value="1">الفصل الأول</option>
+            <option value="2">الفصل الثاني</option>
+            <option value="3">الفصل الثالث</option>
+          </select>
+        </div>
 
         <button 
           type="submit" 
@@ -964,7 +1058,6 @@ function AdminBacDate({ onBack }: { onBack: () => void }) {
            throw error;
         }
         window.dispatchEvent(new CustomEvent('show-admin-alert', { detail: { message: "تم حفظ تاريخ البكالوريا بنجاح!", type: 'success' }}));
-        onBack();
       } else {
         window.dispatchEvent(new CustomEvent('show-admin-alert', { detail: { message: "يرجى إعداد قاعدة البيانات لحفظ الإعدادات.", type: 'error' }}));
       }
@@ -1149,7 +1242,6 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
            throw error;
         }
         triggerAlert("تم حفظ الإعدادات بنجاح!", 'success');
-        onBack();
       } else {
         triggerAlert("يرجى إعداد قاعدة البيانات لحفظ الإعدادات.", 'error');
       }

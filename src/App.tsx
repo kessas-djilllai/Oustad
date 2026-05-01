@@ -74,7 +74,7 @@ export default function App() {
     const {
       data: { subscription },
     } = supabase?.auth.onAuthStateChange((_event, session) => {
-      if (_event === 'SIGNED_OUT' || _event === 'USER_DELETED') {
+      if (_event === 'SIGNED_OUT') {
         const expiresDays = 365;
         document.cookie = `sb-${(import.meta as any).env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0]}-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       }
@@ -179,7 +179,7 @@ function StudentLayout({ session }: { session: any }) {
           </div>
         </header>
 
-        <StudentPortal loading={loading} />
+        <StudentPortal loading={loading} session={session} />
 
       </div>
 
@@ -270,7 +270,7 @@ const SUBJECTS_DATA = [
   }
 ];
 
-function StudentPortal({ loading }: { loading: boolean }) {
+function StudentPortal({ loading, session }: { loading: boolean, session: any }) {
   const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
   
   const [view, setViewState] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any, lesson?: any }>(() => {
@@ -381,9 +381,37 @@ function StudentPortal({ loading }: { loading: boolean }) {
             setBacDate(adminRes.data.bac_date);
         }
 
+        const specializations = [
+          'علوم تجريبية',
+          'رياضيات',
+          'تقني رياضي',
+          'تسيير واقتصاد',
+          'آداب وفلسفة',
+          'لغات أجنبية'
+        ];
+        const userSpecialization = session?.user?.user_metadata?.specialization;
+
         if (subjectsData.length > 0) {
-          // Format the data to match our UI state format
-          const formattedSubjects = subjectsData.map((sub: any) => {
+          // Filter subjects by user specialization and format the data
+          const formattedSubjects = subjectsData.filter((sub: any) => {
+            if (!userSpecialization) return true;
+            let isForAnotherSpec = false;
+            for (const spec of specializations) {
+               if (spec !== userSpecialization && sub.name.includes(`(${spec})`)) {
+                 isForAnotherSpec = true;
+                 break;
+               }
+            }
+            return !isForAnotherSpec;
+          }).map((sub: any) => {
+            let displayName = sub.name;
+            for (const spec of specializations) {
+               if (displayName.includes(`(${spec})`)) {
+                 displayName = displayName.replace(`(${spec})`, '').trim();
+                 break;
+               }
+            }
+
             const subUnits = unitsData.filter((u: any) => u.subject_id === sub.id).sort((a: any, b: any) => a.unit_order - b.unit_order);
             const formattedUnits = subUnits.map((u: any) => ({
                 ...u,
@@ -408,6 +436,7 @@ function StudentPortal({ loading }: { loading: boolean }) {
             
             return {
               ...sub,
+              name: displayName,
               barColor: sub.bar_color || 'bg-blue-500',
               progress: p,
               icon: Calculator, // In a real app, map icon_name to actual Lucide component
