@@ -3,6 +3,11 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { GoogleGenAI, Type } from "@google/genai";
 import { getSubjectPrompt } from '../lib/prompts';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { 
   BookOpen, 
   Target, 
@@ -23,7 +28,9 @@ import {
   X,
   Wand2,
   Cpu,
-  Calendar
+  Calendar,
+  FileText,
+  Upload
 } from "lucide-react";
 import { motion } from "motion/react";
 
@@ -1405,6 +1412,16 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
         <div className="col-span-1 glass rounded-[2rem] p-6 hidden lg:block">
           <h3 className="font-bold text-lg text-slate-800 mb-6">إجراءات سريعة</h3>
           <div className="space-y-3">
+            <button onClick={() => setView('analyze_pdf')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-violet-50 border-transparent hover:border-violet-100 transition-all text-right group border">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-violet-100 text-violet-600 flex items-center justify-center group-hover:scale-110 transition-transform"><FileText size={20}/></div>
+                <div className="text-right">
+                  <h4 className="font-bold text-slate-800 text-sm">تحليل موضوع (PDF)</h4>
+                  <p className="text-[10px] text-slate-500">استخراج التمارين بالذكاء الاصطناعي</p>
+                </div>
+              </div>
+              <ChevronLeft size={18} className="text-slate-400 group-hover:text-violet-600 transition-colors" />
+            </button>
             <button onClick={() => setView('manage_subjects')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-indigo-50 border-transparent hover:border-indigo-100 transition-all text-right group border">
               <div className="flex items-center gap-3">
                  <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform"><BookOpen size={16}/></div>
@@ -1486,6 +1503,287 @@ function AdminManageContent({ onBack }: { onBack: () => void }) {
   );
 }
 
+function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
+  const [examFile, setExamFile] = useState<File | null>(null);
+  const [correctionFile, setCorrectionFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [results, setResults] = useState<any[]>([]);
+  const [bacInfo, setBacInfo] = useState<{year: string, specialization: string} | null>(null);
+  const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+
+  const handleExamFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setExamFile(e.target.files[0]);
+    }
+  };
+
+  const handleCorrectionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCorrectionFile(e.target.files[0]);
+    }
+  };
+
+  const getBase64 = (fileObj: File): Promise<string> => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+    reader.readAsDataURL(fileObj);
+  });
+
+  const handleAnalyze = async () => {
+    if (!examFile || !correctionFile) {
+      triggerAlert("يرجى اختيار ملف الموضوع وملف التصحيح أولاً", "error");
+      return;
+    }
+    
+    if (examFile.size > 5 * 1024 * 1024 || correctionFile.size > 5 * 1024 * 1024) {
+      triggerAlert("حجم كل ملف يجب أن لا يتجاوز 5MB", "error");
+      return;
+    }
+
+    try {
+      setIsAnalyzing(true);
+      setResults([]);
+      setBacInfo(null);
+      setExpandedExercise(null);
+      
+      const { data: settingsData } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
+      if (!settingsData?.api_key) {
+        throw new Error("لم يتم تكوين مفتاح API. يرجى إعداده في الإعدادات.");
+      }
+
+      const examBase64Data = await getBase64(examFile);
+      const correctionBase64Data = await getBase64(correctionFile);
+      const ai = new GoogleGenAI({ apiKey: settingsData.api_key });
+      
+      const prompt = `أنت خبير في المناهج التعليمية وتحليل مواضيع البكالوريا. تم إرفاق ملفي PDF. الأول هو موضوع بكالوريا، والثاني هو التصحيح الوزاري النموذجي لنفس الموضوع.
+الموضوع يحتوي عادة على موضوعين (الموضوع الأول والموضوع الثاني).
+مهمتك هي استخراج كل التمارين من الموضوع، وتحديد المادة التي ينتمي إليها، والوحدة الدراسية لكل تمرين، ثم **استخراج الحل النموذجي الحرفي والخاص بكل تمرين من ملف التصحيح المرفق** وربطه به، بالإضافة إلى استخراج سنة البكالوريا والتخصص (الشعبة).
+يجب إرجاع النتيجة بصيغة JSON فقط بالتنسيق التالي:
+{
+  "bac_year": "2023",
+  "specialization": "شعبة علوم تجريبية",
+  "topics": [
+    {
+      "topic": "الموضوع الأول",
+      "exercises": [
+        { 
+          "exercise_number": 1, 
+          "subject": "اسم المادة", 
+          "unit": "اسم الوحدة",
+          "solution": "قم بكتابة الحل النموذجي المستخرج من ملف التصحيح لهذا التمرين هنا باستخدام تنسيق Markdown"
+        }
+      ]
+    },
+    {
+      "topic": "الموضوع الثاني",
+      "exercises": [
+         { 
+           "exercise_number": 1, 
+           "subject": "اسم المادة", 
+           "unit": "اسم الوحدة",
+           "solution": "قم بكتابة الحل النموذجي المستخرج من ملف التصحيح لهذا التمرين هنا باستخدام تنسيق Markdown"
+         }
+      ]
+    }
+  ]
+}
+بدون أي نص إضافي أو شروحات، فقط الـ JSON.`;
+
+      const response = await ai.models.generateContent({
+        model: settingsData.ai_model || 'gemini-2.5-flash',
+        contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: 'هذا هو ملف موضوع الامتحان:' },
+                // @ts-ignore
+                { inlineData: { data: examBase64Data, mimeType: examFile.type } },
+                { text: 'وهذا هو ملف التصحيح الوزاري النموذجي:' },
+                // @ts-ignore
+                { inlineData: { data: correctionBase64Data, mimeType: correctionFile.type } },
+                { text: prompt }
+              ]
+            }
+        ]
+      });
+
+      const textResponse = response.text || '';
+      const cleanedJson = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+      
+      try {
+          const parsed = JSON.parse(cleanedJson);
+          if (parsed.topics) {
+            setResults(parsed.topics);
+            setBacInfo({ year: parsed.bac_year, specialization: parsed.specialization });
+          } else if (Array.isArray(parsed)) {
+            if (parsed.length > 0 && parsed[0].topic && parsed[0].exercises) {
+              setResults(parsed);
+            } else {
+              setResults([{ topic: "نتائج التحليل", exercises: parsed }]);
+            }
+          } else {
+            setResults([{ topic: "نتائج التحليل", exercises: [parsed] }]);
+          }
+          triggerAlert("تم تحليل الملف بنجاح", "success");
+      } catch(e) {
+          throw new Error("فشل في قراءة النتيجة كـ JSON: " + textResponse.substring(0, 50) + "...");
+      }
+
+    } catch (e: any) {
+      triggerAlert("حدث خطأ أثناء التحليل: " + e.message, "error");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const toggleSolution = (topicIndex: number, exerciseIndex: number) => {
+    const key = `${topicIndex}-${exerciseIndex}`;
+    setExpandedExercise(prev => prev === key ? null : key);
+  };
+
+  return (
+    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 animate-in fade-in slide-in-from-bottom-4">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
+          <ChevronRight size={20} />
+        </button>
+        <div className="w-12 h-12 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center">
+           <FileText size={24} />
+        </div>
+        <div>
+          <h2 className="font-bold text-xl text-slate-800">تحليل ملف PDF للبكالوريا</h2>
+          <p className="text-xs text-slate-500 font-bold mt-1">باستخدام الذكاء الاصطناعي</p>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="glass rounded-2xl p-6 border-2 border-dashed border-indigo-200 bg-indigo-50/30 text-center relative hover:bg-indigo-50/50 transition-colors">
+            <input 
+              type="file" 
+              accept="application/pdf"
+              onChange={handleExamFileChange}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <div className="flex flex-col items-center justify-center gap-3">
+               <div className="w-16 h-16 bg-indigo-100 text-indigo-500 rounded-full flex items-center justify-center shadow-inner">
+                 {examFile ? <FileText size={32} /> : <Upload size={32} />}
+               </div>
+               <div>
+                 <p className="font-bold text-slate-700">{examFile ? examFile.name : "رفع موضوع الامتحان (PDF)"}</p>
+                 <p className="text-xs text-slate-500 mt-1">الحد الأقصى 5MB</p>
+               </div>
+            </div>
+          </div>
+
+          <div className="glass rounded-2xl p-6 border-2 border-dashed border-emerald-200 bg-emerald-50/30 text-center relative hover:bg-emerald-50/50 transition-colors">
+            <input 
+              type="file" 
+              accept="application/pdf"
+              onChange={handleCorrectionFileChange}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <div className="flex flex-col items-center justify-center gap-3">
+               <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center shadow-inner">
+                 {correctionFile ? <FileText size={32} /> : <Upload size={32} />}
+               </div>
+               <div>
+                 <p className="font-bold text-slate-700">{correctionFile ? correctionFile.name : "رفع التصحيح النموذجي (PDF)"}</p>
+                 <p className="text-xs text-slate-500 mt-1">الحد الأقصى 5MB</p>
+               </div>
+            </div>
+          </div>
+        </div>
+
+        <button 
+          onClick={handleAnalyze} 
+          disabled={!examFile || !correctionFile || isAnalyzing}
+          className="w-full bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white font-bold rounded-xl py-4 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {isAnalyzing ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              جاري التحليل بالذكاء الاصطناعي...
+            </>
+          ) : (
+             <>
+               <Wand2 size={20} />
+               تحليل الموضوع
+             </>
+          )}
+        </button>
+
+        {results.length > 0 && (
+          <div className="mt-8 space-y-8 animate-in fade-in">
+            <h3 className="font-bold text-lg text-slate-800 border-b border-slate-100 pb-2 flex items-center justify-between">
+              نتائج التحليل
+              {bacInfo && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-lg">{bacInfo.year}</span>
+                  <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-lg">{bacInfo.specialization}</span>
+                </div>
+              )}
+            </h3>
+            
+            <div className="grid gap-8">
+              {results.map((topicGroup: any, tIdx: number) => (
+                <div key={tIdx} className="space-y-4">
+                  <h4 className="font-bold text-md text-indigo-700 bg-indigo-50 inline-block px-4 py-2 rounded-xl border border-indigo-100">{topicGroup.topic}</h4>
+                  <div className="grid gap-4">
+                    {topicGroup.exercises?.map((res: any, idx: number) => {
+                      const solKey = `${tIdx}-${idx}`;
+                      const isExpanded = expandedExercise === solKey;
+                      const solution = res.solution;
+
+                      return (
+                      <div key={idx} className="bg-slate-50 rounded-xl border border-slate-100 overflow-hidden">
+                        <div 
+                          className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-slate-100 transition-colors"
+                          onClick={() => toggleSolution(tIdx, idx)}
+                        >
+                           <div className="flex items-center gap-3">
+                             <span className="w-8 h-8 flex items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 font-black text-sm">
+                               {res.exercise_number}
+                             </span>
+                             <div>
+                               <span className="text-xs text-slate-500 font-bold block mb-1">المادة</span>
+                               <span className="font-bold text-slate-800">{res.subject || 'غير محدد'}</span>
+                             </div>
+                           </div>
+                           <div className="flex items-center gap-4">
+                             <div className="bg-white px-4 py-2 rounded-lg border border-slate-200 flex-1 md:text-left text-right">
+                               <span className="text-xs text-slate-500 font-bold block mb-1">الوحدة الدراسية</span>
+                               <span className="font-bold text-emerald-600">{res.unit || 'غير محدد'}</span>
+                             </div>
+                             {solution && (
+                               <button className={`h-10 px-4 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors ${isExpanded ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'}`}>
+                                  {isExpanded ? <ChevronRight size={16} className="-rotate-90" /> : <ChevronRight size={16} className="rotate-90" />}
+                                  {isExpanded ? 'إخفاء الحل' : 'عرض الحل'}
+                               </button>
+                             )}
+                           </div>
+                        </div>
+
+                        {(isExpanded && solution) && (
+                          <div className="p-6 bg-white border-t border-slate-100 animate-in slide-in-from-top-2 fade-in">
+                               <div className="prose prose-slate max-w-none p-4 bg-slate-50 rounded-xl border border-slate-100 text-right leading-relaxed overflow-x-auto" dir="rtl">
+                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{solution}</ReactMarkdown>
+                               </div>
+                          </div>
+                        )}
+                      </div>
+                    )})}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AdminLayout() {
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -1542,6 +1840,12 @@ export function AdminLayout() {
                <BookOpen size={18} /> عرض ومسح المحتوى
             </button>
             <button 
+              onClick={() => { setView('analyze_pdf'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'analyze_pdf' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+            >
+               <FileText size={18} /> تحليل ملف PDF
+            </button>
+            <button 
               onClick={() => { setView('manage_subjects'); closeSidebar(); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_subjects' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
@@ -1596,7 +1900,7 @@ export function AdminLayout() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10">
+      <div className="flex-1 w-full px-4 sm:px-8 pt-6 sm:pt-10 z-10">
         
         <header className="hidden md:flex justify-between items-center mb-8 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100">
           <div className="flex items-center gap-4">
@@ -1625,6 +1929,7 @@ export function AdminLayout() {
           <div className="animate-in fade-in duration-300 slide-in-from-bottom-4">
              {view === 'dashboard' && <AdminDashboard setView={setView} />}
              {view === 'manage_content' && <AdminManageContent onBack={() => setView('dashboard')} />}
+             {view === 'analyze_pdf' && <AdminAnalyzePdf onBack={() => setView('dashboard')} />}
              {view === 'add_lesson' && <AdminAddLesson onBack={() => setView('dashboard')} />}
              {view === 'add_exercise' && <AdminAddExercise onBack={() => setView('dashboard')} />}
              {view === 'manage_subjects' && <AdminAddSubject onBack={() => setView('dashboard')} />}

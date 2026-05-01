@@ -1,17 +1,28 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { BookOpen, AlertCircle, Mail, Lock, User, ChevronRight, Sparkles } from 'lucide-react';
+import { BookOpen, AlertCircle, Mail, Lock, User, ChevronRight, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
+  const [specialization, setSpecialization] = useState('علوم تجريبية');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const specializations = [
+    'علوم تجريبية',
+    'رياضيات',
+    'تقني رياضي',
+    'تسيير واقتصاد',
+    'آداب وفلسفة',
+    'لغات أجنبية'
+  ];
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +47,8 @@ export function AuthPage() {
           password,
           options: {
             data: {
-              full_name: name
+              full_name: name,
+              specialization: specialization
             }
           }
         });
@@ -114,6 +126,27 @@ export function AuthPage() {
                       />
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">الشعبة (التخصص)</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-slate-400">
+                        <BookOpen size={20} />
+                      </div>
+                      <select
+                        value={specialization}
+                        onChange={(e) => setSpecialization(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pr-12 pl-4 text-slate-800 font-bold focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all appearance-none"
+                      >
+                        {specializations.map(spec => (
+                          <option key={spec} value={spec}>{spec}</option>
+                        ))}
+                      </select>
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-slate-400">
+                        <ChevronRight size={20} className="-rotate-90" />
+                      </div>
+                    </div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -143,14 +176,21 @@ export function AuthPage() {
                   <Lock size={20} />
                 </div>
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pr-12 pl-4 text-slate-800 font-bold focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-left"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pr-12 pl-12 text-slate-800 font-bold focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-left"
                   placeholder="••••••••"
                   dir="ltr"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
             </div>
 

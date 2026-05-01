@@ -60,14 +60,24 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase?.auth.getSession().then(({ data: { session } }) => {
+    supabase?.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error("Session error:", error.message);
+      }
       setSession(session);
+      setLoading(false);
+    }).catch(err => {
+      console.error(err);
       setLoading(false);
     });
 
     const {
       data: { subscription },
     } = supabase?.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'SIGNED_OUT' || _event === 'USER_DELETED') {
+        const expiresDays = 365;
+        document.cookie = `sb-${(import.meta as any).env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0]}-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+      }
       setSession(session);
       setLoading(false);
     }) || { data: { subscription: { unsubscribe: () => {} } } };

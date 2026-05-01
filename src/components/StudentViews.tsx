@@ -67,8 +67,7 @@ export function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { s
            {isLessons ? <PlayCircle size={16} className="md:w-5 md:h-5"/> : <ClipboardList size={16} className="md:w-5 md:h-5"/>}
         </div>
         <div>
-          <h2 className="font-bold text-base md:text-xl text-slate-800">{subject.name} - الوحدات</h2>
-          <p className="text-[10px] md:text-xs text-slate-500 font-medium">حدد الوحدة لفتح {isLessons ? 'الدروس' : 'التمارين'}</p>
+          <h2 className="font-bold text-base md:text-xl text-slate-800">{subject.name}</h2>
         </div>
       </div>
 
