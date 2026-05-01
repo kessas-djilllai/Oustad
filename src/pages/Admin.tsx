@@ -243,9 +243,9 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
               }, {});
 
               return Object.entries(groupedItems).map(([groupName, groupItems]: any) => (
-                <div key={groupName} className="mb-6 last:mb-0 bg-white p-3 md:p-4 rounded-2xl border border-slate-200 shadow-sm">
-                  <h5 className="font-bold text-slate-700 mb-4 text-sm px-3 flex items-center border-r-4 border-indigo-500">{groupName}</h5>
-                  <div className="space-y-3">
+                <div key={groupName} className="mb-4 md:mb-6 last:mb-0 bg-white p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+                  <h5 className="font-bold text-slate-700 mb-3 text-xs md:text-sm px-2 md:px-3 flex items-center border-r-2 md:border-r-4 border-indigo-500">{groupName}</h5>
+                  <div className="space-y-2">
                     {groupItems.map((item: any) => {
                        let displayTitle = item.title || item.name;
                        let subtitle = "";
@@ -259,8 +259,8 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
                        }
                        
                        return (
-                      <div key={item.id} className="flex justify-between items-start md:items-center p-3 md:p-4 bg-slate-50 rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm gap-2 md:gap-4">
-                        <div className="flex-1">
+                      <div key={item.id} className="flex justify-between items-start md:items-center p-2.5 md:p-4 bg-slate-50 rounded-lg md:rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm gap-2">
+                        <div className="flex-1 min-w-0">
                           <h4 className="font-bold text-slate-800 text-sm md:text-base break-words">{displayTitle}</h4>
                           {subtitle && <p className="text-xs text-indigo-600 mt-1">{subtitle}</p>}
                           <p className="text-[10px] text-slate-400 mt-1">{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-DZ') : ''}</p>
@@ -403,7 +403,7 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="glass rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm">
+    <div className="glass rounded-[1.5rem] md:rounded-[2rem] p-3 md:p-6 max-w-3xl mx-auto shadow-sm">
       <div className="flex items-center gap-4 mb-4">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0">
           <ChevronRight size={20} />
@@ -638,7 +638,7 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="glass rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm">
+    <div className="glass rounded-[1.5rem] md:rounded-[2rem] p-3 md:p-6 max-w-3xl mx-auto shadow-sm">
       <div className="flex items-center gap-4 mb-4">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0">
           <ChevronRight size={20} />
@@ -809,7 +809,7 @@ function AdminAddSubject({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="glass rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm">
+    <div className="glass rounded-[1.5rem] md:rounded-[2rem] p-3 md:p-6 max-w-3xl mx-auto shadow-sm">
       <div className="flex items-center gap-4 mb-4">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0">
           <ChevronRight size={20} />
@@ -985,7 +985,7 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="glass rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm">
+    <div className="glass rounded-[1.5rem] md:rounded-[2rem] p-3 md:p-6 max-w-3xl mx-auto shadow-sm">
       <div className="flex items-center gap-4 mb-4">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0">
           <ChevronRight size={20} />
@@ -1140,7 +1140,7 @@ function AdminBacDate({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="bg-white rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm border border-slate-100">
+    <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-3 md:p-6 max-w-3xl mx-auto shadow-sm border border-slate-100">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
           <ChevronRight size={20} />
@@ -1324,7 +1324,7 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="bg-white rounded-[2rem] p-4 md:p-6 max-w-2xl mx-auto shadow-sm border border-slate-100">
+    <div className="bg-white rounded-[1.5rem] md:rounded-[2rem] p-3 md:p-6 max-w-3xl mx-auto shadow-sm border border-slate-100">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
           <ChevronRight size={20} />
@@ -1969,7 +1969,7 @@ export function AdminLayout() {
   const closeSidebar = () => setIsSidebarOpen(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 relative flex md:flex-row flex-col">
+    <div className="min-h-[100dvh] bg-slate-50 relative flex md:flex-row flex-col">
       <AlertModal />
       {/* Mobile Header (Sidebar Toggle + Title) */}
       <div className="md:hidden flex justify-between items-center p-4 bg-white border-b border-slate-100 z-40 sticky top-0">
@@ -2091,7 +2091,7 @@ export function AdminLayout() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 w-full px-4 sm:px-8 pt-6 sm:pt-10 z-10">
+      <div className="flex-1 w-full px-3 md:px-8 pt-4 md:pt-10 pb-20 md:pb-8 z-10 flex flex-col min-w-0">
         
         <header className="hidden md:flex justify-between items-center mb-8 bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100">
           <div className="flex items-center gap-4">

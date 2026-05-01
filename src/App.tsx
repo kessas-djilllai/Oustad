@@ -111,7 +111,6 @@ export default function App() {
 // ==========================================
 
 function StudentLayout({ session }: { session: any }) {
-  const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -130,11 +129,6 @@ function StudentLayout({ session }: { session: any }) {
       localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 2000);
-    return () => clearTimeout(timer);
-  }, []);
 
   const handleLogout = async () => {
     await supabase?.auth.signOut();
@@ -179,7 +173,7 @@ function StudentLayout({ session }: { session: any }) {
           </div>
         </header>
 
-        <StudentPortal loading={loading} session={session} />
+        <StudentPortal session={session} />
 
       </div>
 
@@ -270,7 +264,7 @@ const SUBJECTS_DATA = [
   }
 ];
 
-function StudentPortal({ loading, session }: { loading: boolean, session: any }) {
+function StudentPortal({ session }: { session: any }) {
   const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
   
   const [view, setViewState] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any, lesson?: any }>(() => {
@@ -306,7 +300,7 @@ function StudentPortal({ loading, session }: { loading: boolean, session: any })
     localStorage.setItem('portal_view', JSON.stringify(viewToSave));
   };
   
-  const [dbLoading, setDbLoading] = useState(false);
+  const [dbLoading, setDbLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [bacDate, setBacDate] = useState<string | null>(null);
 
@@ -455,9 +449,9 @@ function StudentPortal({ loading, session }: { loading: boolean, session: any })
     fetchData();
   }, [refreshTrigger]);
 
-  if (loading || dbLoading) {
+  if (dbLoading) {
     return (
-      <div className="space-y-4 md:space-y-8 animate-in fade-in duration-500">
+      <div className="space-y-4 md:space-y-8">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
           {/* Main search skeleton */}
           <div className="col-span-2 md:col-span-3 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 min-h-[120px] md:min-h-[160px] flex flex-col justify-center gap-3 relative overflow-hidden border border-slate-200/40">
@@ -541,28 +535,20 @@ function StudentPortal({ loading, session }: { loading: boolean, session: any })
 
   return (
     <>
-      <AnimatePresence mode="wait">
-        <motion.div
-           key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}
-           initial={{ opacity: 0, x: -10 }}
-           animate={{ opacity: 1, x: 0 }}
-           exit={{ opacity: 0, x: 10 }}
-           transition={{ duration: 0.2 }}
-        >
-          {view.type === 'dashboard' && <DashboardView subjects={subjects} bacDate={bacDate} onSubjectClick={(s, type) => setView({ type: 'subject_units', subject: s, listType: type })} onStartQuiz={() => setView({ type: 'quiz' })} />}
-          {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
-          {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
-            if (view.listType === 'exercises') {
-              setView({ type: 'solve_exercise', subject: currentSubject, unit: currentUnit, exercise: item });
-            } else {
-              setView({ type: 'view_lesson', subject: currentSubject, unit: currentUnit, lesson: item });
-            }
-          }} />}
-          {view.type === 'view_lesson' && <LessonDetailsView subject={currentSubject} unit={currentUnit} lesson={view.lesson} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'lessons' })} />}
-          {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'exercises' })} />}
-          {view.type === 'quiz' && <QuizView subjects={subjects} onBack={() => setView({ type: 'dashboard' })} />}
-        </motion.div>
-      </AnimatePresence>
+      <div key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}>
+        {view.type === 'dashboard' && <DashboardView subjects={subjects} bacDate={bacDate} onSubjectClick={(s, type) => setView({ type: 'subject_units', subject: s, listType: type })} onStartQuiz={() => setView({ type: 'quiz' })} />}
+        {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
+        {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
+          if (view.listType === 'exercises') {
+            setView({ type: 'solve_exercise', subject: currentSubject, unit: currentUnit, exercise: item });
+          } else {
+            setView({ type: 'view_lesson', subject: currentSubject, unit: currentUnit, lesson: item });
+          }
+        }} />}
+        {view.type === 'view_lesson' && <LessonDetailsView subject={currentSubject} unit={currentUnit} lesson={view.lesson} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'lessons' })} />}
+        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'exercises' })} />}
+        {view.type === 'quiz' && <QuizView subjects={subjects} onBack={() => setView({ type: 'dashboard' })} />}
+      </div>
     </>
   );
 }
@@ -760,26 +746,12 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
             </button>
           </div>
         </div>
-        <motion.div layout className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
-          <AnimatePresence mode="popLayout">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
             {subjects.map((sub, index) => (
-              <motion.div 
+              <div 
                 key={`${activeTab}-${sub.id}`}
-                layout
-                initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.8, y: -20 }}
-                transition={{ 
-                  duration: 0.3,
-                  type: "spring", 
-                  stiffness: 300, 
-                  damping: 25,
-                  delay: index * 0.05
-                }}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
                 onClick={() => onSubjectClick(sub, activeTab)}
-                className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover relative overflow-hidden"
+                className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover relative overflow-hidden transition-transform hover:scale-[1.02] active:scale-[0.98]"
               >
                 <div className={`absolute -left-10 -top-10 w-24 h-24 rounded-full blur-2xl opacity-10 group-hover:opacity-20 transition-all pointer-events-none ${sub.barColor}`} />
                 <div className="flex justify-between items-start mb-3 md:mb-6 relative">
@@ -797,10 +769,9 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
                      <div className={`h-full rounded-full ${sub.barColor}`} style={{ width: `${sub.progress}%` }} />
                    </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
-          </AnimatePresence>
-        </motion.div>
+        </div>
       </div>
     </div>
   )
