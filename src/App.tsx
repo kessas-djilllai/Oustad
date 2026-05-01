@@ -7,6 +7,7 @@ import "katex/dist/katex.min.css";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { AdminLayout, AdminLogin } from "./pages/Admin";
+import { PdfBacAnalis } from "./pages/PdfBacAnalis";
 import { AuthPage } from "./pages/Auth";
 import { loadUserProgress, getProgressSync, saveProgress, checkDailyLogin, getXP, getStreak, addXP } from "./lib/progress";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -100,6 +101,7 @@ export default function App() {
         <Route path="/" element={session ? <StudentLayout session={session} /> : <Navigate to="/auth" replace />} />
         <Route path="/admin" element={<AdminLayout />} />
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/analyze" element={<PdfBacAnalis />} />
       </Routes>
     </BrowserRouter>
   );
