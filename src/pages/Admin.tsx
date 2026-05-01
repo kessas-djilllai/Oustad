@@ -1673,6 +1673,20 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
   const [results, setResults] = useState<any[]>([]);
   const [bacInfo, setBacInfo] = useState<{year: string, specialization: string} | null>(null);
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+  const [dbSubjects, setDbSubjects] = useState<any[]>([]);
+  const [dbUnits, setDbUnits] = useState<any[]>([]);
+  const [savingState, setSavingState] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!supabase) return;
+      const { data: s } = await supabase.from('subjects').select('*');
+      if (s) setDbSubjects(s);
+      const { data: u } = await supabase.from('units').select('*');
+      if (u) setDbUnits(u);
+    }
+    fetchData();
+  }, []);
 
   const handleExamFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -1717,10 +1731,20 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
       const examBase64Data = await getBase64(examFile);
       const correctionBase64Data = await getBase64(correctionFile);
       const ai = new GoogleGenAI({ apiKey: settingsData.api_key });
-      
+
+      const availableSubjectsContext = dbSubjects.map(sub => {
+        const subUnits = dbUnits.filter(u => u.subject_id === sub.id).map(u => u.name).join('، ');
+        return `- المادة: ${sub.name} (الوحدات: ${subUnits || 'لا يوجد وحدات'})`;
+      }).join('\n');
+
       const prompt = `أنت خبير في المناهج التعليمية وتحليل مواضيع البكالوريا. تم إرفاق ملفي PDF. الأول هو موضوع بكالوريا، والثاني هو التصحيح الوزاري النموذجي لنفس الموضوع.
 الموضوع يحتوي عادة على موضوعين (الموضوع الأول والموضوع الثاني).
 مهمتك هي استخراج كل التمارين من الموضوع، وتحديد المادة التي ينتمي إليها، والوحدة الدراسية لكل تمرين، ثم **استخراج الحل النموذجي الحرفي والخاص بكل تمرين من ملف التصحيح المرفق** وربطه به، بالإضافة إلى استخراج سنة البكالوريا والتخصص (الشعبة).
+
+قائمة المواد والوحدات المتاحة في قاعدة البيانات:
+${availableSubjectsContext}
+
+تلميح مهم: يجب تحديد "المادة" (subject) و"الوحدة الدراسية" (unit) لكل تمرين بدقة بحيث يتطابق تماماً مع الأسماء في القائمة المتاحة أعلاه إن أمكن.
 يجب إرجاع النتيجة بصيغة JSON فقط بالتنسيق التالي:
 {
   "bac_year": "2023",
@@ -1733,7 +1757,8 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
           "exercise_number": 1, 
           "subject": "اسم المادة", 
           "unit": "اسم الوحدة",
-          "solution": "قم بكتابة الحل النموذجي المستخرج من ملف التصحيح لهذا التمرين هنا باستخدام تنسيق Markdown"
+          "exam": "قم بكتابة نص التمرين كاملا المستخرج من ملف الأسئلة المرفق باستخدام تنسيق Markdown",
+          "solution": "قم بكتابة الحل النموذجي المستخرج من ملف التصحيح المرفق لهذا التمرين باستخدام تنسيق Markdown"
         }
       ]
     },
@@ -1744,7 +1769,8 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
            "exercise_number": 1, 
            "subject": "اسم المادة", 
            "unit": "اسم الوحدة",
-           "solution": "قم بكتابة الحل النموذجي المستخرج من ملف التصحيح لهذا التمرين هنا باستخدام تنسيق Markdown"
+           "exam": "قم بكتابة نص التمرين كاملا المستخرج من ملف الأسئلة المرفق باستخدام تنسيق Markdown",
+           "solution": "قم بكتابة الحل النموذجي المستخرج من ملف التصحيح المرفق لهذا التمرين باستخدام تنسيق Markdown"
          }
       ]
     }
@@ -1753,21 +1779,51 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
 بدون أي نص إضافي أو شروحات، فقط الـ JSON.`;
 
       const response = await ai.models.generateContent({
-        model: settingsData.ai_model || 'gemini-2.5-flash',
+        model: 'gemini-3.1-pro-preview',
         contents: [
             {
               role: 'user',
               parts: [
                 { text: 'هذا هو ملف موضوع الامتحان:' },
-                // @ts-ignore
                 { inlineData: { data: examBase64Data, mimeType: examFile.type } },
                 { text: 'وهذا هو ملف التصحيح الوزاري النموذجي:' },
-                // @ts-ignore
                 { inlineData: { data: correctionBase64Data, mimeType: correctionFile.type } },
                 { text: prompt }
               ]
             }
-        ]
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              bac_year: { type: Type.STRING },
+              specialization: { type: Type.STRING },
+              topics: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    topic: { type: Type.STRING },
+                    exercises: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          exercise_number: { type: Type.NUMBER },
+                          subject: { type: Type.STRING },
+                          unit: { type: Type.STRING },
+                          exam: { type: Type.STRING, description: "نص التمرين بتنسيق Markdown. لا تضع الحل هنا." },
+                          solution: { type: Type.STRING }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       });
 
       const textResponse = response.text || '';
@@ -1775,21 +1831,23 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
       
       try {
           const parsed = JSON.parse(cleanedJson);
-          if (parsed.topics) {
-            setResults(parsed.topics);
+          
+          let parsedTopics = [];
+          if (parsed.topics && Array.isArray(parsed.topics) && parsed.topics.length > 0) {
+            parsedTopics = parsed.topics;
             setBacInfo({ year: parsed.bac_year, specialization: parsed.specialization });
-          } else if (Array.isArray(parsed)) {
-            if (parsed.length > 0 && parsed[0].topic && parsed[0].exercises) {
-              setResults(parsed);
-            } else {
-              setResults([{ topic: "نتائج التحليل", exercises: parsed }]);
-            }
-          } else {
-            setResults([{ topic: "نتائج التحليل", exercises: [parsed] }]);
+          } else if (Array.isArray(parsed) && parsed.length > 0) {
+             parsedTopics = parsed;
           }
-          triggerAlert("تم تحليل الملف بنجاح", "success");
-      } catch(e) {
-          throw new Error("فشل في قراءة النتيجة كـ JSON: " + textResponse.substring(0, 50) + "...");
+          
+          if (parsedTopics.length > 0) {
+             setResults(parsedTopics);
+             triggerAlert("تم تحليل الملف بنجاح", "success");
+          } else {
+             throw new Error("لم يتم العثور على أي تمارين. قد يكون النموذج غير قادر على قراءة هذه الملفات.");
+          }
+      } catch(e: any) {
+          throw new Error("فشل في استخراج البيانات: " + e.message);
       }
 
     } catch (e: any) {
@@ -1802,6 +1860,57 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
   const toggleSolution = (topicIndex: number, exerciseIndex: number) => {
     const key = `${topicIndex}-${exerciseIndex}`;
     setExpandedExercise(prev => prev === key ? null : key);
+  };
+
+  const handleAddExerciseToUnit = async (exerciseData: any, topicGroupIndex: number, exerciseIndex: number, tInfo?: any) => {
+    if (!supabase) return;
+    
+    const dbSubject = dbSubjects.find(s => s.name?.trim() === exerciseData.subject?.trim());
+    let targetUnitId = null;
+
+    if (dbSubject) {
+       const matchingUnit = dbUnits.find(u => u.subject_id === dbSubject.id && u.name?.trim() === exerciseData.unit?.trim());
+       if (matchingUnit) targetUnitId = matchingUnit.id;
+    } else {
+       const matchingUnit = dbUnits.find(u => u.name?.trim() === exerciseData.unit?.trim());
+       if (matchingUnit) targetUnitId = matchingUnit.id;
+    }
+
+    if (!targetUnitId) {
+       triggerAlert(`لم يتم العثور على وحدة متطابقة لـ "${exerciseData.unit}". يرجى التأكد من اسم الوحدة والمادة.`, "error");
+       return;
+    }
+
+    const stateKey = `${topicGroupIndex}-${exerciseIndex}`;
+    setSavingState(prev => ({ ...prev, [stateKey]: true }));
+
+    try {
+      const exercise_id = 'e_' + Math.random().toString(36).substr(2, 9);
+      const bYear = bacInfo?.year || '';
+      const bSpec = bacInfo?.specialization || '';
+      const tName = tInfo?.topic || '';
+      const title = `تمرين ${exerciseData.exercise_number} - باك ${bYear} ${bSpec} (${tName})`;
+      
+      const contentArr = [{
+        exam: exerciseData.exam,
+        solution: exerciseData.solution
+      }];
+
+      const { error } = await supabase.from('exercises').insert([{
+        id: exercise_id,
+        unit_id: targetUnitId,
+        title: title,
+        exercise_order: 99,
+        content: JSON.stringify(contentArr)
+      }]);
+
+      if (error) throw error;
+      triggerAlert("تمت إضافة التمرين إلى قاعدة البيانات بنجاح!", "success");
+    } catch (e: any) {
+      triggerAlert("حدث خطأ أثناء حفظ التمرين: " + e.message, "error");
+    } finally {
+      setSavingState(prev => ({ ...prev, [stateKey]: false }));
+    }
   };
 
   return (
@@ -1927,10 +2036,36 @@ function AdminAnalyzePdf({ onBack }: { onBack: () => void }) {
                            </div>
                         </div>
 
-                        {(isExpanded && solution) && (
-                          <div className="p-6 bg-white border-t border-slate-100 animate-in slide-in-from-top-2 fade-in">
-                               <div className="prose prose-slate max-w-none p-4 bg-slate-50 rounded-xl border border-slate-100 text-right leading-relaxed overflow-x-auto" dir="rtl">
-                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{solution}</ReactMarkdown>
+                        {(isExpanded && (solution || res.exam)) && (
+                          <div className="p-6 bg-white border-t border-slate-100 animate-in slide-in-from-top-2 fade-in space-y-4">
+                               {res.exam && (
+                                   <div className="prose prose-slate max-w-none p-4 bg-slate-50 rounded-xl border border-slate-100 text-right leading-relaxed overflow-x-auto" dir="rtl">
+                                     <h5 className="font-bold text-slate-700 mb-2">نص التمرين:</h5>
+                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{res.exam}</ReactMarkdown>
+                                   </div>
+                               )}
+                               {solution && (
+                                   <div className="prose prose-slate max-w-none p-4 bg-emerald-50 rounded-xl border border-emerald-100 text-right leading-relaxed overflow-x-auto" dir="rtl">
+                                     <h5 className="font-bold text-emerald-700 mb-2">الحل النموذجي:</h5>
+                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{solution}</ReactMarkdown>
+                                   </div>
+                               )}
+                               
+                               <div className="pt-4 border-t border-slate-100 flex justify-end">
+                                 <button
+                                   onClick={() => handleAddExerciseToUnit(res, tIdx, idx, topicGroup)}
+                                   disabled={savingState[solKey]}
+                                   className="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
+                                 >
+                                   {savingState[solKey] ? (
+                                     <span>جاري الإضافة...</span>
+                                   ) : (
+                                     <>
+                                       <Plus size={18} />
+                                       إضافة التمرين إلى قاعدة البيانات
+                                     </>
+                                   )}
+                                 </button>
                                </div>
                           </div>
                         )}
