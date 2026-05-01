@@ -52,7 +52,8 @@ import {
   Flame,
   Star,
   Sun,
-  Moon
+  Moon,
+  Home
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -267,21 +268,17 @@ const SUBJECTS_DATA = [
 
 function StudentPortal({ session }: { session: any }) {
   const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
+  const [mainTab, setMainTab] = useState<'home' | 'lessons' | 'exercises' | 'topics' | 'settings'>('home');
   
   const [view, setViewState] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any, lesson?: any }>(() => {
     const saved = localStorage.getItem('portal_view');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Fix up the icon which gets lost in JSON stringify
         if (parsed.subject) {
           const foundSubject = SUBJECTS_DATA.find(s => s.id === parsed.subject.id);
-          if (foundSubject) {
-             parsed.subject.icon = foundSubject.icon;
-          } else {
-             // Default to generic icon if not found in SUBJECTS_DATA
-             parsed.subject.icon = BookOpen;
-          }
+          if (foundSubject) parsed.subject.icon = foundSubject.icon;
+          else parsed.subject.icon = BookOpen;
         }
         return parsed;
       } catch (e) {
@@ -292,7 +289,6 @@ function StudentPortal({ session }: { session: any }) {
   });
 
   const setView = (newView: any) => {
-    // Before saving, ensure we don't try to stringify the icon component
     setViewState(newView);
     const viewToSave = { ...newView };
     if (viewToSave.subject) {
@@ -300,6 +296,7 @@ function StudentPortal({ session }: { session: any }) {
     }
     localStorage.setItem('portal_view', JSON.stringify(viewToSave));
   };
+
   
   const [dbLoading, setDbLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -538,7 +535,11 @@ function StudentPortal({ session }: { session: any }) {
   return (
     <>
       <div key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}>
-        {view.type === 'dashboard' && <DashboardView subjects={subjects} bacDate={bacDate} onSubjectClick={(s, type) => setView({ type: 'subject_units', subject: s, listType: type })} onStartQuiz={() => setView({ type: 'quiz' })} />}
+        {view.type === 'dashboard' && mainTab === 'home' && <DashboardHomeView subjects={subjects} bacDate={bacDate} onStartQuiz={() => setView({ type: 'quiz' })} />}
+        {view.type === 'dashboard' && (mainTab === 'lessons' || mainTab === 'exercises') && <DashboardSubjectsView subjects={subjects} listType={mainTab} onSubjectClick={(s) => setView({ type: 'subject_units', subject: s, listType: mainTab })} />}
+        {view.type === 'dashboard' && mainTab === 'topics' && <TopicsView />}
+        {view.type === 'dashboard' && mainTab === 'settings' && <SettingsView />}
+        
         {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
         {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
           if (view.listType === 'exercises') {
@@ -551,11 +552,75 @@ function StudentPortal({ session }: { session: any }) {
         {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'exercises' })} />}
         {view.type === 'quiz' && <QuizView subjects={subjects} onBack={() => setView({ type: 'dashboard' })} />}
       </div>
+
+      {view.type === 'dashboard' && (
+        <div className="fixed bottom-0 left-0 right-0 h-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-800/50 z-40 flex items-center justify-around px-2 sm:px-6 pb-2 text-slate-500 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.05)]">
+          <BottomNavItem icon={<Home size={22} />} label="الرئيسية" active={mainTab === 'home'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('home'); }} />
+          <BottomNavItem icon={<ClipboardList size={22} />} label="التمارين" active={mainTab === 'exercises'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('exercises'); }} />
+          <BottomNavItem icon={<PlayCircle size={22} />} label="الدروس" active={mainTab === 'lessons'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('lessons'); }} />
+          <BottomNavItem icon={<FileText size={22} />} label="مواضيع" active={mainTab === 'topics'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('topics'); }} />
+          <BottomNavItem icon={<Settings size={22} />} label="الإعدادات" active={mainTab === 'settings'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('settings'); }} />
+        </div>
+      )}
     </>
   );
 }
 
-function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { subjects: any[], bacDate?: string | null, onSubjectClick: (s: any, listType: 'lessons' | 'exercises') => void, onStartQuiz: () => void }) {
+function BottomNavItem({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void }) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center gap-1.5 w-16 h-16 rounded-2xl transition-all ${active ? 'text-blue-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}
+    >
+      <div className={`relative flex items-center justify-center ${active ? 'bg-blue-50 text-blue-600 rounded-xl w-12 h-10 shadow-sm' : ''}`}>
+        {icon}
+      </div>
+      <span className={`text-[10px] font-bold ${active ? 'text-blue-600' : 'text-slate-500'}`}>{label}</span>
+    </button>
+  );
+}
+
+function TopicsView() {
+  return (
+    <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-[2rem] border border-slate-100 min-h-[50vh] text-center">
+       <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6 shadow-inner">
+         <FileText size={40} className="text-slate-400" />
+       </div>
+       <h2 className="font-bold text-2xl text-slate-800 mb-2">مواضيع بكالوريا سابقة</h2>
+       <p className="text-slate-500 font-medium">هذا القسم قيد التطوير وغير متوفر حالياً. قريباً!</p>
+    </div>
+  )
+}
+
+function SettingsView() {
+  const navigate = useNavigate();
+  return (
+    <div className="space-y-4 animate-in fade-in">
+      <div className="flex items-center gap-3 mb-6">
+        <h2 className="font-bold text-2xl text-slate-800">الإعدادات</h2>
+      </div>
+      <div className="bg-white rounded-[2rem] p-3 md:p-6 border border-slate-100 shadow-sm space-y-4">
+         <button 
+           onClick={() => navigate('/admin')}
+           className="w-full flex items-center justify-between p-4 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-50 active:bg-slate-100 transition-colors group text-right"
+         >
+           <div className="flex items-center gap-4">
+             <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100 transition-transform group-hover:scale-105">
+               <Target size={24} />
+             </div>
+             <div>
+               <h4 className="font-bold text-slate-800 text-lg">لوحة التحكم</h4>
+               <p className="text-sm text-slate-500 font-medium transition-colors">إدارة المحتوى وتعديل قاعدة البيانات</p>
+             </div>
+           </div>
+           <ChevronRight size={20} className="text-slate-400 group-hover:text-orange-500 transition-transform group-hover:-translate-x-1" />
+         </button>
+      </div>
+    </div>
+  )
+}
+
+function DashboardHomeView({ subjects, bacDate, onStartQuiz }: { subjects: any[], bacDate?: string | null, onStartQuiz: () => void }) {
   const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>(() => {
     return (localStorage.getItem('dashboard_active_tab') as 'lessons' | 'exercises') || 'lessons';
   });
@@ -729,55 +794,45 @@ function DashboardView({ subjects, bacDate, onSubjectClick, onStartQuiz }: { sub
         </div>
 
       </div>
+    </div>
+  )
+}
 
-      <div>
-        <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-4 md:mb-6 gap-3">
-          <h3 className="font-bold text-base md:text-lg text-slate-800 flex items-center gap-1.5 md:gap-2">
-            <BookOpen size={18} className="text-indigo-500" />
-            المواد الدراسية
-          </h3>
-          
-          <div className="flex bg-slate-100/80 dark:bg-slate-800/50 p-1.5 rounded-xl w-full md:w-auto shadow-inner border border-slate-200/60 dark:border-slate-700/50">
-            <button 
-              onClick={() => setActiveTab('lessons')}
-              className={`flex-1 flex justify-center items-center gap-2 md:w-36 py-2.5 rounded-lg text-sm font-extrabold transition-all duration-200 ${activeTab === 'lessons' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}
+function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subjects: any[], listType: 'lessons' | 'exercises', onSubjectClick: (s: any) => void }) {
+  return (
+    <div className="animate-in fade-in duration-300">
+      <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-6 md:mb-8 gap-3">
+        <h3 className="font-bold text-2xl text-slate-800 flex items-center gap-2">
+          {listType === 'lessons' ? <PlayCircle size={24} className="text-blue-500" /> : <ClipboardList size={24} className="text-blue-500" />}
+          {listType === 'lessons' ? 'الدروس' : 'التمارين'}
+        </h3>
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
+          {subjects.map((sub, index) => (
+            <div 
+              key={`${sub.id}`}
+              onClick={() => onSubjectClick(sub)}
+              className="glass rounded-3xl md:rounded-[2rem] p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover relative overflow-hidden transition-transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              <PlayCircle size={16} /> الدروس
-            </button>
-            <button 
-              onClick={() => setActiveTab('exercises')}
-              className={`flex-1 flex justify-center items-center gap-2 md:w-36 py-2.5 rounded-lg text-sm font-extrabold transition-all duration-200 ${activeTab === 'exercises' ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}
-            >
-              <ClipboardList size={16} /> التمارين
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
-            {subjects.map((sub, index) => (
-              <div 
-                key={`${sub.id}`}
-                onClick={() => onSubjectClick(sub, activeTab)}
-                className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover relative overflow-hidden transition-transform hover:scale-[1.02] active:scale-[0.98]"
-              >
-                <div className={`absolute -left-10 -top-10 w-24 h-24 rounded-full blur-2xl opacity-10 group-hover:opacity-20 transition-all pointer-events-none ${sub.barColor}`} />
-                <div className="flex justify-between items-start mb-3 md:mb-6 relative">
-                   <div className={`w-8 h-8 md:w-12 md:h-12 rounded-xl md:rounded-2xl ${sub.bg} ${sub.color} flex items-center justify-center shadow-sm`}>
-                     <sub.icon size={18} className="md:w-6 md:h-6" />
-                   </div>
-                </div>
-                <div>
-                   <h4 className="font-bold text-sm md:text-lg text-slate-800 mb-2 md:mb-4 truncate">{sub.name}</h4>
-                   <div className="flex justify-between text-[9px] md:text-xs font-bold text-slate-500 mb-1 md:mb-1.5">
-                      <span>التقدم</span>
-                      <span>{sub.progress}%</span>
-                   </div>
-                   <div className="w-full bg-slate-100 rounded-full h-1 md:h-1.5 overflow-hidden">
-                     <div className={`h-full rounded-full ${sub.barColor}`} style={{ width: `${sub.progress}%` }} />
-                   </div>
-                </div>
+              <div className={`absolute -left-10 -top-10 w-24 h-24 rounded-full blur-2xl opacity-10 group-hover:opacity-20 transition-all pointer-events-none ${sub.barColor}`} />
+              <div className="flex justify-between items-start mb-4 md:mb-6 relative">
+                 <div className={`w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl ${sub.bg} ${sub.color} flex items-center justify-center shadow-sm`}>
+                   <sub.icon size={20} className="md:w-7 md:h-7" />
+                 </div>
               </div>
-            ))}
-        </div>
+              <div>
+                 <h4 className="font-bold text-sm md:text-lg text-slate-800 mb-2 md:mb-4 truncate">{sub.name}</h4>
+                 <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500 mb-1.5 md:mb-2">
+                    <span>التقدم</span>
+                    <span>{sub.progress}%</span>
+                 </div>
+                 <div className="w-full bg-slate-100 rounded-full h-1.5 md:h-2 overflow-hidden">
+                   <div className={`h-full rounded-full ${sub.barColor}`} style={{ width: `${sub.progress}%` }} />
+                 </div>
+              </div>
+            </div>
+          ))}
       </div>
     </div>
   )
