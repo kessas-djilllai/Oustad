@@ -1813,6 +1813,212 @@ function AdminManageBac({ onBack }: { onBack: () => void }) {
   );
 }
 
+function AdminAddCookies({ onBack }: { onBack: () => void }) {
+  const [activeTab, setActiveTab] = useState<'add' | 'view'>('add');
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [jsonInput, setJsonInput] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [allCookies, setAllCookies] = useState<any>({});
+
+  useEffect(() => {
+    async function loadData() {
+      if (!supabase) return;
+      setLoading(true);
+      try {
+        const { data: subData } = await supabase.from('subjects').select('*');
+        if (subData) setSubjects(subData);
+
+        const { data: settingsData } = await supabase.from('admin_settings').select('subject_cookies').limit(1).single();
+        if (settingsData && settingsData.subject_cookies) {
+            try {
+               const cookies = JSON.parse(settingsData.subject_cookies);
+               setAllCookies(cookies);
+               if (selectedSubjectId) {
+                   if (cookies[selectedSubjectId]) {
+                      setJsonInput(JSON.stringify(cookies[selectedSubjectId], null, 2));
+                   } else {
+                      setJsonInput('{\n  "levels": [\n    {\n      "level": "المستوى 1",\n      "questions": [\n        {\n          "q": "السؤال الأول؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الثاني؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الثالث؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الرابع؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الخامس؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال السادس؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال السابع؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الثامن؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال التاسع؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال العاشر؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        }\n      ]\n    }\n  ]\n}');
+                   }
+               }
+            } catch(e) {
+               console.error("Error parsing subject_cookies setting", e);
+            }
+        } else if (selectedSubjectId) {
+             setJsonInput('{\n  "levels": [\n    {\n      "level": "المستوى 1",\n      "questions": [\n        {\n          "q": "السؤال الأول؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الثاني؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الثالث؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الرابع؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الخامس؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال السادس؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال السابع؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الثامن؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال التاسع؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال العاشر؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        }\n      ]\n    }\n  ]\n}');
+        }
+      } catch (e) {
+         console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [selectedSubjectId, activeTab]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSubjectId || !jsonInput) return;
+    setIsSubmitting(true);
+    try {
+        const parsedInput = JSON.parse(jsonInput);
+        
+        let existingCookies: any = {};
+        const { data: currentData } = await supabase.from('admin_settings').select('id, subject_cookies').limit(1).single();
+        if (currentData && currentData.subject_cookies) {
+            try {
+                existingCookies = JSON.parse(currentData.subject_cookies);
+            } catch(e) {}
+        }
+        
+        existingCookies[selectedSubjectId] = parsedInput;
+        
+        const updateData = currentData ? { ...currentData, id: 1, subject_cookies: JSON.stringify(existingCookies) } : { id: 1, subject_cookies: JSON.stringify(existingCookies) };
+        
+        const { error } = await supabase.from('admin_settings').upsert(updateData);
+        if (error) {
+           if (error.message.includes('subject_cookies')) {
+             throw new Error("يرجى تحديث قاعدة البيانات وتشغيل: ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS subject_cookies TEXT;");
+           }
+           throw error;
+        }
+        triggerAlert('تم حفظ الكوكيز بنجاح', 'success');
+        setAllCookies(existingCookies);
+    } catch(err: any) {
+        triggerAlert('حدث خطأ: ' + (err.message || 'تأكد من صحة ملف JSON'), 'error');
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteCookies = async (subjectId: string) => {
+    if (!confirm('هل أنت متأكد من مسح كويز هذه المادة؟')) return;
+    try {
+        let existingCookies: any = { ...allCookies };
+        delete existingCookies[subjectId];
+        
+        const { data: currentData } = await supabase.from('admin_settings').select('id, subject_cookies').limit(1).single();
+        const updateData = currentData ? { ...currentData, id: 1, subject_cookies: JSON.stringify(existingCookies) } : { id: 1, subject_cookies: JSON.stringify(existingCookies) };
+        
+        const { error } = await supabase.from('admin_settings').upsert(updateData);
+        if (error) throw error;
+        
+        setAllCookies(existingCookies);
+        if (selectedSubjectId === subjectId) {
+            setJsonInput('{\n  "levels": [\n    {\n      "level": "المستوى 1",\n      "questions": [\n        {\n          "q": "السؤال الأول؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        }\n      ]\n    }\n  ]\n}');
+        }
+        triggerAlert('تم مسح الكويز بنجاح', 'success');
+    } catch(err: any) {
+        triggerAlert('خطأ أثناء المسح: ' + err.message, 'error');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors">
+            <ChevronRight size={20} className="rotate-180" />
+          </button>
+          <h2 className="font-bold text-2xl text-slate-800">الكوكيز (المراحل)</h2>
+        </div>
+        
+        <div className="flex bg-white rounded-xl shadow-sm border border-slate-100 p-1">
+          <button
+            onClick={() => setActiveTab('add')}
+            className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'add' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+          >
+            إضافة/تعديل كويز
+          </button>
+          <button
+            onClick={() => setActiveTab('view')}
+            className={`px-6 py-2 rounded-lg font-bold text-sm transition-all ${activeTab === 'view' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
+          >
+            عرض الكويزات
+          </button>
+        </div>
+      </div>
+
+      {activeTab === 'add' ? (
+        <div className="bg-white rounded-[2rem] p-6 lg:p-8 shadow-sm border border-slate-100">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-slate-700">المادة</label>
+              <select
+                value={selectedSubjectId}
+                onChange={(e) => setSelectedSubjectId(e.target.value)}
+                className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium"
+                required
+              >
+                <option value="">-- اختر المادة --</option>
+                {subjects.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-slate-700">الكوكيز بصيغة JSON</label>
+              <textarea
+                value={jsonInput}
+                onChange={(e) => setJsonInput(e.target.value)}
+                placeholder='{\n  "levels": [\n    {\n      "level": "المستوى 1",\n      "questions": [\n        {\n          "q": "السؤال الأول؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الثاني؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        {\n          "q": "السؤال الثالث؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        },\n        ... (10 أسئلة)\n      ]\n    }\n  ]\n}'
+                className="w-full h-80 px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-mono text-sm text-left"
+                dir="ltr"
+                required
+                disabled={!selectedSubjectId}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting || !selectedSubjectId}
+              className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? 'جاري الحفظ...' : 'حفظ الكوكيز'}
+            </button>
+          </form>
+        </div>
+      ) : (
+        <div className="bg-white rounded-[2rem] p-6 lg:p-8 shadow-sm border border-slate-100">
+          <h3 className="font-bold text-xl text-slate-800 mb-6">احصائيات الكويزات (المراحل)</h3>
+          {loading ? (
+             <div className="text-center text-slate-500 py-10 font-bold animate-pulse">جاري التحميل...</div>
+          ) : (
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {subjects.filter(s => {
+                   const subjectCookies = allCookies[s.id];
+                   return subjectCookies?.levels && subjectCookies.levels.length > 0;
+                }).map(s => {
+                   const subjectCookies = allCookies[s.id];
+                   const levelsCount = subjectCookies?.levels ? subjectCookies.levels.length : 0;
+                   return (
+                     <div key={s.id} className="p-5 border border-slate-200 bg-slate-50 rounded-2xl flex flex-col gap-3 transition-hover hover:border-blue-200 hover:bg-blue-50/50">
+                        <div className="flex justify-between items-start">
+                           <h4 className="font-bold text-lg text-slate-800 line-clamp-1">{s.name}</h4>
+                           <button onClick={() => handleDeleteCookies(s.id)} className="text-red-500 hover:bg-red-50 p-1 rounded-lg transition-colors" title="مسح الكويز">
+                             <Trash2 size={18} />
+                           </button>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                           <span className="text-slate-500 font-bold">عدد المراحل:</span>
+                           <span className="font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-700">
+                             {levelsCount} مرحلة
+                           </span>
+                        </div>
+                     </div>
+                   );
+                })}
+                {subjects.filter(s => allCookies[s.id]?.levels?.length > 0).length === 0 && <div className="col-span-full text-slate-500 text-center py-4 text-sm font-bold">لا توجد كويزات (مراحل) مضافة بعد</div>}
+             </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminManageContent({ onBack }: { onBack: () => void }) {
   const [activeTab, setActiveTab] = useState<'subjects' | 'units' | 'lessons' | 'exercises'>('subjects');
 
@@ -1972,6 +2178,12 @@ export function AdminLayout() {
                <FileText size={18} /> إدارة مواضيع البكالوريا
             </button>
             <button 
+              onClick={() => { setView('manage_cookies'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_cookies' ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+            >
+               <FileText size={18} /> إدارة كوكيز المواد
+            </button>
+            <button 
               onClick={() => { setView('users'); closeSidebar(); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'users' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
@@ -2043,6 +2255,7 @@ export function AdminLayout() {
              {view === 'manage_subjects' && <AdminAddSubject onBack={() => setView('dashboard')} />}
              {view === 'manage_units' && <AdminAddUnit onBack={() => setView('dashboard')} />}
              {view === 'manage_bac' && <AdminManageBac onBack={() => setView('dashboard')} />}
+             {view === 'manage_cookies' && <AdminAddCookies onBack={() => setView('dashboard')} />}
              {view === 'settings' && <AdminSettings onBack={() => setView('dashboard')} />}
              {view === 'bac_date' && <AdminBacDate onBack={() => setView('dashboard')} />}
              {view === 'users' && <AdminUsers />}
