@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
 import { GoogleGenAI, Type } from "@google/genai";
 import { supabase } from "../lib/supabase";
 import { triggerAlert, AlertModal } from "./Admin";
@@ -114,10 +115,10 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
                         properties: {
                           exercise_number: { type: Type.NUMBER },
                           subject: { type: Type.STRING },
-                          unit: { type: Type.STRING },
+                          units: { type: Type.ARRAY, items: { type: Type.STRING }, description: "الوحدات الدراسية التي يشملها التمرين" },
                           exam: { type: Type.STRING, description: "نص التمرين بتنسيق Markdown." }
                         },
-                        required: ["exercise_number", "subject", "unit", "exam"]
+                        required: ["exercise_number", "subject", "units", "exam"]
                       }
                     }
                   },
@@ -205,26 +206,43 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
     if (!supabase) return;
     
     const dbSubject = dbSubjects.find(s => s.name?.trim() === exerciseData.subject?.trim());
-    let targetUnitId = null;
+    
+    // Support both the new 'units' array and fallback to 'unit' string if AI returns old format
+    const unitsList: string[] = Array.isArray(exerciseData.units) 
+      ? exerciseData.units 
+      : (exerciseData.unit ? [exerciseData.unit] : []);
 
-    if (dbSubject) {
-       const matchingUnit = dbUnits.find(u => u.subject_id === dbSubject.id && u.name?.trim() === exerciseData.unit?.trim());
-       if (matchingUnit) targetUnitId = matchingUnit.id;
-    } else {
-       const matchingUnit = dbUnits.find(u => u.name?.trim() === exerciseData.unit?.trim());
-       if (matchingUnit) targetUnitId = matchingUnit.id;
+    const targetUnitIds: string[] = [];
+    const notFoundUnits: string[] = [];
+
+    unitsList.forEach(unitName => {
+      let matchingUnit;
+      if (dbSubject) {
+         matchingUnit = dbUnits.find(u => u.subject_id === dbSubject.id && u.name?.trim() === unitName?.trim());
+      } else {
+         matchingUnit = dbUnits.find(u => u.name?.trim() === unitName?.trim());
+      }
+      if (matchingUnit) {
+        targetUnitIds.push(matchingUnit.id);
+      } else {
+        notFoundUnits.push(unitName);
+      }
+    });
+
+    if (targetUnitIds.length === 0) {
+       triggerAlert(`لم يتم العثور على أي وحدات متطابقة لـ: ${notFoundUnits.join(', ')}. يرجى التأكد من الأسماء.`, "error");
+       return;
     }
 
-    if (!targetUnitId) {
-       triggerAlert(`لم يتم العثور على وحدة متطابقة لـ "${exerciseData.unit}". يرجى التأكد من اسم الوحدة والمادة.`, "error");
-       return;
+    if (notFoundUnits.length > 0) {
+       // Optional warning about partially missing units
+       console.warn("بعض الوحدات لم يتم العثور عليها:", notFoundUnits);
     }
 
     const stateKey = `${topicGroupIndex}-${exerciseIndex}`;
     setSavingState(prev => ({ ...prev, [stateKey]: true }));
 
     try {
-      const exercise_id = 'e_' + Math.random().toString(36).substr(2, 9);
       const bYear = bacInfo?.year || '';
       const bSpec = bacInfo?.specialization || '';
       const tName = tInfo?.topic || '';
@@ -234,13 +252,15 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
         exam: exerciseData.exam
       }];
 
-      const { error } = await supabase.from('exercises').insert([{
-        id: exercise_id,
-        unit_id: targetUnitId,
+      const insertData = targetUnitIds.map(unitId => ({
+        id: 'e_' + Math.random().toString(36).substr(2, 9),
+        unit_id: unitId,
         title: title,
         exercise_order: 99,
         content: JSON.stringify(contentArr)
-      }]);
+      }));
+
+      const { error } = await supabase.from('exercises').insert(insertData);
 
       if (error) throw error;
       triggerAlert("تمت إضافة التمرين إلى قاعدة البيانات بنجاح!", "success", false);
@@ -379,8 +399,8 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
                            </div>
                            <div className="flex items-center gap-4">
                              <div className="bg-white px-5 py-2.5 rounded-xl border border-slate-200 flex-1 md:text-left text-right shadow-sm">
-                               <span className="text-xs text-slate-500 font-bold block mb-1">الوحدة الدراسية</span>
-                               <span className="font-bold text-emerald-600">{res.unit || 'غير محدد'}</span>
+                               <span className="text-xs text-slate-500 font-bold block mb-1">الوحدات الدراسية</span>
+                               <span className="font-bold text-emerald-600">{(res.units && res.units.length) ? res.units.join('، ') : (res.unit || 'غير محدد')}</span>
                              </div>
                              {res.exam && (
                                <button className={`h-10 px-4 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors ${expandedExercise === solKey ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'}`}>
@@ -394,7 +414,7 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
                         {(expandedExercise === solKey && res.exam) && (
                           <div className="p-2 md:p-6 bg-white border-t border-slate-200 animate-in slide-in-from-top-2 fade-in space-y-8">
                                <div className="markdown-container prose prose-slate prose-base md:prose-lg max-w-none text-right leading-loose w-full" dir="rtl">
-                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{preprocessMath(String(res.exam))}</ReactMarkdown>
+                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>{preprocessMath(String(res.exam))}</ReactMarkdown>
                                </div>
                                
                                <div className="pt-6 border-t border-slate-100 flex justify-end">
