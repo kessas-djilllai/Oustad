@@ -537,7 +537,7 @@ function StudentPortal({ session }: { session: any }) {
       <div key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}>
         {view.type === 'dashboard' && mainTab === 'home' && <DashboardHomeView subjects={subjects} bacDate={bacDate} onStartQuiz={() => setView({ type: 'quiz' })} />}
         {view.type === 'dashboard' && (mainTab === 'lessons' || mainTab === 'exercises') && <DashboardSubjectsView subjects={subjects} listType={mainTab} onSubjectClick={(s) => setView({ type: 'subject_units', subject: s, listType: mainTab })} />}
-        {view.type === 'dashboard' && mainTab === 'topics' && <TopicsView />}
+        {view.type === 'dashboard' && mainTab === 'topics' && <TopicsView subjects={subjects} />}
         {view.type === 'dashboard' && mainTab === 'settings' && <SettingsView />}
         
         {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
@@ -580,14 +580,168 @@ function BottomNavItem({ icon, label, active, onClick }: { icon: React.ReactNode
   );
 }
 
-function TopicsView() {
+function BacPdfView({ year, subject, onBack }: { year: string, subject: any, onBack: () => void }) {
+  const [exam, setExam] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadExam() {
+      if (!supabase) return;
+      try {
+        setLoading(true);
+        const { data, error } = await supabase.from('bac_exams').select('*').eq('year', year).eq('subject_id', subject.id).limit(1).single();
+        if (data) setExam(data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadExam();
+  }, [year, subject.id]);
+
   return (
-    <div className="flex flex-col items-center justify-center p-8 bg-slate-50 rounded-[2rem] border border-slate-100 min-h-[50vh] text-center">
-       <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6 shadow-inner">
-         <FileText size={40} className="text-slate-400" />
+    <div className="animate-in fade-in duration-300 relative z-10 space-y-6">
+      <div className="flex items-center gap-4 mb-4 md:mb-8">
+        <button onClick={onBack} className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0 relative z-20">
+          <ChevronRight size={24} />
+        </button>
+        <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${subject.bg} ${subject.color} flex items-center justify-center shadow-sm shrink-0`}>
+           <subject.icon size={28} />
+        </div>
+        <div>
+          <h2 className="font-bold text-xl md:text-3xl text-slate-800">{subject.name}</h2>
+          <p className="text-xs md:text-sm text-slate-500 font-medium">بكالوريا {year}</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
+          <p className="text-sm font-bold text-slate-500 mt-4">جاري التحميل...</p>
+        </div>
+      ) : !exam ? (
+        <div className="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100">
+           <FileText size={40} className="text-slate-300 mx-auto mb-4" />
+           <p className="text-slate-500 font-bold mb-1">الموضوع غير متوفر</p>
+           <p className="text-slate-400 text-sm">لم يتم رفع مواضيع لهذه المادة في هذه السنة.</p>
+        </div>
+      ) : (
+        <div className="grid gap-6">
+          <div className="bg-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 p-4 md:p-6 flex flex-col items-center">
+             <h3 className="font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl mb-6 flex items-center gap-2 w-full justify-center text-center">
+                 <FileText size={20} className="text-blue-500" />
+                 موضوع بكالوريا {year}
+             </h3>
+             <iframe src={exam.exam_file} className="w-full h-[600px] md:h-[800px] rounded-2xl border border-slate-200 bg-slate-50 relative z-10" title={`Exam ${year}`} />
+          </div>
+
+          {exam.solution_file && (
+             <div className="bg-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 p-4 md:p-6 flex flex-col items-center mt-4">
+                 <h3 className="font-bold text-emerald-700 bg-emerald-50 px-4 py-2 rounded-xl mb-6 flex items-center gap-2 w-full justify-center text-center border border-emerald-100">
+                     <FileText size={20} className="text-emerald-500" />
+                     التصحيح النموذجي
+                 </h3>
+                 <iframe src={exam.solution_file} className="w-full h-[600px] md:h-[800px] rounded-2xl border border-emerald-100 bg-slate-50 relative z-10" title={`Solution ${year}`} />
+             </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TopicsView({ subjects }: { subjects: any[] }) {
+  const [selectedYear, setSelectedYear] = useState<string | null>(null);
+  const [selectedSubject, setSelectedSubject] = useState<any | null>(null);
+  const [bacExamsList, setBacExamsList] = useState<{id: string, year: string, subject_id: string}[]>([]);
+  const years = ["2025", "2024", "2023", "2022", "2021", "2020", "2019"];
+
+  useEffect(() => {
+     async function fetchList() {
+       if (!supabase) return;
+       try {
+         const { data, error } = await supabase.from('bac_exams').select('id, year, subject_id');
+         if (data) setBacExamsList(data);
+       } catch (e) {
+         console.error(e);
+       }
+     }
+     fetchList();
+  }, []);
+
+  if (selectedSubject && selectedYear) {
+      return <BacPdfView year={selectedYear} subject={selectedSubject} onBack={() => setSelectedSubject(null)} />
+  }
+
+  if (selectedYear) {
+      const examsForYear = bacExamsList.filter(e => e.year === selectedYear);
+      const subjectsWithExams = subjects.filter(s => examsForYear.some(e => e.subject_id === s.id));
+      
+      return (
+         <div className="animate-in fade-in slide-in-from-right-4 relative z-10 space-y-6">
+             <div className="flex items-center gap-4 mb-4 md:mb-8">
+                 <button onClick={() => setSelectedYear(null)} className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 shadow-sm relative z-20 transition-all font-bold">
+                     <ChevronRight size={24} />
+                 </button>
+                 <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-sm">
+                    <FileText size={28} />
+                 </div>
+                 <div>
+                    <h2 className="font-bold text-xl md:text-3xl text-slate-800">مواضيع بكالوريا {selectedYear}</h2>
+                    <p className="text-xs md:text-sm text-slate-500 font-medium">عرض حسب التخصص والمادة</p>
+                 </div>
+             </div>
+             {subjectsWithExams.length === 0 ? (
+                 <div className="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100">
+                    <FileText size={40} className="text-slate-300 mx-auto mb-4" />
+                    <p className="text-slate-500 font-bold mb-1">لا يوجد مواضيع متاحة</p>
+                    <p className="text-slate-400 text-sm">سيتم إضافة مواضيع لهذه السنة قريباً.</p>
+                 </div>
+             ) : (
+                 <DashboardSubjectsView 
+                    subjects={subjectsWithExams} 
+                    listType="topics" 
+                    onSubjectClick={(s) => setSelectedSubject(s)} 
+                 />
+             )}
+         </div>
+      );
+  }
+
+  return (
+    <div className="animate-in fade-in">
+       <div className="mb-6">
+         <h2 className="font-bold text-xl md:text-3xl text-slate-800 flex items-center gap-3">
+           <FileText className="text-blue-500 font-black" size={32} />
+           مواضيع بكالوريا سابقة
+         </h2>
+         <p className="text-sm md:text-base text-slate-500 font-medium pr-11 mt-1">اختر سنة البكالوريا لعرض المواضيع</p>
        </div>
-       <h2 className="font-bold text-2xl text-slate-800 mb-2">مواضيع بكالوريا سابقة</h2>
-       <p className="text-slate-500 font-medium">هذا القسم قيد التطوير وغير متوفر حالياً. قريباً!</p>
+
+       <div className="grid gap-3 md:gap-4 max-w-3xl">
+         {years.map(y => {
+            const count = bacExamsList.filter(e => e.year === y).length;
+            return (
+              <button 
+                  key={y} 
+                  onClick={() => setSelectedYear(y)}
+                  className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between hover:bg-slate-50 active:scale-[0.99] transition-all group cursor-pointer"
+               >
+                 <div className="flex items-center gap-4">
+                    <div className="bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center font-black text-lg md:text-xl shadow-[0_4px_12px_-4px_rgba(37,99,235,0.2)]">
+                       {y}
+                    </div>
+                    <span className="font-bold text-slate-700 md:text-lg">بكالوريا {y}</span>
+                 </div>
+                 <div className="flex items-center gap-4">
+                    <span className="text-xs md:text-sm bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full font-bold group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">{count} مواد متوفرة</span>
+                    <ChevronRight size={20} className="text-slate-400 rotate-180 group-hover:-translate-x-1 group-hover:text-blue-600 transition-all font-black" />
+                 </div>
+              </button>
+            )
+         })}
+       </div>
     </div>
   )
 }
@@ -798,13 +952,13 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz }: { subjects: any[]
   )
 }
 
-function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subjects: any[], listType: 'lessons' | 'exercises', onSubjectClick: (s: any) => void }) {
+function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subjects: any[], listType: 'lessons' | 'exercises' | 'topics', onSubjectClick: (s: any) => void }) {
   return (
     <div className="animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-6 md:mb-8 gap-3">
         <h3 className="font-bold text-2xl text-slate-800 flex items-center gap-2">
-          {listType === 'lessons' ? <PlayCircle size={24} className="text-blue-500" /> : <ClipboardList size={24} className="text-blue-500" />}
-          {listType === 'lessons' ? 'الدروس' : 'التمارين'}
+          {listType === 'lessons' ? <PlayCircle size={24} className="text-blue-500" /> : listType === 'exercises' ? <ClipboardList size={24} className="text-blue-500" /> : <FileText size={24} className="text-blue-500" />}
+          {listType === 'lessons' ? 'الدروس' : listType === 'exercises' ? 'التمارين' : 'المواد'}
         </h3>
       </div>
       

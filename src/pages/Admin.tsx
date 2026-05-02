@@ -40,8 +40,12 @@ import { PdfBacAnalis } from "./PdfBacAnalis";
 
 export type AlertEventPayload = { message: string, type?: 'success' | 'error' | 'info' };
 
-export const triggerAlert = (message: string, type: 'success' | 'error' | 'info' = 'info', refresh: boolean = true) => {
-  window.dispatchEvent(new CustomEvent<AlertEventPayload>('show-admin-alert', { detail: { message, type } }));
+export const triggerAlert = (message: string, type: 'success' | 'error' | 'info' = 'info', refresh: boolean = false) => {
+  let displayMessage = message;
+  if (typeof displayMessage === 'string' && displayMessage.includes('Failed to fetch')) {
+    displayMessage = displayMessage.replace('Failed to fetch', 'انقطع الاتصال بالخادم (Failed to fetch). تأكد من: 1) اتصالك بالإنترنت، 2) إيقاف مانع الإعلانات (Adblocker)، 3) أن مشروع Supabase الخاص بك غير متوقف (Paused).');
+  }
+  window.dispatchEvent(new CustomEvent<AlertEventPayload>('show-admin-alert', { detail: { message: displayMessage, type } }));
   if (type === 'success' && refresh) {
     window.dispatchEvent(new CustomEvent('refresh-admin-view'));
   }
@@ -594,7 +598,7 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
       const jsonStr = response.text.trim();
       const parsedData = JSON.parse(jsonStr);
       setGeneratedQuestions([{ exam: parsedData.exam, solution: parsedData.solution }]);
-      triggerAlert("تم توليد الموضوع بنجاح!", 'success');
+      triggerAlert("تم توليد الموضوع بنجاح!", 'success', false);
     } catch (err: any) {
       console.error(err);
       let errMsg = err.message || String(err);
@@ -734,11 +738,40 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
         </div>
 
         {generatedQuestions.length > 0 && (
-          <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
-            <h3 className="font-bold text-slate-700 mb-3 text-sm flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span> الأسئلة المُولّدة جاهزة
+          <div className="mt-8 space-y-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <h3 className="font-bold text-slate-700 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span> محتوى التمرين المُولّد جاهز للحفظ (يمكنك التعديل عليه)
             </h3>
-            <p className="text-xs text-slate-500">تم تجهيز {generatedQuestions.length} أسئلة بنجاح. سيتم إرفاقها بالتمرين عند الحفظ.</p>
+            
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">نص التمرين والاستحقاقات (Markdown)</label>
+              <textarea
+                value={generatedQuestions[0].exam}
+                onChange={(e) => {
+                   const newQs = [...generatedQuestions];
+                   newQs[0].exam = e.target.value;
+                   setGeneratedQuestions(newQs);
+                }}
+                rows={10}
+                className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-mono"
+                dir="rtl"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">نص التصحيح النموذجي (Markdown)</label>
+              <textarea
+                value={generatedQuestions[0].solution}
+                onChange={(e) => {
+                   const newQs = [...generatedQuestions];
+                   newQs[0].solution = e.target.value;
+                   setGeneratedQuestions(newQs);
+                }}
+                rows={10}
+                className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-mono"
+                dir="rtl"
+              />
+            </div>
           </div>
         )}
       </form>
@@ -1392,7 +1425,7 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
                  type="button"
                  onClick={() => {
                    navigator.clipboard.writeText(`CREATE POLICY "Allow public update to subjects" ON subjects FOR UPDATE USING (true);\nCREATE POLICY "Allow public update to units" ON units FOR UPDATE USING (true);\nCREATE POLICY "Allow public update to lessons" ON lessons FOR UPDATE USING (true);\nCREATE POLICY "Allow public update to exercises" ON exercises FOR UPDATE USING (true);\nCREATE POLICY "Allow public delete to subjects" ON subjects FOR DELETE USING (true);\nCREATE POLICY "Allow public delete to units" ON units FOR DELETE USING (true);\nCREATE POLICY "Allow public delete to lessons" ON lessons FOR DELETE USING (true);\nCREATE POLICY "Allow public delete to exercises" ON exercises FOR DELETE USING (true);`);
-                   triggerAlert('تم نسخ الكود!', 'success');
+                   triggerAlert('تم نسخ الكود!', 'success', false);
                  }}
                  className="text-[10px] bg-slate-100 font-bold px-3 py-1 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"
                >
@@ -1410,6 +1443,36 @@ CREATE POLICY "Allow public delete to subjects" ON subjects FOR DELETE USING (tr
 CREATE POLICY "Allow public delete to units" ON units FOR DELETE USING (true);
 ...`}
            </pre>
+
+           <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-2 mt-6">
+              تفعيل مواضيع البكالوريا (SQL)
+           </h4>
+           <div className="relative group mb-3">
+              <pre className="bg-slate-900 text-slate-300 p-4 rounded-xl text-left text-[10px] overflow-x-auto dir-ltr font-mono leading-loose max-h-40 overflow-y-auto">
+{`CREATE TABLE IF NOT EXISTS bac_exams (
+  id TEXT PRIMARY KEY,
+  year TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  exam_file TEXT NOT NULL,
+  solution_file TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+CREATE POLICY "Allow public read to bac_exams" ON bac_exams FOR SELECT USING (true);
+CREATE POLICY "Allow public update to bac_exams" ON bac_exams FOR UPDATE USING (true);
+CREATE POLICY "Allow public insert to bac_exams" ON bac_exams FOR INSERT USING (true);
+CREATE POLICY "Allow public delete to bac_exams" ON bac_exams FOR DELETE USING (true);`}
+              </pre>
+              <button 
+                 type="button"
+                 onClick={() => {
+                   navigator.clipboard.writeText(`CREATE TABLE IF NOT EXISTS bac_exams ( id TEXT PRIMARY KEY, year TEXT NOT NULL, subject_id TEXT NOT NULL, exam_file TEXT NOT NULL, solution_file TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() ); CREATE POLICY "Allow public read to bac_exams" ON bac_exams FOR SELECT USING (true); CREATE POLICY "Allow public insert to bac_exams" ON bac_exams FOR INSERT USING (true); CREATE POLICY "Allow public update to bac_exams" ON bac_exams FOR UPDATE USING (true); CREATE POLICY "Allow public delete to bac_exams" ON bac_exams FOR DELETE USING (true);`);
+                   triggerAlert('تم نسخ كود البكالوريا!', 'success', false);
+                 }}
+                 className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-white/10 text-white hover:bg-white/20 text-xs px-2 py-1 rounded transition-all"
+              >
+                 نسخ
+              </button>
+           </div>
         </div>
 
         <button 
