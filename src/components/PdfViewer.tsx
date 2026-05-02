@@ -35,30 +35,30 @@ export function PdfViewer({ url }: { url: string }) {
   }
 
   return (
-    <div className="flex flex-col items-center w-full relative min-w-0" ref={containerRef}>
-      <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 bg-slate-800 text-white px-4 py-2 rounded-2xl mb-4 sticky top-4 z-50 shadow-xl w-fit mx-auto max-w-full" dir="ltr">
-        <button
-          onClick={() => setScale(s => Math.max(s - 0.2, 0.5))}
-          className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
-        >
-          <ZoomOut size={20} />
-        </button>
-        <span className="text-sm font-bold min-w-[3rem] text-center">
-          {Math.round(scale * 100)}%
-        </span>
-        <button
-          onClick={() => setScale(s => Math.min(s + 0.2, 3.0))}
-          className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
-        >
-          <ZoomIn size={20} />
-        </button>
-      </div>
-
+    <div className="flex flex-col items-center w-full h-full relative min-w-0" ref={containerRef}>
       <div 
-        className="w-full overflow-auto bg-slate-100/50 rounded-xl h-[85vh] md:h-[800px] relative p-0 overflow-y-auto overflow-x-auto border border-slate-200" 
+        className="w-full h-full overflow-auto bg-slate-100/50 relative p-0 overflow-y-auto overflow-x-auto" 
         dir="ltr"
       >
-        <div className="w-max min-w-full flex flex-col items-center p-2 md:p-6 pb-20">
+        <div className="flex flex-wrap items-center justify-center gap-2 md:gap-4 bg-slate-800/90 backdrop-blur text-white px-4 py-2 rounded-2xl sticky top-4 z-50 shadow-xl w-fit mx-auto max-w-full">
+          <button
+            onClick={() => setScale(s => Math.max(s - 0.2, 0.5))}
+            className="p-1.5 hover:bg-slate-700/80 rounded-lg transition-colors"
+          >
+            <ZoomOut size={20} />
+          </button>
+          <span className="text-sm font-bold min-w-[3rem] text-center">
+            {Math.round(scale * 100)}%
+          </span>
+          <button
+            onClick={() => setScale(s => Math.min(s + 0.2, 3.0))}
+            className="p-1.5 hover:bg-slate-700/80 rounded-lg transition-colors"
+          >
+            <ZoomIn size={20} />
+          </button>
+        </div>
+
+        <div className="w-max min-w-full flex flex-col items-center p-2 md:p-6 pb-20 mt-4">
           <Document
           file={url}
           onLoadSuccess={onDocumentLoadSuccess}

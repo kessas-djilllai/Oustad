@@ -584,6 +584,7 @@ function BottomNavItem({ icon, label, active, onClick }: { icon: React.ReactNode
 function BacPdfView({ year, subject, onBack }: { year: string, subject: any, onBack: () => void }) {
   const [exam, setExam] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'exam' | 'solution'>('exam');
 
   useEffect(() => {
     async function loadExam() {
@@ -602,8 +603,8 @@ function BacPdfView({ year, subject, onBack }: { year: string, subject: any, onB
   }, [year, subject.id]);
 
   return (
-    <div className="animate-in fade-in duration-300 relative z-10 space-y-6">
-      <div className="flex items-center gap-4 mb-4 md:mb-8">
+    <div className="animate-in fade-in duration-300 relative z-10 flex flex-col h-[calc(100vh-120px)] md:h-[calc(100vh-80px)] -mx-4 md:mx-0">
+      <div className="flex items-center gap-4 mb-4 px-4 md:px-0 shrink-0">
         <button onClick={onBack} className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0 relative z-20">
           <ChevronRight size={24} />
         </button>
@@ -617,41 +618,44 @@ function BacPdfView({ year, subject, onBack }: { year: string, subject: any, onB
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20">
+        <div className="flex flex-col items-center justify-center flex-1">
           <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
           <p className="text-sm font-bold text-slate-500 mt-4">جاري التحميل...</p>
         </div>
       ) : !exam ? (
-        <div className="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100">
+        <div className="bg-slate-50 mx-4 md:mx-0 p-8 rounded-3xl text-center border border-slate-100 mt-10">
            <FileText size={40} className="text-slate-300 mx-auto mb-4" />
            <p className="text-slate-500 font-bold mb-1">الموضوع غير متوفر</p>
            <p className="text-slate-400 text-sm">لم يتم رفع مواضيع لهذه المادة في هذه السنة.</p>
         </div>
       ) : (
-        <div className="grid gap-6 min-w-0">
-          <div className="bg-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 p-4 md:p-6 flex flex-col items-center w-full min-w-0">
-             <div className="bg-slate-50 px-4 py-2 rounded-xl mb-6 flex items-center justify-center w-full">
-                 <h3 className="font-bold text-slate-700 flex items-center gap-2 text-center">
-                     <FileText size={20} className="text-blue-500" />
-                     موضوع بكالوريا {year}
-                 </h3>
+        <div className="flex flex-col flex-1 bg-white md:rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border-y md:border border-slate-200 overflow-hidden min-w-0">
+           {exam.solution_file && (
+             <div className="flex border-b border-slate-100 bg-slate-50/80 p-2 gap-2 shrink-0">
+                <button
+                   onClick={() => setActiveTab('exam')}
+                   className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all text-sm flex items-center justify-center gap-2 ${activeTab === 'exam' ? 'bg-white text-blue-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-slate-200/50'}`}
+                >
+                   <FileText size={18} />
+                   الموضوع
+                </button>
+                <button
+                   onClick={() => setActiveTab('solution')}
+                   className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all text-sm flex items-center justify-center gap-2 ${activeTab === 'solution' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-slate-200/50'}`}
+                >
+                   <ClipboardList size={18} />
+                   التصحيح النموذجي
+                </button>
              </div>
-             
-             <PdfViewer url={exam.exam_file} />
-          </div>
-
-          {exam.solution_file && (
-             <div className="bg-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 p-4 md:p-6 flex flex-col items-center mt-4 w-full min-w-0">
-                 <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl mb-6 flex items-center justify-center w-full">
-                     <h3 className="font-bold text-emerald-700 flex items-center gap-2 text-center">
-                         <FileText size={20} className="text-emerald-500" />
-                         التصحيح النموذجي
-                     </h3>
-                 </div>
-
+           )}
+           
+           <div className="flex-1 relative w-full h-full overflow-hidden">
+              {activeTab === 'exam' ? (
+                 <PdfViewer url={exam.exam_file} />
+              ) : (
                  <PdfViewer url={exam.solution_file} />
-             </div>
-          )}
+              )}
+           </div>
         </div>
       )}
     </div>
@@ -728,7 +732,7 @@ function TopicsView({ subjects }: { subjects: any[] }) {
 
        <div className="grid gap-2.5 md:gap-4 max-w-3xl w-full">
          {years.map(y => {
-            const count = bacExamsList.filter(e => e.year === y).length;
+            const count = bacExamsList.filter(e => e.year === y && subjects.some(s => s.id === e.subject_id)).length;
             return (
               <button 
                   key={y} 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { GoogleGenAI, Type } from "@google/genai";
 import { supabase } from "../lib/supabase";
 import { triggerAlert, AlertModal } from "./Admin";
 import { ChevronRight, FileText, Upload, AlertCircle, Save } from "lucide-react";
-import { pdfjs } from 'react-pdf';
 
 export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) {
   const navigate = useNavigate();
@@ -11,12 +11,8 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
   const [examFile, setExamFile] = useState<File | null>(null);
   const [solutionFile, setSolutionFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isDetecting, setIsDetecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [dbSubjects, setDbSubjects] = useState<any[]>([]);
-  
-  const [detectedYear, setDetectedYear] = useState<string>("");
-  const [detectedSubject, setDetectedSubject] = useState<any>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -29,95 +25,17 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
       }
     }
     fetchData();
-    
-    if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-      pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-    }
   }, []);
 
-  const extractTextFromPdf = async (file: File): Promise<string> => {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-      const pdfDocument = await loadingTask.promise;
-      
-      let fullText = '';
-      const numPages = Math.min(pdfDocument.numPages, 2); // check first 2 pages
-      for (let i = 1; i <= numPages; i++) {
-        const page = await pdfDocument.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map((item: any) => item.str).join(' ') + ' ';
-      }
-      return fullText;
-    } catch (err) {
-      console.error("Text extraction error:", err);
-      return "";
-    }
-  };
-
-  const handleExamFileChange = async (file: File) => {
-    setExamFile(file);
-    setDetectedYear("");
-    setDetectedSubject(null);
-    setErrorMsg(null);
-    setIsDetecting(true);
-    
-    try {
-      let pdfText = await extractTextFromPdf(file);
-      pdfText = pdfText + " " + decodeURIComponent(file.name);
-      
-      const parsedYearMatch = pdfText.match(/20[0-2][0-9]/);
-      let foundYear = parsedYearMatch ? parsedYearMatch[0] : "";
-      
-      const norm = (str: string) => str.trim().replace(/\s+/g, '').replace(/[()[\]{}./\-_:،؛]/g, '');
-      const textForward = norm(pdfText);
-      const textReversedLetters = pdfText.split('').reverse().join('');
-      const textReversedWords = pdfText.split(' ').reverse().join(' ');
-      const textVariations = [textForward, norm(textReversedLetters), norm(textReversedWords)];
-      
-      let bestMatchScore = 0;
-      let matchedSubject = null;
-      for (const subject of dbSubjects) {
-          const sNameNorm = norm(subject.name);
-          // Split into meaningful words to match parts
-          const words = subject.name.split(' ').filter((w: string) => w.length > 2).map((w: string) => norm(w));
-          let score = 0;
-          for (const w of words) {
-              if (textVariations.some(tv => tv.includes(w))) { score++; }
-          }
-          for (const tv of textVariations) {
-            if (tv.includes(sNameNorm)) score += 5;
-          }
-
-          if (score > bestMatchScore && score > 0) {
-              bestMatchScore = score;
-              matchedSubject = subject;
-          }
-      }
-      
-      if (foundYear) setDetectedYear(foundYear);
-      if (matchedSubject) setDetectedSubject(matchedSubject);
-
-      if (!foundYear || !matchedSubject) {
-          setErrorMsg("لم يتم التعرف على السنة أو المادة من الملف تلقائياً. تأكد من أن محتوى الملف أو اسمه يحتوي على السنة واسم المادة بوضوح.");
-      }
-
-    } catch (err) {
-      console.error("Auto detect failed silently", err);
-      setErrorMsg("حدث خطأ أثناء فحص الملف.");
-    } finally {
-      setIsDetecting(false);
-    }
-  };
+  const getBase64 = (fileObj: File): Promise<string> => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+    reader.readAsDataURL(fileObj);
+  });
 
   const handleAnalyzeAndSave = async () => {
     if (!examFile) {
       triggerAlert("يرجى اختيار ملف الموضوع أولاً", "error");
-      return;
-    }
-    
-    if (!detectedYear || !detectedSubject) {
-      triggerAlert("لا يمكن الحفظ، لم يتمكن النظام من استخراج بيانات المواضيع.", "error");
       return;
     }
     
@@ -129,9 +47,74 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
     try {
       setIsAnalyzing(true);
       setErrorMsg(null);
+      
+      const { data: settingsData } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
+      if (!settingsData?.api_key) {
+        throw new Error("لم يتم تكوين مفتاح API. يرجى إعداده في الإعدادات.");
+      }
 
-      const parsedYear = detectedYear;
-      const matchedSubject = detectedSubject;
+      const examBase64Data = await getBase64(examFile);
+      const solutionBase64Data = solutionFile ? await getBase64(solutionFile) : null;
+      
+      const ai = new GoogleGenAI({ apiKey: settingsData.api_key });
+
+      const subjectsList = dbSubjects.map(s => `- ${s.name}`).join('\n');
+      
+      const prompt = `أنت خبير في تحليل مواضيع البكالوريا الجزائرية. تم إرفاق ملف PDF للأسئلة.
+مهمتك هي استخراج المعلومات التالية فقط:
+- سنة البكالوريا (مثال: 2024، 2023...)
+- اسم المادة وتخصصها (الشعبة) لكي تتطابق بدقة مع أحد المواد الموجودة في القائمة أسفله. يجب أن تختار اسم المادة بالضبط كما هو موجود في القائمة.
+
+قائمة المواد المتاحة:
+${subjectsList}`;
+
+      const actualModel = (settingsData.ai_model && settingsData.ai_model !== 'gemini-2.5-flash') ? settingsData.ai_model : 'gemini-3-flash-preview';
+
+      const response = await ai.models.generateContent({
+        model: actualModel,
+        contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: prompt },
+                { inlineData: { data: examBase64Data, mimeType: 'application/pdf' } }
+              ],
+            }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              bac_year: { type: Type.STRING },
+              subject_name: { type: Type.STRING }
+            },
+            required: ["bac_year", "subject_name"]
+          }
+        }
+      });
+
+      const textResponse = response.text || '';
+      const cleanedJson = textResponse.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+      const parsed = JSON.parse(cleanedJson);
+      
+      if (!parsed.bac_year || !parsed.subject_name) {
+          throw new Error("لم يتمكن الذكاء الاصطناعي من استخراج السنة أو المادة.");
+      }
+
+      const norm = (str: string) => str.trim().replace(/\s+/g, ' ').replace(/[()[\]{}./\-_]/g, '');
+      let matchedSubject = dbSubjects.find(s => s.name.trim() === parsed.subject_name.trim());
+      
+      if (!matchedSubject) {
+          matchedSubject = dbSubjects.find(s => norm(s.name) === norm(parsed.subject_name));
+      }
+      if (!matchedSubject) {
+          matchedSubject = dbSubjects.find(s => norm(s.name).includes(norm(parsed.subject_name)) || norm(parsed.subject_name).includes(norm(s.name)));
+      }
+
+      if (!matchedSubject) {
+          throw new Error(`تعرف الذكاء الاصطناعي على المادة "${parsed.subject_name}" ولكنها غير موجودة بدقة في القائمة. الرجاء التحقق من أسماء المواد.`);
+      }
 
       if (supabase) {
          let examUrl = '';
@@ -171,7 +154,7 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
 
          const { error } = await supabase.from('bac_exams').insert({
              id: 'bac_' + Math.random().toString(36).substr(2, 9),
-             year: parsedYear.toString(),
+             year: parsed.bac_year.toString(),
              subject_id: matchedSubject.id,
              exam_file: examUrl,
              solution_file: solutionUrl
@@ -185,11 +168,9 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
          }
       }
 
-      triggerAlert(`تم حفظ موضوع بكالوريا ${parsedYear} في مادة ${matchedSubject.name} بنجاح!`, "success");
+      triggerAlert(`تم حفظ موضوع بكالوريا ${parsed.bac_year} في مادة ${parsed.subject_name} بنجاح!`, "success");
       setExamFile(null);
       setSolutionFile(null);
-      setDetectedYear("");
-      setDetectedSubject(null);
 
     } catch (e: any) {
       console.error(e);
@@ -215,14 +196,14 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
         </div>
         <div>
           <h2 className="font-bold text-xl text-slate-800">إضافة موضوع بكالوريا</h2>
-          <p className="text-xs text-slate-500 font-bold mt-1">يتم استخراج المادة والسنة بالنظام تلقائياً من الـ PDF</p>
+          <p className="text-xs text-slate-500 font-bold mt-1">يُتعرف تلقائياً على المادة وسنة البكالوريا من الـ PDF</p>
         </div>
       </div>
 
       <div className="space-y-6">
         {errorMsg && (
           <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl whitespace-pre-wrap" dir="rtl">
-            <h4 className="font-bold flex items-center gap-2 mb-2"><AlertCircle size={18} /> نصيحة / تنبيه</h4>
+            <h4 className="font-bold flex items-center gap-2 mb-2"><AlertCircle size={18} /> خطأ</h4>
             <p className="text-sm">{errorMsg}</p>
           </div>
         )}
@@ -232,7 +213,7 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
             <input 
               type="file" 
               accept="application/pdf"
-              onChange={(e) => { if (e.target.files && e.target.files[0]) handleExamFileChange(e.target.files[0]) }}
+              onChange={(e) => { if(e.target.files) setExamFile(e.target.files[0]) }}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
             <div className="flex flex-col items-center justify-center gap-3">
@@ -265,31 +246,15 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
           </div>
         </div>
 
-        {(isDetecting || (detectedYear && detectedSubject)) && (
-           <div className="max-w-3xl mx-auto w-full p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center min-h-[80px]">
-              {isDetecting ? (
-                 <div className="flex items-center gap-3 text-indigo-600 font-bold">
-                    <div className="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-                    جاري فحص الملف لاستخراج معلومات المادة...
-                 </div>
-              ) : (detectedYear && detectedSubject) ? (
-                 <div className="flex items-center gap-2 text-emerald-600 font-bold">
-                    <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">✓</div>
-                    <span>{`تم التعرف: بكالوريا ${detectedYear} - ${detectedSubject.name}`}</span>
-                 </div>
-              ) : null}
-           </div>
-        )}
-
         <button 
           onClick={handleAnalyzeAndSave} 
-          disabled={!examFile || isAnalyzing || isDetecting || !detectedYear || !detectedSubject}
+          disabled={!examFile || isAnalyzing}
           className="w-full max-w-xl mx-auto flex bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white font-bold rounded-xl py-4 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed items-center justify-center gap-2 relative z-10"
         >
           {isAnalyzing ? (
             <>
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              جاري الرفع والحفظ...
+              جاري الفحص والحفظ...
             </>
           ) : (
              <>
@@ -302,3 +267,4 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
     </div>
   );
 }
+
