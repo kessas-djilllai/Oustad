@@ -91,7 +91,11 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+         <div className="flex gap-2">
+           <div className="w-3 h-3 rounded-full bg-blue-600 animate-bounce"></div>
+           <div className="w-3 h-3 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+           <div className="w-3 h-3 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+         </div>
       </div>
     );
   }
@@ -571,7 +575,7 @@ function BottomNavItem({ icon, label, active, onClick }: { icon: React.ReactNode
   return (
     <button 
       onClick={onClick}
-      className={`flex flex-col items-center justify-center gap-1.5 w-16 h-16 rounded-2xl transition-all ${active ? 'text-blue-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}
+      className={`no-global-loader flex flex-col items-center justify-center gap-1.5 w-16 h-16 rounded-2xl transition-all ${active ? 'text-blue-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}
     >
       <div className={`relative flex items-center justify-center ${active ? 'bg-blue-50 text-blue-600 rounded-xl w-12 h-10 shadow-sm' : ''}`}>
         {icon}
@@ -619,8 +623,12 @@ function BacPdfView({ year, subject, onBack }: { year: string, subject: any, onB
 
       {loading ? (
         <div className="flex flex-col items-center justify-center flex-1">
-          <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin"></div>
-          <p className="text-sm font-bold text-slate-500 mt-4">جاري التحميل...</p>
+           <div className="flex gap-1.5 mb-4">
+             <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce"></div>
+             <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+             <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+           </div>
+          <p className="text-sm font-bold text-slate-500">جاري التحميل...</p>
         </div>
       ) : !exam ? (
         <div className="bg-slate-50 mx-4 md:mx-0 p-8 rounded-3xl text-center border border-slate-100 mt-10">
@@ -666,16 +674,20 @@ function TopicsView({ subjects }: { subjects: any[] }) {
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<any | null>(null);
   const [bacExamsList, setBacExamsList] = useState<{id: string, year: string, subject_id: string}[]>([]);
+  const [loading, setLoading] = useState(true);
   const years = ["2025", "2024", "2023", "2022", "2021", "2020", "2019"];
 
   useEffect(() => {
      async function fetchList() {
        if (!supabase) return;
        try {
+         setLoading(true);
          const { data, error } = await supabase.from('bac_exams').select('id, year, subject_id');
          if (data) setBacExamsList(data);
        } catch (e) {
          console.error(e);
+       } finally {
+         setLoading(false);
        }
      }
      fetchList();
@@ -731,7 +743,29 @@ function TopicsView({ subjects }: { subjects: any[] }) {
        </div>
 
        <div className="grid gap-2.5 md:gap-4 max-w-3xl w-full">
-         {years.map(y => {
+         {loading ? (
+             <div className="space-y-4">
+                 <div className="flex justify-center mb-6">
+                    <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-white border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-full">
+                       <div className="relative flex h-3 w-3">
+                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                         <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                       </div>
+                       <span className="text-sm font-bold text-slate-600">جاري جلب المعلومات...</span>
+                    </div>
+                 </div>
+                 {[1,2,3,4].map(i => (
+                    <div key={i} className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-slate-50 flex items-center justify-between overflow-hidden relative">
+                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/80 to-transparent z-10"></div>
+                        <div className="flex items-center gap-3 md:gap-4 w-full">
+                           <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl bg-slate-100/80 animate-pulse shrink-0"></div>
+                           <div className="h-5 w-32 bg-slate-100/80 rounded-lg animate-pulse"></div>
+                        </div>
+                        <div className="h-8 w-20 bg-slate-100/80 rounded-xl animate-pulse shrink-0"></div>
+                    </div>
+                 ))}
+             </div>
+         ) : years.map(y => {
             const count = bacExamsList.filter(e => e.year === y && subjects.some(s => s.id === e.subject_id)).length;
             return (
               <button 

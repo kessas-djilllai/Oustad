@@ -50,6 +50,12 @@ body {
   }
 }
 
+@keyframes progress {
+  0% { left: -30%; width: 30%; }
+  50% { width: 50%; }
+  100% { left: 100%; width: 30%; }
+}
+
 .prose {
   word-wrap: break-word;
   overflow-wrap: anywhere;

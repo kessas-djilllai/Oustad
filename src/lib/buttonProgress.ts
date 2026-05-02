@@ -8,7 +8,7 @@ export function initGlobalButtonProgress() {
   document.addEventListener('click', (e) => {
     // Find closest button or elements with role="button"
     const target = (e.target as Element).closest('button');
-    if (target) {
+    if (target && !target.closest('.no-global-loader')) {
       clickedButton = target;
       clearTimeout(clickTimeout);
       // Give the click event loop time to trigger fetch

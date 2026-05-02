@@ -72,7 +72,11 @@ export function PdfViewer({ url }: { url: string }) {
           loading={
             <div className="py-10 flex flex-col items-center w-[90%] max-w-xs mx-auto absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur shadow-2xl rounded-3xl z-50 p-6 border border-slate-200">
               <div className="text-slate-600 font-bold mb-4 flex flex-col items-center">
-                <div className="w-10 h-10 border-4 border-slate-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+                 <div className="flex gap-1.5 mb-6">
+                   <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-bounce"></div>
+                   <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                   <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                 </div>
                 <span dir="rtl">جاري تحميل الملف...</span>
               </div>
               <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden shadow-inner flex mb-2">
@@ -101,7 +105,11 @@ export function PdfViewer({ url }: { url: string }) {
               className="shadow-2xl mx-auto rounded-lg overflow-hidden bg-white select-none relative mb-6"
               loading={
                   <div className="py-20 flex flex-col items-center w-full justify-center bg-white/50 animate-pulse min-h-[500px]">
-                     <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+                     <div className="flex gap-1.5 mb-4">
+                       <div className="w-2.5 h-2.5 rounded-full bg-slate-300 animate-bounce"></div>
+                       <div className="w-2.5 h-2.5 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                       <div className="w-2.5 h-2.5 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                     </div>
                      <p className="text-slate-500 font-bold text-sm">جاري عرض الصفحة {index + 1}...</p>
                   </div>
               }
