@@ -553,12 +553,12 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
 
   const generateWithAI = async () => {
     let apiKey = '';
-    let aiModel = 'gemini-2.5-flash';
+    let aiModel = 'gemini-3-flash-preview';
     if (supabase) {
       const { data } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
       if (data && data.api_key) {
         apiKey = data.api_key;
-        aiModel = data.ai_model || 'gemini-2.5-flash';
+        aiModel = (data.ai_model && data.ai_model !== 'gemini-2.5-flash') ? data.ai_model : 'gemini-3-flash-preview';
       }
     }
     
@@ -1227,7 +1227,7 @@ function AdminBacDate({ onBack }: { onBack: () => void }) {
 
 function AdminSettings({ onBack }: { onBack: () => void }) {
   const [apiKey, setApiKey] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState('gemini-3-flash-preview');
   const [availableModels, setAvailableModels] = useState<{id: string, name: string}[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -1237,14 +1237,14 @@ function AdminSettings({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     async function loadSettings() {
       let currentKey = '';
-      let savedModel = 'gemini-2.5-flash';
+      let savedModel = 'gemini-3-flash-preview';
       
       if (supabase) {
         try {
           const { data } = await supabase.from('admin_settings').select('*').limit(1).single();
           if (data && data.api_key) {
             currentKey = data.api_key;
-            savedModel = data.ai_model || savedModel;
+            savedModel = (data.ai_model && data.ai_model !== 'gemini-2.5-flash') ? data.ai_model : savedModel;
           }
         } catch (e) { }
       }
@@ -1449,7 +1449,8 @@ CREATE POLICY "Allow public delete to units" ON units FOR DELETE USING (true);
            </h4>
            <div className="relative group mb-3">
               <pre className="bg-slate-900 text-slate-300 p-4 rounded-xl text-left text-[10px] overflow-x-auto dir-ltr font-mono leading-loose max-h-40 overflow-y-auto">
-{`CREATE TABLE IF NOT EXISTS bac_exams (
+{`-- إنشاء جدول مواضيع البكالوريا
+CREATE TABLE IF NOT EXISTS bac_exams (
   id TEXT PRIMARY KEY,
   year TEXT NOT NULL,
   subject_id TEXT NOT NULL,
@@ -1460,12 +1461,20 @@ CREATE POLICY "Allow public delete to units" ON units FOR DELETE USING (true);
 CREATE POLICY "Allow public read to bac_exams" ON bac_exams FOR SELECT USING (true);
 CREATE POLICY "Allow public update to bac_exams" ON bac_exams FOR UPDATE USING (true);
 CREATE POLICY "Allow public insert to bac_exams" ON bac_exams FOR INSERT USING (true);
-CREATE POLICY "Allow public delete to bac_exams" ON bac_exams FOR DELETE USING (true);`}
+CREATE POLICY "Allow public delete to bac_exams" ON bac_exams FOR DELETE USING (true);
+
+-- إعداد دلو تخزين ملفات الـ PDF (Supabase Storage)
+INSERT INTO storage.buckets (id, name, public) VALUES ('bac_files', 'bac_files', true);
+
+CREATE POLICY "Public Read bac_files" ON storage.objects FOR SELECT USING (bucket_id = 'bac_files');
+CREATE POLICY "Public Insert bac_files" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'bac_files');
+CREATE POLICY "Public Update bac_files" ON storage.objects FOR UPDATE USING (bucket_id = 'bac_files');
+CREATE POLICY "Public Delete bac_files" ON storage.objects FOR DELETE USING (bucket_id = 'bac_files');`}
               </pre>
               <button 
                  type="button"
                  onClick={() => {
-                   navigator.clipboard.writeText(`CREATE TABLE IF NOT EXISTS bac_exams ( id TEXT PRIMARY KEY, year TEXT NOT NULL, subject_id TEXT NOT NULL, exam_file TEXT NOT NULL, solution_file TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() ); CREATE POLICY "Allow public read to bac_exams" ON bac_exams FOR SELECT USING (true); CREATE POLICY "Allow public insert to bac_exams" ON bac_exams FOR INSERT USING (true); CREATE POLICY "Allow public update to bac_exams" ON bac_exams FOR UPDATE USING (true); CREATE POLICY "Allow public delete to bac_exams" ON bac_exams FOR DELETE USING (true);`);
+                   navigator.clipboard.writeText(`CREATE TABLE IF NOT EXISTS bac_exams ( id TEXT PRIMARY KEY, year TEXT NOT NULL, subject_id TEXT NOT NULL, exam_file TEXT NOT NULL, solution_file TEXT, created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() ); CREATE POLICY "Allow public read to bac_exams" ON bac_exams FOR SELECT USING (true); CREATE POLICY "Allow public insert to bac_exams" ON bac_exams FOR INSERT USING (true); CREATE POLICY "Allow public update to bac_exams" ON bac_exams FOR UPDATE USING (true); CREATE POLICY "Allow public delete to bac_exams" ON bac_exams FOR DELETE USING (true); INSERT INTO storage.buckets (id, name, public) VALUES ('bac_files', 'bac_files', true); CREATE POLICY "Public Read bac_files" ON storage.objects FOR SELECT USING (bucket_id = 'bac_files'); CREATE POLICY "Public Insert bac_files" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'bac_files'); CREATE POLICY "Public Update bac_files" ON storage.objects FOR UPDATE USING (bucket_id = 'bac_files'); CREATE POLICY "Public Delete bac_files" ON storage.objects FOR DELETE USING (bucket_id = 'bac_files');`);
                    triggerAlert('تم نسخ كود البكالوريا!', 'success', false);
                  }}
                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 bg-white/10 text-white hover:bg-white/20 text-xs px-2 py-1 rounded transition-all"
@@ -1689,6 +1698,121 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
 
 
 
+function AdminManageBac({ onBack }: { onBack: () => void }) {
+  const [exams, setExams] = useState<any[]>([]);
+  const [subjectsMap, setSubjectsMap] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const { data: sData } = await supabase.from('subjects').select('id, name');
+        const sMap: Record<string, string> = {};
+        if (sData) {
+          sData.forEach(s => sMap[s.id] = s.name);
+        }
+        setSubjectsMap(sMap);
+
+        const { data: eData } = await supabase.from('bac_exams').select('*').order('year', { ascending: false });
+        if (eData) {
+          setExams(eData);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, []);
+
+  const handleDelete = async (id: string, examUrl: string, solutionUrl: string | null) => {
+    if (!supabase || !confirm('هل أنت متأكد من حذف هذه البكالوريا؟')) return;
+    setDeletingId(id);
+    try {
+       const deleteFile = async (url: string) => {
+         try {
+           const parts = url.split('/');
+           const fileName = parts[parts.length - 1];
+           if (fileName) {
+             await supabase.storage.from('bac_files').remove([fileName]);
+           }
+         } catch(e) {}
+       };
+
+       if (examUrl && examUrl.includes('bac_files/')) await deleteFile(examUrl);
+       if (solutionUrl && solutionUrl.includes('bac_files/')) await deleteFile(solutionUrl);
+
+       const { error } = await supabase.from('bac_exams').delete().eq('id', id);
+       if (error) throw error;
+       
+       setExams(exams.filter(e => e.id !== id));
+       triggerAlert('تم الحذف بنجاح', 'success');
+    } catch (e: any) {
+      triggerAlert('خطأ أثناء الحذف: ' + e.message, 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
+           <ChevronRight size={20} className="rotate-180" />
+        </button>
+        <div>
+          <h2 className="font-bold text-xl md:text-2xl text-slate-800">إدارة البكالوريات</h2>
+          <p className="text-xs text-slate-500 font-medium">عرض جميع مواضيع البكالوريا المضافة مسبقاً لحذفها أو تصفحها.</p>
+        </div>
+      </div>
+
+      {loading ? (
+         <div className="text-center py-10"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
+      ) : exams.length === 0 ? (
+         <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+           <p className="text-slate-500 font-bold mb-4">لا توجد مواضيع بكالوريا مضافة حالياً.</p>
+         </div>
+      ) : (
+         <div className="grid gap-3">
+           {exams.map((exam, index) => (
+              <div key={exam.id || index} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 gap-4 transition-all hover:bg-white hover:shadow-md">
+                 <div>
+                    <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                       <FileText size={16} className="text-indigo-500" />
+                       بكالوريا {exam.year} - {subjectsMap[exam.subject_id] || 'مادة غير معروفة'}
+                    </h3>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                       {exam.exam_file && (
+                           <a href={exam.exam_file} target="_blank" rel="noreferrer" className="text-xs px-3 py-1.5 bg-indigo-100/50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold flex items-center gap-1 transition-colors"><FileText size={12}/> عرض الموضوع</a>
+                       )}
+                       {exam.solution_file && (
+                           <a href={exam.solution_file} target="_blank" rel="noreferrer" className="text-xs px-3 py-1.5 bg-emerald-100/50 hover:bg-emerald-100 text-emerald-700 rounded-lg font-bold flex items-center gap-1 transition-colors"><FileText size={12}/> عرض الحل</a>
+                       )}
+                    </div>
+                 </div>
+                 
+                 <button 
+                   onClick={() => handleDelete(exam.id, exam.exam_file, exam.solution_file)}
+                   disabled={deletingId === exam.id}
+                   className="w-full md:w-auto px-4 py-2.5 bg-red-50 hover:bg-red-500 hover:text-white text-red-600 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                 >
+                   {deletingId === exam.id ? <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div> : <Trash size={16} />}
+                   حذف بالكامل
+                 </button>
+              </div>
+           ))}
+         </div>
+      )}
+    </div>
+  );
+}
+
 function AdminManageContent({ onBack }: { onBack: () => void }) {
   const [activeTab, setActiveTab] = useState<'subjects' | 'units' | 'lessons' | 'exercises'>('subjects');
 
@@ -1842,6 +1966,12 @@ export function AdminLayout() {
                )}
             </AnimatePresence>
             <button 
+              onClick={() => { setView('manage_bac'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_bac' ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+            >
+               <FileText size={18} /> إدارة مواضيع البكالوريا
+            </button>
+            <button 
               onClick={() => { setView('users'); closeSidebar(); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'users' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
@@ -1906,12 +2036,13 @@ export function AdminLayout() {
         ) : (
           <div key={refreshKey} className="animate-in fade-in duration-300">
              {view === 'dashboard' && <AdminDashboard setView={setView} />}
-             {view === 'manage_content' && <AdminManageContent onBack={() => setView('dashboard')} />}
+             {view === 'adminManageContent' && <AdminManageContent onBack={() => setView('dashboard')} />}
              {view === 'analyze_pdf' && <PdfBacAnalis onBack={() => setView('dashboard')} />}
              {view === 'add_lesson' && <AdminAddLesson onBack={() => setView('dashboard')} />}
              {view === 'add_exercise' && <AdminAddExercise onBack={() => setView('dashboard')} />}
              {view === 'manage_subjects' && <AdminAddSubject onBack={() => setView('dashboard')} />}
              {view === 'manage_units' && <AdminAddUnit onBack={() => setView('dashboard')} />}
+             {view === 'manage_bac' && <AdminManageBac onBack={() => setView('dashboard')} />}
              {view === 'settings' && <AdminSettings onBack={() => setView('dashboard')} />}
              {view === 'bac_date' && <AdminBacDate onBack={() => setView('dashboard')} />}
              {view === 'users' && <AdminUsers />}

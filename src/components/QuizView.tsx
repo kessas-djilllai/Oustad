@@ -34,12 +34,12 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
 
     setErrorMsg(null);
     let apiKey = '';
-    let aiModel = 'gemini-2.5-flash';
+    let aiModel = 'gemini-3-flash-preview';
     if (supabase) {
       const { data } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
       if (data && data.api_key) {
         apiKey = data.api_key;
-        aiModel = data.ai_model || 'gemini-2.5-flash';
+        aiModel = (data.ai_model && data.ai_model !== 'gemini-2.5-flash') ? data.ai_model : 'gemini-3-flash-preview';
       }
     }
 

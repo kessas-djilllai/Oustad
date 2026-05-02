@@ -68,14 +68,16 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
 قائمة المواد المتاحة:
 ${subjectsList}`;
 
+      const actualModel = (settingsData.ai_model && settingsData.ai_model !== 'gemini-2.5-flash') ? settingsData.ai_model : 'gemini-3-flash-preview';
+
       const response = await ai.models.generateContent({
-        model: settingsData.ai_model || 'gemini-2.5-flash',
+        model: actualModel,
         contents: [
             {
               role: 'user',
               parts: [
                 { text: prompt },
-                { inlineData: { data: examBase64Data, mimeType: examFile.type } }
+                { inlineData: { data: examBase64Data, mimeType: 'application/pdf' } }
               ],
             }
         ],
@@ -100,18 +102,62 @@ ${subjectsList}`;
           throw new Error("لم يتمكن الذكاء الاصطناعي من استخراج السنة أو المادة.");
       }
 
-      const matchedSubject = dbSubjects.find(s => s.name.trim() === parsed.subject_name.trim());
+      const norm = (str: string) => str.trim().replace(/\s+/g, ' ').replace(/[()[\]{}./\-_]/g, '');
+      let matchedSubject = dbSubjects.find(s => s.name.trim() === parsed.subject_name.trim());
+      
+      if (!matchedSubject) {
+          matchedSubject = dbSubjects.find(s => norm(s.name) === norm(parsed.subject_name));
+      }
+      if (!matchedSubject) {
+          matchedSubject = dbSubjects.find(s => norm(s.name).includes(norm(parsed.subject_name)) || norm(parsed.subject_name).includes(norm(s.name)));
+      }
+
       if (!matchedSubject) {
           throw new Error(`تعرف الذكاء الاصطناعي على المادة "${parsed.subject_name}" ولكنها غير موجودة بدقة في القائمة. الرجاء التحقق من أسماء المواد.`);
       }
 
       if (supabase) {
+         let examUrl = '';
+         let solutionUrl = null;
+
+         const examFileName = `exam_${Date.now()}_${examFile.name}`;
+         const { data: examUploadData, error: examUploadError } = await supabase.storage
+           .from('bac_files')
+           .upload(examFileName, examFile);
+           
+         if (examUploadError) {
+             throw new Error("فشل رفع الموضوع: " + examUploadError.message + " (هل أنشأت دلو Storage المسمى bac_files؟)");
+         }
+         
+         const { data: { publicUrl: examPublicUrl } } = supabase.storage
+           .from('bac_files')
+           .getPublicUrl(examFileName);
+           
+         examUrl = examPublicUrl;
+
+         if (solutionFile) {
+           const solutionFileName = `solution_${Date.now()}_${solutionFile.name}`;
+           const { error: solutionUploadError } = await supabase.storage
+             .from('bac_files')
+             .upload(solutionFileName, solutionFile);
+             
+           if (solutionUploadError) {
+               throw new Error("فشل رفع الحل: " + solutionUploadError.message);
+           }
+           
+           const { data: { publicUrl: solutionPublicUrl } } = supabase.storage
+             .from('bac_files')
+             .getPublicUrl(solutionFileName);
+             
+           solutionUrl = solutionPublicUrl;
+         }
+
          const { error } = await supabase.from('bac_exams').insert({
              id: 'bac_' + Math.random().toString(36).substr(2, 9),
              year: parsed.bac_year.toString(),
              subject_id: matchedSubject.id,
-             exam_file: 'data:application/pdf;base64,' + examBase64Data,
-             solution_file: solutionBase64Data ? ('data:application/pdf;base64,' + solutionBase64Data) : null
+             exam_file: examUrl,
+             solution_file: solutionUrl
          });
          
          if (error) {

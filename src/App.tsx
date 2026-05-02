@@ -15,6 +15,7 @@ import { getSubjectPrompt } from "./lib/prompts";
 import { preprocessMath } from "./lib/utils";
 import { QuizView } from "./components/QuizView";
 import { SubjectTypeView, SubjectUnitsView, UnitDetailsView, ContentListView, LessonDetailsView, InteractiveExerciseView } from "./components/StudentViews";
+import { PdfViewer } from "./components/PdfViewer";
 import { 
   BookOpen,
   Target, 
@@ -627,22 +628,28 @@ function BacPdfView({ year, subject, onBack }: { year: string, subject: any, onB
            <p className="text-slate-400 text-sm">لم يتم رفع مواضيع لهذه المادة في هذه السنة.</p>
         </div>
       ) : (
-        <div className="grid gap-6">
-          <div className="bg-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 p-4 md:p-6 flex flex-col items-center">
-             <h3 className="font-bold text-slate-700 bg-slate-50 px-4 py-2 rounded-xl mb-6 flex items-center gap-2 w-full justify-center text-center">
-                 <FileText size={20} className="text-blue-500" />
-                 موضوع بكالوريا {year}
-             </h3>
-             <iframe src={exam.exam_file} className="w-full h-[600px] md:h-[800px] rounded-2xl border border-slate-200 bg-slate-50 relative z-10" title={`Exam ${year}`} />
+        <div className="grid gap-6 min-w-0">
+          <div className="bg-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 p-4 md:p-6 flex flex-col items-center w-full min-w-0">
+             <div className="bg-slate-50 px-4 py-2 rounded-xl mb-6 flex items-center justify-center w-full">
+                 <h3 className="font-bold text-slate-700 flex items-center gap-2 text-center">
+                     <FileText size={20} className="text-blue-500" />
+                     موضوع بكالوريا {year}
+                 </h3>
+             </div>
+             
+             <PdfViewer url={exam.exam_file} />
           </div>
 
           {exam.solution_file && (
-             <div className="bg-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 p-4 md:p-6 flex flex-col items-center mt-4">
-                 <h3 className="font-bold text-emerald-700 bg-emerald-50 px-4 py-2 rounded-xl mb-6 flex items-center gap-2 w-full justify-center text-center border border-emerald-100">
-                     <FileText size={20} className="text-emerald-500" />
-                     التصحيح النموذجي
-                 </h3>
-                 <iframe src={exam.solution_file} className="w-full h-[600px] md:h-[800px] rounded-2xl border border-emerald-100 bg-slate-50 relative z-10" title={`Solution ${year}`} />
+             <div className="bg-white rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border border-slate-100 p-4 md:p-6 flex flex-col items-center mt-4 w-full min-w-0">
+                 <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-xl mb-6 flex items-center justify-center w-full">
+                     <h3 className="font-bold text-emerald-700 flex items-center gap-2 text-center">
+                         <FileText size={20} className="text-emerald-500" />
+                         التصحيح النموذجي
+                     </h3>
+                 </div>
+
+                 <PdfViewer url={exam.solution_file} />
              </div>
           )}
         </div>
@@ -719,24 +726,24 @@ function TopicsView({ subjects }: { subjects: any[] }) {
          <p className="text-sm md:text-base text-slate-500 font-medium pr-11 mt-1">اختر سنة البكالوريا لعرض المواضيع</p>
        </div>
 
-       <div className="grid gap-3 md:gap-4 max-w-3xl">
+       <div className="grid gap-2.5 md:gap-4 max-w-3xl w-full">
          {years.map(y => {
             const count = bacExamsList.filter(e => e.year === y).length;
             return (
               <button 
                   key={y} 
                   onClick={() => setSelectedYear(y)}
-                  className="bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between hover:bg-slate-50 active:scale-[0.99] transition-all group cursor-pointer"
+                  className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between hover:bg-slate-50 active:scale-[0.99] transition-all group cursor-pointer w-full"
                >
-                 <div className="flex items-center gap-4">
-                    <div className="bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center font-black text-lg md:text-xl shadow-[0_4px_12px_-4px_rgba(37,99,235,0.2)]">
+                 <div className="flex items-center gap-3 md:gap-4">
+                    <div className="bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors w-10 h-10 md:w-14 md:h-14 rounded-xl flex items-center justify-center font-black text-base md:text-xl shadow-[0_4px_12px_-4px_rgba(37,99,235,0.2)] shrink-0">
                        {y}
                     </div>
-                    <span className="font-bold text-slate-700 md:text-lg">بكالوريا {y}</span>
+                    <span className="font-bold text-slate-700 text-sm md:text-lg whitespace-nowrap">بكالوريا {y}</span>
                  </div>
-                 <div className="flex items-center gap-4">
-                    <span className="text-xs md:text-sm bg-slate-100 text-slate-500 px-3 py-1.5 rounded-full font-bold group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">{count} مواد متوفرة</span>
-                    <ChevronRight size={20} className="text-slate-400 rotate-180 group-hover:-translate-x-1 group-hover:text-blue-600 transition-all font-black" />
+                 <div className="flex items-center gap-2 md:gap-4">
+                    <span className="text-[10px] md:text-sm bg-slate-100 text-slate-500 px-2 md:px-3 py-1 md:py-1.5 rounded-xl font-bold group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors whitespace-nowrap">{count} مواد</span>
+                    <ChevronRight size={18} className="text-slate-400 rotate-180 group-hover:-translate-x-1 group-hover:text-blue-600 transition-all font-black shrink-0" />
                  </div>
               </button>
             )
