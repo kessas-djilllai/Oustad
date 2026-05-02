@@ -32,7 +32,8 @@ import {
   FileText,
   Upload,
   Users,
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import AdminUsers from "./users";
@@ -1821,6 +1822,7 @@ function AdminAddCookies({ onBack }: { onBack: () => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [allCookies, setAllCookies] = useState<any>({});
+  const [cookieToDelete, setCookieToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -1892,11 +1894,11 @@ function AdminAddCookies({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const handleDeleteCookies = async (subjectId: string) => {
-    if (!confirm('هل أنت متأكد من مسح كويز هذه المادة؟')) return;
+  const handleDeleteCookies = async () => {
+    if (!cookieToDelete) return;
     try {
         let existingCookies: any = { ...allCookies };
-        delete existingCookies[subjectId];
+        delete existingCookies[cookieToDelete];
         
         const { data: currentData } = await supabase.from('admin_settings').select('id, subject_cookies').limit(1).single();
         const updateData = currentData ? { ...currentData, id: 1, subject_cookies: JSON.stringify(existingCookies) } : { id: 1, subject_cookies: JSON.stringify(existingCookies) };
@@ -1905,12 +1907,14 @@ function AdminAddCookies({ onBack }: { onBack: () => void }) {
         if (error) throw error;
         
         setAllCookies(existingCookies);
-        if (selectedSubjectId === subjectId) {
+        if (selectedSubjectId === cookieToDelete) {
             setJsonInput('{\n  "levels": [\n    {\n      "level": "المستوى 1",\n      "questions": [\n        {\n          "q": "السؤال الأول؟",\n          "options": ["خيار 1", "خيار 2", "خيار 3", "خيار 4"],\n          "correct": 0,\n          "justification": "تبرير الإجابة"\n        }\n      ]\n    }\n  ]\n}');
         }
         triggerAlert('تم مسح الكويز بنجاح', 'success');
     } catch(err: any) {
         triggerAlert('خطأ أثناء المسح: ' + err.message, 'error');
+    } finally {
+        setCookieToDelete(null);
     }
   };
 
@@ -1997,7 +2001,7 @@ function AdminAddCookies({ onBack }: { onBack: () => void }) {
                      <div key={s.id} className="p-5 border border-slate-200 bg-slate-50 rounded-2xl flex flex-col gap-3 transition-hover hover:border-blue-200 hover:bg-blue-50/50">
                         <div className="flex justify-between items-start">
                            <h4 className="font-bold text-lg text-slate-800 line-clamp-1">{s.name}</h4>
-                           <button onClick={() => handleDeleteCookies(s.id)} className="text-red-500 hover:bg-red-50 p-1 rounded-lg transition-colors" title="مسح الكويز">
+                           <button onClick={() => setCookieToDelete(s.id)} className="text-red-500 hover:bg-red-50 p-1 rounded-lg transition-colors" title="مسح الكويز">
                              <Trash2 size={18} />
                            </button>
                         </div>
@@ -2015,6 +2019,48 @@ function AdminAddCookies({ onBack }: { onBack: () => void }) {
           )}
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {cookieToDelete && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setCookieToDelete(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative"
+            >
+              <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trash2 size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800 text-center mb-2">تأكيد الحذف</h3>
+              <p className="text-slate-500 text-center mb-8 font-medium">هل أنت متأكد من مسح جميع الأسئلة والمراحل الخاصة بهذه المادة؟ لا يمكن التراجع عن هذا الإجراء.</p>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setCookieToDelete(null)}
+                  className="flex-1 py-3.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button 
+                  onClick={handleDeleteCookies}
+                  className="flex-1 py-3.5 px-4 bg-red-500 hover:bg-red-600 text-white font-bold rounded-2xl shadow-lg shadow-red-500/20 transition-all"
+                >
+                  نعم، مسح
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

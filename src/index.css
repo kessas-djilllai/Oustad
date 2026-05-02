@@ -160,6 +160,10 @@ body {
   direction: ltr;
 }
 
+.glow {
+  box-shadow: 0 0 20px -2px var(--tw-shadow-color);
+}
+
 .dark .text-slate-800,
 .dark .text-slate-700,
 .dark .text-slate-600 {

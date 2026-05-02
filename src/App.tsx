@@ -333,19 +333,7 @@ function StudentPortal({ session }: { session: any }) {
       if (!supabase) {
         // compute progress for SUBJECTS_DATA
         const computedSubjects = SUBJECTS_DATA.map((sub: any) => {
-          let totalItems = 0;
-          let completedItems = 0;
-          sub.units?.forEach((u: any) => {
-            u.lessons?.forEach((l: any) => {
-              totalItems++;
-              if (getProgressSync('completed_lesson', l.id) === 1) completedItems++;
-            });
-            u.exercises?.forEach((e: any) => {
-              totalItems++;
-              if (getProgressSync('completed_exercise', e.id) === 1) completedItems++;
-            });
-          });
-          const p = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+          const p = getProgressSync('quiz_progress', sub.id) || 0;
           return { ...sub, progress: p };
         });
         if (JSON.stringify(computedSubjects) !== JSON.stringify(subjects)) {
@@ -417,20 +405,7 @@ function StudentPortal({ session }: { session: any }) {
                 exercises: exercisesData.filter((e: any) => e.unit_id === u.id).sort((a: any, b: any) => a.exercise_order - b.exercise_order),
             }));
 
-            let totalItems = 0;
-            let completedItems = 0;
-            formattedUnits.forEach((u: any) => {
-              u.lessons?.forEach((l: any) => {
-                totalItems++;
-                if (getProgressSync('completed_lesson', l.id) === 1) completedItems++;
-              });
-              u.exercises?.forEach((e: any) => {
-                totalItems++;
-                if (getProgressSync('completed_exercise', e.id) === 1) completedItems++;
-              });
-            });
-
-            const p = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+            const p = getProgressSync('quiz_progress', sub.id) || 0;
             
             return {
               ...sub,
