@@ -16,6 +16,8 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
   const navigate = useNavigate();
   const onBack = customOnBack || (() => navigate(-1));
   const [examFile, setExamFile] = useState<File | null>(null);
+  const [solutionFile, setSolutionFile] = useState<File | null>(null);
+  const [useAiSolution, setUseAiSolution] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [results, setResults] = useState<any[]>([]);
@@ -41,6 +43,12 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
   const handleExamFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setExamFile(e.target.files[0]);
+    }
+  };
+
+  const handleSolutionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSolutionFile(e.target.files[0]);
     }
   };
 
@@ -81,18 +89,35 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
         return `- المادة: ${sub.name} (الوحدات: ${subUnits || 'لا يوجد وحدات'})`;
       }).join('\n');
 
-      const prompt = getAnalyzePrompt(availableSubjectsContext);
+      let solutionModeContext: 'upload' | 'ai' | 'none' = 'none';
+      const promptParts: any[] = [
+        { text: 'هذا هو ملف موضوع الامتحان:' },
+        { inlineData: { data: examBase64Data, mimeType: examFile.type } }
+      ];
+
+      if (!useAiSolution && solutionFile) {
+        const solutionBase64Data = await getBase64(solutionFile);
+        promptParts.push({ text: 'هذا هو ملف التصحيح النموذجي الوزاري المرفق:' });
+        promptParts.push({ inlineData: { data: solutionBase64Data, mimeType: solutionFile.type } });
+        solutionModeContext = 'upload';
+      } else if (useAiSolution) {
+        solutionModeContext = 'ai';
+      }
+
+      const prompt = getAnalyzePrompt(availableSubjectsContext, solutionModeContext);
+      promptParts.push({ text: prompt });
+
+      const requiredExerciseFields = ["exercise_number", "subject", "units", "exam"];
+      if (solutionModeContext !== 'none') {
+         requiredExerciseFields.push("solution");
+      }
 
       const response = await ai.models.generateContent({
         model: settingsData.ai_model || 'gemini-2.5-flash',
         contents: [
             {
               role: 'user',
-              parts: [
-                { text: 'هذا هو ملف موضوع الامتحان:' },
-                { inlineData: { data: examBase64Data, mimeType: examFile.type } },
-                { text: prompt }
-              ]
+              parts: promptParts,
             }
         ],
         config: {
@@ -116,9 +141,10 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
                           exercise_number: { type: Type.NUMBER },
                           subject: { type: Type.STRING },
                           units: { type: Type.ARRAY, items: { type: Type.STRING }, description: "الوحدات الدراسية التي يشملها التمرين" },
-                          exam: { type: Type.STRING, description: "نص التمرين بتنسيق Markdown." }
+                          exam: { type: Type.STRING, description: "نص التمرين بتنسيق Markdown." },
+                          solution: { type: Type.STRING, description: "نص الحل النموذجي بالتنسيق المطلوب (إن وجد)." }
                         },
-                        required: ["exercise_number", "subject", "units", "exam"]
+                        required: requiredExerciseFields
                       }
                     }
                   },
@@ -248,9 +274,15 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
       const tName = tInfo?.topic || '';
       const title = `تمرين ${exerciseData.exercise_number} - باك ${bYear} ${bSpec} (${tName})`;
       
-      const contentArr = [{
+      const contentArrContent: any = {
         exam: exerciseData.exam
-      }];
+      };
+      
+      if (exerciseData.solution) {
+        contentArrContent.solution = exerciseData.solution;
+      }
+      
+      const contentArr = [contentArrContent];
 
       const insertData = targetUnitIds.map(unitId => ({
         id: 'e_' + Math.random().toString(36).substr(2, 9),
@@ -312,7 +344,7 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
       </div>
 
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 max-w-xl mx-auto w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto w-full">
           <div className="glass rounded-2xl p-6 border-2 border-dashed border-indigo-200 bg-indigo-50/30 text-center relative hover:bg-indigo-50/50 transition-colors">
             <input 
               type="file" 
@@ -330,6 +362,49 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
                </div>
             </div>
           </div>
+          
+          {!useAiSolution && (
+            <div className="glass rounded-2xl p-6 border-2 border-dashed border-emerald-200 bg-emerald-50/30 text-center relative hover:bg-emerald-50/50 transition-colors">
+              <input 
+                type="file" 
+                accept="application/pdf"
+                onChange={handleSolutionFileChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              <div className="flex flex-col items-center justify-center gap-3">
+                 <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center shadow-inner">
+                   {solutionFile ? <FileText size={32} /> : <Upload size={32} />}
+                 </div>
+                 <div>
+                   <p className="font-bold text-slate-700">{solutionFile ? solutionFile.name : "رفع التصحيح النموذجي (PDF)"}</p>
+                   <p className="text-xs text-slate-500 mt-1">اختياري - لاستخراج الحل بدقة</p>
+                 </div>
+              </div>
+            </div>
+          )}
+
+          {useAiSolution && (
+            <div className="glass rounded-2xl p-6 border-2 border-emerald-200 bg-emerald-50/30 flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center shadow-inner mb-3">
+                <Wand2 size={32} />
+              </div>
+              <div>
+                <p className="font-bold text-emerald-700">توليد الحل عبر الذكاء الاصطناعي</p>
+                <p className="text-xs text-emerald-600 mt-1">حسب المنهجية الجزائرية والتدرج السنوي</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-center max-w-xl mx-auto mt-2">
+             <label className="flex items-center space-x-3 space-x-reverse cursor-pointer">
+                <div className="relative">
+                  <input type="checkbox" className="sr-only" checked={useAiSolution} onChange={(e) => setUseAiSolution(e.target.checked)} />
+                  <div className={`block w-14 h-8 rounded-full transition-colors ${useAiSolution ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                  <div className={`dot absolute right-1 top-1 bg-white w-6 h-6 rounded-full transition-transform ${useAiSolution ? '-translate-x-6' : ''}`}></div>
+                </div>
+                <span className="font-bold text-sm text-slate-700">توليد الحل عبر الذكاء الاصطناعي (أغلق لرفع الملف يدوياً)</span>
+             </label>
         </div>
 
         <button 
@@ -414,8 +489,59 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
                         {(expandedExercise === solKey && res.exam) && (
                           <div className="p-2 md:p-6 bg-white border-t border-slate-200 animate-in slide-in-from-top-2 fade-in space-y-8">
                                <div className="markdown-container prose prose-slate prose-base md:prose-lg max-w-none text-right leading-loose w-full" dir="rtl">
-                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>{preprocessMath(String(res.exam))}</ReactMarkdown>
+                                 <ReactMarkdown 
+                                     remarkPlugins={[remarkGfm, remarkMath]} 
+                                     rehypePlugins={[rehypeKatex, rehypeRaw]}
+                                     components={{
+                                       table: ({node, children, ...props}: any) => (
+                                         <div className="overflow-x-auto w-full mb-6 relative" dir="auto">
+                                           <table {...props} className="w-full text-center border-collapse border border-slate-300">
+                                              {React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}
+                                           </table>
+                                         </div>
+                                       ),
+                                       tbody: ({node, children, ...props}: any) => <tbody {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tbody>,
+                                       thead: ({node, children, ...props}: any) => <thead {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</thead>,
+                                       tr: ({node, children, ...props}: any) => <tr {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tr>,
+                                       colgroup: ({node, children, ...props}: any) => <colgroup {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</colgroup>,
+                                       th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
+                                       td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
+                                     }}
+                                  >
+                                    {preprocessMath(String(res.exam))}
+                                 </ReactMarkdown>
                                </div>
+
+                               {res.solution && (
+                                 <div className="mt-8 border-t-2 border-emerald-500 pt-8 animate-in fade-in slide-in-from-bottom-4">
+                                   <div className="text-center mb-6">
+                                     <h3 className="text-xl font-bold text-emerald-700 bg-emerald-50 inline-block px-6 py-2 rounded-full border border-emerald-200">التصحيح المستخرج</h3>
+                                   </div>
+                                   <div className="markdown-container prose prose-slate prose-base md:prose-lg max-w-none text-right leading-loose w-full" dir="rtl">
+                                     <ReactMarkdown 
+                                       remarkPlugins={[remarkGfm, remarkMath]} 
+                                       rehypePlugins={[rehypeKatex, rehypeRaw]}
+                                       components={{
+                                         table: ({node, children, ...props}: any) => (
+                                           <div className="overflow-x-auto w-full mb-6 relative" dir="auto">
+                                             <table {...props} className="w-full text-center border-collapse border border-slate-300">
+                                                {React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}
+                                             </table>
+                                           </div>
+                                         ),
+                                         tbody: ({node, children, ...props}: any) => <tbody {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tbody>,
+                                         thead: ({node, children, ...props}: any) => <thead {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</thead>,
+                                         tr: ({node, children, ...props}: any) => <tr {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tr>,
+                                         colgroup: ({node, children, ...props}: any) => <colgroup {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</colgroup>,
+                                         th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
+                                         td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
+                                       }}
+                                     >
+                                       {preprocessMath(String(res.solution))}
+                                     </ReactMarkdown>
+                                   </div>
+                                 </div>
+                               )}
                                
                                <div className="pt-6 border-t border-slate-100 flex justify-end">
                                  {addedState[solKey] ? (

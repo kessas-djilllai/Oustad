@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
 import "katex/dist/katex.min.css";
 import { getQuizPrompt } from "../lib/promptQuiz";
 import { supabase } from "../lib/supabase";
@@ -243,7 +244,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                <span className="text-blue-500 font-bold flex flex-col sm:flex-row items-end sm:items-center gap-1.5"><Target size={14} /> <span className="line-clamp-1">{selectedUnit?.name}</span></span>
             </div>
             <div className="text-lg md:text-2xl font-bold text-slate-800 mb-8 md:mb-10 leading-relaxed text-center markdown-body quiz-markdown prose max-w-none" dir="rtl">
-              <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
                 {preprocessMath(questions[currentQuestionIdx].q)}
               </ReactMarkdown>
             </div>
@@ -269,7 +270,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                       className={`w-full p-4 md:p-5 rounded-2xl border text-sm md:text-base font-bold transition-all text-right markdown-body quiz-markdown prose max-w-none ${btnClass}`}
                       dir="rtl"
                     >
-                       <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                       <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
                           {preprocessMath(opt)}
                       </ReactMarkdown>
                     </button>
@@ -279,7 +280,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                           <span>التبرير</span>
                         </h4>
                         <div className="text-sm md:text-base markdown-body quiz-markdown" dir="rtl">
-                           <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                           <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
                               {preprocessMath(questions[currentQuestionIdx].justification)}
                            </ReactMarkdown>
                         </div>

@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeRaw from 'rehype-raw';
 import { ChevronRight, ChevronLeft, PlayCircle, ClipboardList, FileText, CheckCircle, RefreshCw, X } from 'lucide-react';
 import { getProgressSync, saveProgress, addXP } from '../lib/progress';
 import { getSubjectPrompt } from '../lib/prompts';
@@ -310,7 +311,25 @@ export function LessonDetailsView({ subject, unit, lesson, onBack }: { subject: 
       <div className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8">
         <div className="prose prose-sm md:prose-base prose-slate max-w-none text-right overflow-hidden break-words w-full" dir="rtl">
            <div className="markdown-body">
-             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+             <ReactMarkdown 
+               remarkPlugins={[remarkGfm, remarkMath]} 
+               rehypePlugins={[rehypeKatex, rehypeRaw]}
+               components={{
+                 table: ({node, children, ...props}: any) => (
+                   <div className="overflow-x-auto w-full mb-6 relative" dir="auto">
+                     <table {...props} className="w-full text-center border-collapse border border-slate-300">
+                        {React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}
+                     </table>
+                   </div>
+                 ),
+                 tbody: ({node, children, ...props}: any) => <tbody {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tbody>,
+                 thead: ({node, children, ...props}: any) => <thead {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</thead>,
+                 tr: ({node, children, ...props}: any) => <tr {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tr>,
+                 colgroup: ({node, children, ...props}: any) => <colgroup {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</colgroup>,
+                 th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
+                 td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
+               }}
+             >
                {preprocessMath(getLessonContent())}
              </ReactMarkdown>
            </div>
@@ -480,13 +499,19 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack }: { s
          <div className="markdown-body rtl prose max-w-none text-right overflow-hidden break-words w-full">
            <ReactMarkdown 
              remarkPlugins={[remarkGfm, remarkMath]}
-             rehypePlugins={[rehypeKatex]}
+             rehypePlugins={[rehypeKatex, rehypeRaw]}
              components={{
-               table: ({node, ...props}: any) => (
+               table: ({node, children, ...props}: any) => (
                  <div className="overflow-x-auto w-full mb-6 relative" dir="auto">
-                   <table {...props} className="w-full text-center border-collapse border border-slate-300" />
+                   <table {...props} className="w-full text-center border-collapse border border-slate-300">
+                     {React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}
+                   </table>
                  </div>
                ),
+               tbody: ({node, children, ...props}: any) => <tbody {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tbody>,
+               thead: ({node, children, ...props}: any) => <thead {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</thead>,
+               tr: ({node, children, ...props}: any) => <tr {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tr>,
+               colgroup: ({node, children, ...props}: any) => <colgroup {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</colgroup>,
                th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
                td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
              }}
@@ -503,13 +528,19 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack }: { s
                <div className="markdown-body rtl prose max-w-none text-right overflow-hidden break-words w-full">
                  <ReactMarkdown 
                   remarkPlugins={[remarkGfm, remarkMath]}
-                  rehypePlugins={[rehypeKatex]}
+                  rehypePlugins={[rehypeKatex, rehypeRaw]}
                   components={{
-                    table: ({node, ...props}: any) => (
+                    table: ({node, children, ...props}: any) => (
                       <div className="overflow-x-auto w-full mb-6 relative" dir="auto">
-                        <table {...props} className="w-full text-center border-collapse border border-slate-300" />
+                        <table {...props} className="w-full text-center border-collapse border border-slate-300">
+                           {React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}
+                        </table>
                       </div>
                     ),
+                    tbody: ({node, children, ...props}: any) => <tbody {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tbody>,
+                    thead: ({node, children, ...props}: any) => <thead {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</thead>,
+                    tr: ({node, children, ...props}: any) => <tr {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</tr>,
+                    colgroup: ({node, children, ...props}: any) => <colgroup {...props}>{React.Children.toArray(children).filter((c: any) => typeof c !== 'string' || c.trim() !== '')}</colgroup>,
                     th: ({node, ...props}: any) => <th {...props} className="border border-slate-300 px-4 py-2 bg-slate-50 font-bold" />,
                     td: ({node, ...props}: any) => <td {...props} className="border border-slate-300 px-4 py-2 text-center" />
                   }}
