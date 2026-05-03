@@ -133,6 +133,29 @@ ${subjectsList}`;
           throw new Error(`تعرف الذكاء الاصطناعي على المواد التالية: [${notFoundSubjects.join('، ')}] ولكنها غير موجودة بدقة في القائمة. الرجاء التحقق من أسماء المواد.`);
       }
 
+      let finalMatchedSubjects = [...matchedSubjects];
+
+      if (supabase) {
+          setAnalyzingStep("جاري التحقق من التكرار...");
+          const { data: existingExams, error: existingError } = await supabase
+            .from('bac_exams')
+            .select('subject_id')
+            .eq('year', parsed.bac_year.toString())
+            .in('subject_id', finalMatchedSubjects.map(s => s.id));
+            
+          if (!existingError && existingExams && existingExams.length > 0) {
+              const existingSubjectIds = existingExams.map(e => e.subject_id);
+              finalMatchedSubjects = finalMatchedSubjects.filter(s => !existingSubjectIds.includes(s.id));
+              
+              if (finalMatchedSubjects.length === 0) {
+                  throw new Error(`موضوع بكالوريا ${parsed.bac_year} مضاف مسبقاً لهذه المواد/التخصصات: ${matchedSubjects.map(s => s.name).join('، ')}.`);
+              } else {
+                  const duplicatedNames = matchedSubjects.filter(s => existingSubjectIds.includes(s.id)).map(s => s.name);
+                  triggerAlert(`هذا الموضوع موجود مسبقاً في: ${duplicatedNames.join('، ')}. سيتم إضافته للتخصصات المتبقية فقط.`, "warning");
+              }
+          }
+      }
+
       setAnalyzingStep("جاري رفع الملفات للسحابة وحفظها...");
 
       if (supabase) {
@@ -171,7 +194,7 @@ ${subjectsList}`;
            solutionUrl = solutionPublicUrl;
          }
 
-         const inserts = matchedSubjects.map(s => ({
+         const inserts = finalMatchedSubjects.map((s: any) => ({
              id: 'bac_' + Math.random().toString(36).substr(2, 9) + '_' + s.id.substring(0, 4),
              year: parsed.bac_year.toString(),
              subject_id: s.id,
@@ -179,17 +202,21 @@ ${subjectsList}`;
              solution_file: solutionUrl
          }));
 
-         const { error } = await supabase.from('bac_exams').insert(inserts);
+         if (inserts.length > 0) {
+             const { error } = await supabase.from('bac_exams').insert(inserts);
          
-         if (error) {
-             if (error.code === '42P01') {
-                 throw new Error("الجدول bac_exams غير موجود في قاعدة البيانات! رجاء قم بإنشائه بواسطة كود SQL من واجهة الإعدادات.");
+             if (error) {
+                 if (error.code === '42P01') {
+                     throw new Error("الجدول bac_exams غير موجود في قاعدة البيانات! رجاء قم بإنشائه بواسطة كود SQL من واجهة الإعدادات.");
+                 }
+                 throw error;
              }
-             throw error;
          }
       }
 
-      triggerAlert(`تم حفظ موضوع بكالوريا ${parsed.bac_year} بنجاح للمواد/التخصصات: ${matchedSubjects.map(s => s.name).join('، ')}`, "success");
+      if (finalMatchedSubjects.length > 0) {
+          triggerAlert(`تم حفظ موضوع بكالوريا ${parsed.bac_year} بنجاح للمواد/التخصصات: ${finalMatchedSubjects.map((s: any) => s.name).join('، ')}`, "success");
+      }
       setExamFile(null);
       setSolutionFile(null);
 
