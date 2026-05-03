@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
@@ -142,6 +142,7 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
   const [subjectsMap, setSubjectsMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 
   const [confirmDelete, setConfirmDelete] = useState<{id: string, name: string} | null>(null);
 
@@ -196,6 +197,39 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
     fetchItems();
   }, [type]);
 
+  const groupedItems = useMemo(() => {
+    return items.reduce((acc: any, item: any) => {
+      let groupName = "غير مصنف";
+      if (type === 'subjects') {
+        const match = item.name.match(/\((.*?)\)$/);
+        groupName = match ? match[1] : 'غير مصنف';
+      } else if (type === 'units') {
+        groupName = subjectsMap[item.subject_id] || 'مادة غير معروفة';
+      } else if (type === 'lessons' || type === 'exercises') {
+        const unitData = unitsMap[item.unit_id];
+        if (unitData) {
+          groupName = subjectsMap[unitData.subject_id] || 'مادة غير معروفة';
+        } else {
+          groupName = 'مادة غير معروفة';
+        }
+      }
+      
+      if (!acc[groupName]) acc[groupName] = [];
+      acc[groupName].push(item);
+      return acc;
+    }, {});
+  }, [items, type, subjectsMap, unitsMap]);
+
+  const groupNames = Object.keys(groupedItems);
+
+  useEffect(() => {
+    if (selectedGroup && !groupedItems[selectedGroup]) {
+      setSelectedGroup(groupNames[0] || null);
+    } else if (!selectedGroup && groupNames.length > 0) {
+      setSelectedGroup(groupNames[0]);
+    }
+  }, [groupNames, selectedGroup, groupedItems]);
+
   const executeDelete = async (id: string) => {
     if (!supabase) {
       triggerAlert("قاعدة البيانات غير متصلة", "error");
@@ -229,6 +263,36 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
     }
   };
 
+  const copyGroupUnits = () => {
+    if (!selectedGroup || !groupedItems[selectedGroup]) return;
+    const names = groupedItems[selectedGroup].map((i: any) => i.name).join('\n');
+    navigator.clipboard.writeText(names);
+    triggerAlert("تم نسخ الأسماء بنجاح!", "success", false);
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedGroup || !groupedItems[selectedGroup] || !supabase) return;
+    if (!confirm(`هل أنت متأكد من حذف ${groupedItems[selectedGroup].length} عنصراً تابعاً لـ "${selectedGroup}" دفعة واحدة؟ لا يمكن التراجع عن هذا الإجراء.`)) {
+        return;
+    }
+    setLoading(true);
+    try {
+        const ids = groupedItems[selectedGroup].map((i: any) => i.id);
+        const { error } = await supabase.from(type).delete().in('id', ids);
+        if (error) throw error;
+        setItems(prev => prev.filter(item => !ids.includes(item.id)));
+        triggerAlert("تم الحذف الجماعي بنجاح", "success");
+    } catch (e: any) {
+        let detailedError = "خطأ في الحذف: " + e.message;
+        if (e.message?.includes('foreign key constraint') || e.code === '23503') {
+            detailedError = "لا يمكن حذف هذه العناصر لارتباطها بعناصر أخرى.";
+        }
+        triggerAlert(detailedError, "error");
+    } finally {
+        setLoading(false);
+    }
+  };
+
   return (
     <div className="mt-10 pt-8 border-t border-slate-200 relative">
       {confirmDelete && createPortal(
@@ -255,38 +319,44 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
           {items.length === 0 ? (
             <p className="text-center text-slate-500 py-8 font-bold text-sm">لا توجد عناصر حالياً</p>
           ) : (
-            (() => {
-              const groupedItems = items.reduce((acc: any, item: any) => {
-                let groupName = "غير مصنف";
-                if (type === 'subjects') {
-                  const match = item.name.match(/\((.*?)\)$/);
-                  groupName = match ? match[1] : 'غير مصنف';
-                } else if (type === 'units') {
-                  groupName = subjectsMap[item.subject_id] || 'مادة غير معروفة';
-                } else if (type === 'lessons' || type === 'exercises') {
-                  const unitData = unitsMap[item.unit_id];
-                  if (unitData) {
-                    groupName = subjectsMap[unitData.subject_id] || 'مادة غير معروفة';
-                  } else {
-                    groupName = 'مادة غير معروفة';
-                  }
-                }
-                
-                if (!acc[groupName]) acc[groupName] = [];
-                acc[groupName].push(item);
-                return acc;
-              }, {});
+            <>
+              <div className="flex gap-2 overflow-x-auto pb-4 mb-4 whitespace-nowrap scrollbar-hide border-b border-slate-200">
+                {groupNames.map(gn => (
+                  <button 
+                    key={gn}
+                    onClick={() => setSelectedGroup(gn)}
+                    className={`px-4 py-2 rounded-full font-bold text-sm transition-all focus:outline-none ${selectedGroup === gn ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    {gn}
+                  </button>
+                ))}
+              </div>
 
-              return Object.entries(groupedItems).map(([groupName, groupItems]: any) => (
+              {selectedGroup && groupedItems[selectedGroup] && (
                 <motion.div 
-                  key={groupName} 
+                  key={selectedGroup} 
                   layout 
-                  className="mb-4 md:mb-6 last:mb-0 bg-white p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm"
+                  className="bg-white p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm"
                 >
-                  <h5 className="font-bold text-slate-700 mb-3 text-xs md:text-sm px-2 md:px-3 flex items-center border-r-2 md:border-r-4 border-indigo-500">{groupName}</h5>
+                  <div className="flex flex-col md:flex-row justify-between md:items-center gap-3 mb-4 px-2">
+                     <h5 className="font-bold text-slate-700 text-sm flex items-center border-r-4 border-indigo-500 pr-2">
+                       عناصر {selectedGroup} ({groupedItems[selectedGroup].length})
+                     </h5>
+                     {type === 'units' && (
+                       <div className="flex gap-2">
+                         <button onClick={copyGroupUnits} className="text-[10px] sm:text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm">
+                            نسخ أسماء الوحدات
+                         </button>
+                         <button onClick={handleBulkDelete} className="text-[10px] sm:text-xs bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm">
+                            حذف جميع الوحدات
+                         </button>
+                       </div>
+                     )}
+                  </div>
+                  
                   <div className="space-y-2 relative min-h-[40px]">
                     <AnimatePresence initial={false}>
-                    {groupItems.map((item: any) => {
+                    {groupedItems[selectedGroup].map((item: any) => {
                        let displayTitle = item.title || item.name;
                        let subtitle = "";
                        if (type === 'lessons' || type === 'exercises') {
@@ -329,8 +399,8 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
                     </AnimatePresence>
                   </div>
                 </motion.div>
-              ));
-            })()
+              )}
+            </>
           )}
         </div>
       )}
