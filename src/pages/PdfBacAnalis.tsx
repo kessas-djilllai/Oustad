@@ -189,7 +189,7 @@ ${subjectsList}`;
          }
       }
 
-      triggerAlert(`تم حفظ موضوع بكالوريا ${parsed.bac_year} بنجاح لـ ${matchedSubjects.length} تخصصات!`, "success");
+      triggerAlert(`تم حفظ موضوع بكالوريا ${parsed.bac_year} بنجاح للمواد/التخصصات: ${matchedSubjects.map(s => s.name).join('، ')}`, "success");
       setExamFile(null);
       setSolutionFile(null);
 
