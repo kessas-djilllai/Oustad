@@ -145,9 +145,10 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 
   const [confirmDelete, setConfirmDelete] = useState<{id: string, name: string} | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState<{group: string, count: number, ids: string[]} | null>(null);
 
   useEffect(() => {
-    if (confirmDelete) {
+    if (confirmDelete || confirmBulkDelete) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -155,7 +156,7 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
     return () => {
       document.body.style.overflow = '';
     };
-  }, [confirmDelete]);
+  }, [confirmDelete, confirmBulkDelete]);
 
   const [unitsMap, setUnitsMap] = useState<Record<string, {name: string, subject_id: string}>>({});
 
@@ -272,12 +273,16 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
 
   const handleBulkDelete = async () => {
     if (!selectedGroup || !groupedItems[selectedGroup] || !supabase) return;
-    if (!confirm(`هل أنت متأكد من حذف ${groupedItems[selectedGroup].length} عنصراً تابعاً لـ "${selectedGroup}" دفعة واحدة؟ لا يمكن التراجع عن هذا الإجراء.`)) {
-        return;
-    }
+    const ids = groupedItems[selectedGroup].map((i: any) => i.id);
+    setConfirmBulkDelete({ group: selectedGroup, count: ids.length, ids });
+  };
+
+  const executeBulkDelete = async () => {
+    if (!confirmBulkDelete || !supabase) return;
+    const { ids } = confirmBulkDelete;
+    setConfirmBulkDelete(null);
     setLoading(true);
     try {
-        const ids = groupedItems[selectedGroup].map((i: any) => i.id);
         const { error } = await supabase.from(type).delete().in('id', ids);
         if (error) throw error;
         setItems(prev => prev.filter(item => !ids.includes(item.id)));
@@ -286,6 +291,8 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
         let detailedError = "خطأ في الحذف: " + e.message;
         if (e.message?.includes('foreign key constraint') || e.code === '23503') {
             detailedError = "لا يمكن حذف هذه العناصر لارتباطها بعناصر أخرى.";
+        } else if (e.message?.includes('row-level security') || e.message?.includes('policy')) {
+            detailedError = "صلاحيات قاعدة البيانات (RLS) تمنع الحذف.";
         }
         triggerAlert(detailedError, "error");
     } finally {
@@ -306,6 +313,22 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
                <div className="flex gap-3">
                  <button type="button" onClick={() => setConfirmDelete(null)} className="flex-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200">إلغاء</button>
                  <button type="button" onClick={() => executeDelete(confirmDelete.id)} className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600">نعم، احذف</button>
+               </div>
+            </div>
+         </div>,
+         document.body
+      )}
+      {confirmBulkDelete && createPortal(
+         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style={{ position: 'fixed' }}>
+            <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-xl text-center">
+               <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Trash size={32} />
+               </div>
+               <h3 className="font-bold text-lg mb-2 text-slate-800">تأكيد الحذف الجماعي</h3>
+               <p className="text-slate-600 mb-6 text-sm">هل أنت متأكد من حذف {confirmBulkDelete.count} عنصراً تابعاً لـ "{confirmBulkDelete.group}" دفعة واحدة؟ لا يمكن التراجع عن هذا الإجراء.</p>
+               <div className="flex gap-3">
+                 <button type="button" onClick={() => setConfirmBulkDelete(null)} className="flex-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200">إلغاء</button>
+                 <button type="button" onClick={executeBulkDelete} className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600">نعم، احذف</button>
                </div>
             </div>
          </div>,
@@ -342,13 +365,15 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
                      <h5 className="font-bold text-slate-700 text-sm flex items-center border-r-4 border-indigo-500 pr-2">
                        عناصر {selectedGroup} ({groupedItems[selectedGroup].length})
                      </h5>
-                     {type === 'units' && (
+                     {(type !== 'subjects') && (
                        <div className="flex gap-2">
-                         <button onClick={copyGroupUnits} className="text-[10px] sm:text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm">
-                            نسخ أسماء الوحدات
-                         </button>
+                         {type === 'units' && (
+                           <button onClick={copyGroupUnits} className="text-[10px] sm:text-xs bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm">
+                              نسخ أسماء الوحدات
+                           </button>
+                         )}
                          <button onClick={handleBulkDelete} className="text-[10px] sm:text-xs bg-red-50 text-red-600 hover:bg-red-100 px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm">
-                            حذف جميع الوحدات
+                            حذف جميع {type === 'units' ? 'الوحدات' : type === 'lessons' ? 'الدروس' : 'التمارين'}
                          </button>
                        </div>
                      )}
