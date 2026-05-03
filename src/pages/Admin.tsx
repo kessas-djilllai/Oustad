@@ -513,7 +513,7 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
            });
         };
 
-        if (Array.isArray(parsed) && parsed.length > 0 && ('unit' in parsed[0] || 'lessons' in parsed[0] || 'items' in parsed[0])) {
+        if (Array.isArray(parsed) && parsed.length > 0 && ('unit' in parsed[0] || 'lessons' in parsed[0] || 'exercises' in parsed[0] || 'items' in parsed[0])) {
            for (const unitObj of parsed) {
               const unitName = String(unitObj.unit || unitObj.name || '').trim();
               const foundUnit = units.find(u => String(u.name || '').trim().replace(/\s+/g, ' ') === unitName.replace(/\s+/g, ' '));
@@ -688,12 +688,8 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
-  const [addMode, setAddMode] = useState<'single' | 'bulk' | 'ai'>('single');
+  const [addMode, setAddMode] = useState<'single' | 'bulk'>('single');
   const [jsonInput, setJsonInput] = useState('');
-  const [aiGeneratedExercises, setAiGeneratedExercises] = useState<any[]>([]);
-  const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
 
   useEffect(() => {
     async function fetchSubjects() {
@@ -716,167 +712,9 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
     fetchUnits();
   }, [selectedSubjectId]);
 
-  const generateWithAI = async () => {
-    let apiKey = '';
-    let aiModel = 'gemini-3-flash-preview';
-    if (supabase) {
-      const { data } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
-      if (data && data.api_key) {
-        apiKey = data.api_key;
-        aiModel = (data.ai_model && data.ai_model !== 'gemini-2.5-flash') ? data.ai_model : 'gemini-3-flash-preview';
-      }
-    }
-    
-    if (!apiKey) {
-      triggerAlert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات أولاً.", 'error');
-      return;
-    }
-    if (!selectedSubjectId || !selectedUnitId || !title) {
-       triggerAlert("الرجاء اختيار المادة والوحدة وكتابة عنوان التمرين أولاً.", 'error');
-       return;
-    }
-    
-    setIsGenerating(true);
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || '';
-      const unitName = units.find(u => u.id === selectedUnitId)?.name || '';
-      
-      const prompt = getSubjectPrompt(subjectName, unitName, title);
-
-      const response = await ai.models.generateContent({
-        model: aiModel,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              exam: { type: Type.STRING, description: "نص موضوع الامتحان بتنسيق Markdown. لا تضع الحل هنا." },
-              solution: { type: Type.STRING, description: "نص التصحيح النموذجي للامتحان بتنسيق Markdown" }
-            },
-            required: ["exam", "solution"]
-          }
-        }
-      });
-      
-      const jsonStr = response.text.trim();
-      const parsedData = JSON.parse(jsonStr);
-      setGeneratedQuestions([{ exam: parsedData.exam, solution: parsedData.solution }]);
-      triggerAlert("تم توليد الموضوع بنجاح!", 'success', false);
-    } catch (err: any) {
-      console.error(err);
-      let errMsg = err.message || String(err);
-      if (errMsg.includes('504') || errMsg.includes('503')) errMsg = "الخادم يواجه ضغطاً (503/504). المحاولة لاحقاً.";
-      else if (errMsg.includes('Failed to fetch')) errMsg = "انقطع الاتصال بالإنترنت أو الخادم أثناء التحليل.";
-      else if (errMsg.includes('token limit')) errMsg = "تجاوز التوليد الحد الأقصى للنصوص المسموح بها.";
-      else if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) errMsg = "لقد استنفدت الحصة المجانية لمفتاح Gemini API هذا (Quota Exceeded). يرجى التحقق من خطة الدفع الخاصة بك أو إضافة مفتاح API جديد.";
-      triggerAlert("حدث خطأ أثناء التوليد: " + errMsg, 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const generateExercisesTitlesWithAI = async () => {
-    let apiKey = '';
-    let aiModel = 'gemini-3-flash-preview';
-    if (supabase) {
-      const { data } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
-      if (data && data.api_key) {
-        apiKey = data.api_key;
-        aiModel = (data.ai_model && data.ai_model !== 'gemini-2.5-flash') ? data.ai_model : 'gemini-3-flash-preview';
-      }
-    }
-    
-    if (!apiKey) {
-      triggerAlert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات أولاً.", 'error');
-      return;
-    }
-    if (!selectedSubjectId) {
-       triggerAlert("الرجاء اختيار المادة أولاً.", 'error');
-       return;
-    }
-    if (units.length === 0) {
-       triggerAlert("لا توجد وحدات لهذه المادة.", 'error');
-       return;
-    }
-
-    setIsGeneratingBulk(true);
-    setAiGeneratedExercises([]);
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || '';
-      
-      const unitsListStr = units.map(u => u.name).join('، ');
-
-      const prompt = `أنت مفتش وخبير تربوي في إعداد المحتوى التعليمي. بناءً على المادة التالية: ${subjectName}. وهذه هي قائمة الوحدات التابعة لها: ${unitsListStr}. رجاءً قم باقتراح تمارين أو مواضيع لكل وحدة، وفقاً للتدرج السنوي لوزارة التربية الوطنية في الجزائر. يجب أن يتناسب عدد التمارين المقترحة مع حجم وأهمية الوحدة (الوحدات الطويلة والمعقدة تتطلب تمارين أكثر). لا تتقيد بعدد محدد، وارجع الناتج بهيكلة JSON تتضمن اسم الوحدة (unitName) ومصفوفة بأسماء التمارين (exercises).`;
-
-      const response = await ai.models.generateContent({
-        model: aiModel,
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                unitName: { type: Type.STRING, description: "اسم الوحدة تماما كما تم توفيره." },
-                exercises: { 
-                  type: Type.ARRAY, 
-                  items: { type: Type.STRING },
-                  description: "قائمة بأسماء التمارين المناسبة لهذه الوحدة"
-                }
-              },
-              required: ["unitName", "exercises"]
-            }
-          }
-        }
-      });
-      
-      const jsonStr = response.text.trim();
-      const parsedData = JSON.parse(jsonStr);
-      
-      let inserts: any[] = [];
-      for (const unitObj of parsedData) {
-          const unitName = String(unitObj.unitName || '').trim();
-          const foundUnit = units.find(u => String(u.name || '').trim().replace(/\s+/g, ' ') === unitName.replace(/\s+/g, ' '));
-          
-          if (foundUnit && Array.isArray(unitObj.exercises)) {
-              for (let i = 0; i < unitObj.exercises.length; i++) {
-                 inserts.push({
-                     unit_id: foundUnit.id,
-                     title: unitObj.exercises[i],
-                     exercise_order: i + 1,
-                     content: null
-                 });
-              }
-          }
-      }
-      
-      if (inserts.length > 0) {
-         setAiGeneratedExercises(inserts);
-         triggerAlert(`تم توليد ${inserts.length} تمارين لـ ${parsedData.length} وحدات. يمكنك الآن حفظها.`, 'success', false);
-      } else {
-         triggerAlert("فشل الذكاء الاصطناعي في مطابقة الوحدات. حاول مرة أخرى.", 'error');
-      }
-
-    } catch (err: any) {
-      console.error(err);
-      let errMsg = err.message || String(err);
-      if (errMsg.includes('504') || errMsg.includes('503')) errMsg = "الخادم يواجه ضغطاً (503/504). المحاولة لاحقاً.";
-      else if (errMsg.includes('Failed to fetch')) errMsg = "انقطع الاتصال بالإنترنت أو الخادم أثناء التحليل.";
-      else if (errMsg.includes('token limit')) errMsg = "تجاوز التوليد الحد الأقصى للنصوص المسموح بها.";
-      else if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) errMsg = "لقد استنفدت الحصة المجانية لمفتاح Gemini API هذا. يرجى إضافة مفتاح API جديد أو المحاولة بنموذج أخر من الإعدادات.";
-      triggerAlert("حدث خطأ أثناء التوليد: " + errMsg, 'error');
-    } finally {
-      setIsGeneratingBulk(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase || (!selectedUnitId && addMode !== 'bulk' && addMode !== 'ai')) {
+    if (!supabase || (!selectedUnitId && addMode !== 'bulk')) {
        triggerAlert('الرجاء التأكد من اختيار الوحدة وإعداد قاعدة البيانات (Supabase).', 'error');
        return;
     }
@@ -923,14 +761,14 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
            });
         };
 
-        if (Array.isArray(parsed) && parsed.length > 0 && ('unit' in parsed[0] || 'exercises' in parsed[0] || 'items' in parsed[0])) {
+        if (Array.isArray(parsed) && parsed.length > 0 && ('unit' in parsed[0] || 'exercises' in parsed[0] || 'lessons' in parsed[0] || 'items' in parsed[0])) {
            for (const unitObj of parsed) {
               const unitName = String(unitObj.unit || unitObj.name || '').trim();
               const foundUnit = units.find(u => String(u.name || '').trim().replace(/\s+/g, ' ') === unitName.replace(/\s+/g, ' '));
               if (!foundUnit) {
                   throw new Error(`لم يتم العثور على الوحدة: ${unitName} في المادة المحددة.`);
               }
-              const unitItemsObj = unitObj.exercises || unitObj.items || [];
+              const unitItemsObj = unitObj.exercises || unitObj.lessons || unitObj.items || [];
               inserts.push(...parseItems(unitItemsObj, foundUnit.id));
            }
         } else if (selectedUnitId) {
@@ -953,31 +791,6 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
       }
       return;
     }
-    
-    if (addMode === 'ai') {
-      if (!aiGeneratedExercises || aiGeneratedExercises.length === 0) {
-        triggerAlert('الرجاء توليد التمارين أولاً.', 'error');
-        return;
-      }
-      setIsSubmitting(true);
-      try {
-        const { error } = await supabase.from('exercises').insert(aiGeneratedExercises.map((ex, index) => ({
-             ...ex,
-             id: 'e_' + Math.random().toString(36).substr(2, 9) + index
-        })));
-        if (!error) {
-          triggerAlert(`تم إضافة ${aiGeneratedExercises.length} تمرين من الذكاء الاصطناعي بنجاح!`, 'success');
-          setAiGeneratedExercises([]);
-        } else {
-          triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
-        }
-      } catch (err: any) {
-        triggerAlert('حدث خطأ: ' + err.message, 'error');
-      } finally {
-        setIsSubmitting(false);
-      }
-      return;
-    }
 
     if (!title) {
        triggerAlert('الرجاء تعبئة عنوان التمرين.', 'error');
@@ -987,20 +800,17 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
     setIsSubmitting(true);
     try {
       const exercise_id = 'e_' + Math.random().toString(36).substr(2, 9);
-      // We store the generated questions in the 'content' column as JSON string
-      const contentStr = generatedQuestions.length > 0 ? JSON.stringify(generatedQuestions) : null;
       
       const { error } = await supabase.from('exercises').insert([{
         id: exercise_id,
         unit_id: selectedUnitId,
         title: title,
         exercise_order: 99,
-        content: contentStr
+        content: null
       }]);
       if (!error) {
         triggerAlert('تمت إضافة التمرين بنجاح!', 'success');
         setTitle('');
-        setGeneratedQuestions([]);
       } else {
         triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
       }
@@ -1046,9 +856,9 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
           </select>
         </div>
 
-        {addMode !== 'ai' && (
+        {addMode !== 'bulk' && (
         <div>
-           <label className="block text-sm font-bold text-slate-700 mb-2">اختر الوحدة {addMode === 'bulk' && '(اختياري)'}</label>
+           <label className="block text-sm font-bold text-slate-700 mb-2">اختر الوحدة</label>
             <select 
               value={selectedUnitId} 
               onChange={(e) => setSelectedUnitId(e.target.value)}
@@ -1076,13 +886,6 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
             className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${addMode === 'bulk' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             إضافة متعددة (JSON)
-          </button>
-          <button
-            type="button"
-            onClick={() => setAddMode('ai')}
-            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${addMode === 'ai' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            توليد بالذكاء الاصطناعي
           </button>
         </div>
 
@@ -1114,49 +917,7 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {addMode === 'ai' && (
-          <div>
-             <button 
-                type="button"
-                onClick={generateExercisesTitlesWithAI}
-                disabled={isGeneratingBulk || !selectedSubjectId}
-                className="w-full relative group overflow-hidden bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold rounded-xl py-4 hover:from-purple-700 hover:to-fuchsia-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 disabled:opacity-50"
-             >
-                <div className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-                {isGeneratingBulk ? (
-                  <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
-                ) : (
-                  <>توليد التمارين (الذكاء الاصطناعي) لجميع الوحدات <Sparkles size={18} /></>
-                )}
-             </button>
-             {aiGeneratedExercises.length > 0 && (
-                <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
-                   <p className="text-sm font-bold text-emerald-800 flex items-center gap-2"><CheckCircle2 size={18} /> جاهز للحفظ: تم توليد {aiGeneratedExercises.length} تمارين لجميع الوحدات المتاحة.</p>
-                </div>
-             )}
-          </div>
-        )}
-
         <div className="flex flex-col md:flex-row gap-4 mt-8">
-          {addMode === 'single' && (
-          <button 
-            type="button" 
-            onClick={generateWithAI}
-            disabled={isGenerating || !selectedSubjectId || !selectedUnitId || !title}
-            className="flex-1 relative group overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl py-3.5 hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30 disabled:opacity-50"
-          >
-            <div className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
-            {isGenerating ? (
-               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
-            ) : (
-               <>
-                 <Wand2 size={18} className="animate-pulse" /> 
-                 توليد التمرين الذكي
-               </>
-            )}
-          </button>
-          )}
-          
           <button 
             type="submit" 
             disabled={isSubmitting}
@@ -1169,44 +930,6 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
             )}
           </button>
         </div>
-
-        {generatedQuestions.length > 0 && (
-          <div className="mt-8 space-y-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <h3 className="font-bold text-slate-700 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"></span> محتوى التمرين المُولّد جاهز للحفظ (يمكنك التعديل عليه)
-            </h3>
-            
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">نص التمرين والاستحقاقات (Markdown)</label>
-              <textarea
-                value={generatedQuestions[0].exam}
-                onChange={(e) => {
-                   const newQs = [...generatedQuestions];
-                   newQs[0].exam = e.target.value;
-                   setGeneratedQuestions(newQs);
-                }}
-                rows={10}
-                className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-mono"
-                dir="rtl"
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-2">نص التصحيح النموذجي (Markdown)</label>
-              <textarea
-                value={generatedQuestions[0].solution}
-                onChange={(e) => {
-                   const newQs = [...generatedQuestions];
-                   newQs[0].solution = e.target.value;
-                   setGeneratedQuestions(newQs);
-                }}
-                rows={10}
-                className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-mono"
-                dir="rtl"
-              />
-            </div>
-          </div>
-        )}
       </form>
       ) : (
         <AdminEntityList type="exercises" title="قائمة التمارين" />
