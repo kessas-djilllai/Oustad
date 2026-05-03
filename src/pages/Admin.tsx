@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -57,6 +58,15 @@ export function AlertModal() {
   const [alertData, setAlertData] = useState<AlertEventPayload>({ message: '', type: 'info' });
 
   useEffect(() => {
+    if (isOpen && alertData.type !== 'success') {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen, alertData.type]);
+
+  useEffect(() => {
     let timeoutId: any;
     const handler = (e: any) => {
       setAlertData(e.detail);
@@ -75,8 +85,8 @@ export function AlertModal() {
   if (!isOpen) return null;
 
   if (alertData.type === 'success') {
-    return (
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 w-full max-w-sm pointer-events-none">
+    return createPortal(
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-4 w-full max-w-sm pointer-events-none" style={{ position: 'fixed' }}>
         <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-2xl p-4 shadow-lg flex items-center justify-between gap-3 pointer-events-auto">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
@@ -88,12 +98,13 @@ export function AlertModal() {
             <X size={20} />
           </button>
         </motion.div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" style={{ position: 'fixed' }}>
       <motion.div initial={{opacity: 0}} animate={{opacity: 1}} className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsOpen(false)} />
       <motion.div initial={{scale: 0.95, opacity: 0}} animate={{scale: 1, opacity: 1}} className="relative bg-white rounded-[2rem] p-6 max-w-sm w-full shadow-2xl flex flex-col items-center text-center">
          <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${alertData.type === 'error' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
@@ -105,7 +116,8 @@ export function AlertModal() {
          </div>
          <button onClick={() => setIsOpen(false)} className="w-full bg-slate-900 text-white font-bold rounded-xl py-3 hover:bg-slate-800 transition-all text-sm">حسناً</button>
       </motion.div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -130,6 +142,17 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [confirmDelete, setConfirmDelete] = useState<{id: string, name: string} | null>(null);
+
+  useEffect(() => {
+    if (confirmDelete) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [confirmDelete]);
 
   const [unitsMap, setUnitsMap] = useState<Record<string, {name: string, subject_id: string}>>({});
 
@@ -206,8 +229,8 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
 
   return (
     <div className="mt-10 pt-8 border-t border-slate-200 relative">
-      {confirmDelete && (
-         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      {confirmDelete && createPortal(
+         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm" style={{ position: 'fixed' }}>
             <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-xl text-center">
                <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Trash size={32} />
@@ -219,7 +242,8 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
                  <button type="button" onClick={() => executeDelete(confirmDelete.id)} className="flex-1 px-4 py-2 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600">نعم، احذف</button>
                </div>
             </div>
-         </div>
+         </div>,
+         document.body
       )}
       <h3 className="font-bold text-lg text-slate-800 mb-4">{title}</h3>
       {loading ? (
@@ -981,55 +1005,72 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
           return;
         }
 
-        let unitsToInsert: any[] = [];
-        let finalSubjectId = selectedSubjectId;
-        let finalTrimestre = trimestre;
+        let allUnitsToInsert: any[] = [];
 
-        if (!Array.isArray(parsed) && typeof parsed === 'object' && parsed !== null) {
-          const { specialization, subject, trimestre: t, units } = parsed;
+        const processImportEntry = (entry: any) => {
+          const { specialization, subject, trimestre: t, units } = entry;
           if (!specialization || !subject || !units) {
              throw new Error('الـ JSON يجب أن يحتوي على: specialization, subject, units');
           }
-          const fullSubjectName = specialization === 'جميع الشعب' ? subject : `${subject} (${specialization})`;
-          const foundSub = subjects.find(s => s.name === fullSubjectName);
+
+          const targetSpec = specialization.trim();
+          const targetSub = subject.trim();
+          const fullSubjectName = targetSpec === 'جميع الشعب' ? targetSub : `${targetSub} (${targetSpec})`;
+          
+          const foundSub = subjects.find(s => 
+            s.name.trim() === fullSubjectName || 
+            (targetSpec !== 'جميع الشعب' && s.name.includes(targetSub) && s.name.includes(targetSpec))
+          );
+
           if (!foundSub) {
-             throw new Error(`المادة "${fullSubjectName}" غير موجودة. يرجى إضافتها أولاً.`);
+             throw new Error(`المادة "${fullSubjectName}" غير موجودة. تأكد من مطابقة الاسم والتخصص.`);
           }
-          finalSubjectId = foundSub.id;
-          finalTrimestre = String(t || '1');
-          unitsToInsert = units;
-        } else if (Array.isArray(parsed)) {
-          if (!selectedSubjectId) {
-             throw new Error('يرجى اختيار المادة أولاً أو استخدام صيغة JSON الكاملة.');
+
+          const finalTrimestre = String(t || '1');
+          const unitsArr = Array.isArray(units) ? units : [];
+          
+          return unitsArr.map((item: any, index: number) => {
+            const nameStr = typeof item === 'string' ? item : item.name || item.title;
+            if (!nameStr) throw new Error(`لا يمكن العثور على اسم في أحد العناصر لمادة ${targetSub}.`);
+            return {
+              id: 'u_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now() + '_' + index,
+              subject_id: foundSub.id,
+              name: nameStr,
+              trimestre: parseInt(finalTrimestre),
+              unit_order: 99
+            };
+          });
+        };
+
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 0 && typeof parsed[0] === 'object' && parsed[0] !== null && 'units' in parsed[0]) {
+            parsed.forEach(entry => {
+              allUnitsToInsert = [...allUnitsToInsert, ...processImportEntry(entry)];
+            });
+          } else {
+            if (!selectedSubjectId) {
+              throw new Error('يرجى اختيار المادة أولاً أو استخدام صيغة JSON الكاملة.');
+            }
+            allUnitsToInsert = parsed.map((item, index) => {
+              const nameStr = typeof item === 'string' ? item : item.name || item.title;
+              return {
+                id: 'u_' + Math.random().toString(36).substr(2, 9) + index,
+                subject_id: selectedSubjectId,
+                name: nameStr,
+                trimestre: parseInt(trimestre),
+                unit_order: 99
+              };
+            });
           }
-          unitsToInsert = parsed;
         } else {
-           throw new Error('تنسيق JSON غير مدعوم.');
+          allUnitsToInsert = processImportEntry(parsed);
         }
 
-        if (!Array.isArray(unitsToInsert)) {
-           throw new Error('قائمة الوحدات (units) يجب أن تكون مصفوفة.');
-        }
+        const { error: insError } = await supabase.from('units').insert(allUnitsToInsert);
+        if (insError) throw insError;
 
-        const inserts = unitsToInsert.map((item, index) => {
-          const nameStr = typeof item === 'string' ? item : item.name || item.title;
-          if (!nameStr) throw new Error('لا يمكن العثور على اسم في أحد عناصر الوحدات.');
-          return {
-            id: 'u_' + Math.random().toString(36).substr(2, 9) + index,
-            subject_id: finalSubjectId,
-            name: nameStr,
-            trimestre: parseInt(finalTrimestre),
-            unit_order: 99
-          };
-        });
-
-        const { error } = await supabase.from('units').insert(inserts);
-        if (!error) {
-          triggerAlert(`تم إضافة ${inserts.length} وحدة بنجاح!`, 'success');
-          setJsonInput('');
-        } else {
-          triggerAlert('حدث خطأ: ' + error.message, 'error');
-        }
+        triggerAlert(`تم إضافة ${allUnitsToInsert.length} وحدة بنجاح!`, 'success');
+        setJsonInput('');
       } catch (err: any) {
         triggerAlert('خطأ: ' + err.message, 'error');
       } finally {
@@ -1871,6 +1912,15 @@ function AdminAddCookies({ onBack }: { onBack: () => void }) {
   const [cookieToDelete, setCookieToDelete] = useState<string | null>(null);
 
   useEffect(() => {
+    if (cookieToDelete) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [cookieToDelete]);
+
+  useEffect(() => {
     async function loadData() {
       if (!supabase) return;
       setLoading(true);
@@ -2067,13 +2117,14 @@ function AdminAddCookies({ onBack }: { onBack: () => void }) {
       )}
 
       {/* Delete Confirmation Modal */}
-      <AnimatePresence>
-        {cookieToDelete && (
+      {cookieToDelete && createPortal(
+        <AnimatePresence>
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }} 
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
+            style={{ position: 'fixed' }}
             onClick={() => setCookieToDelete(null)}
           >
             <motion.div 
@@ -2105,8 +2156,9 @@ function AdminAddCookies({ onBack }: { onBack: () => void }) {
               </div>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }
