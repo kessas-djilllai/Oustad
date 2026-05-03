@@ -11,6 +11,7 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
   const [examFile, setExamFile] = useState<File | null>(null);
   const [solutionFile, setSolutionFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzingStep, setAnalyzingStep] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [dbSubjects, setDbSubjects] = useState<any[]>([]);
 
@@ -46,6 +47,7 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
 
     try {
       setIsAnalyzing(true);
+      setAnalyzingStep("تهيئة الفحص...");
       setErrorMsg(null);
       
       const { data: settingsData } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
@@ -53,6 +55,7 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
         throw new Error("لم يتم تكوين مفتاح API. يرجى إعداده في الإعدادات.");
       }
 
+      setAnalyzingStep("جاري قراءة الملف وتجهيزه...");
       const examBase64Data = await getBase64(examFile);
       const solutionBase64Data = solutionFile ? await getBase64(solutionFile) : null;
       
@@ -63,12 +66,14 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
       const prompt = `أنت خبير في تحليل مواضيع البكالوريا الجزائرية. تم إرفاق ملف PDF للأسئلة.
 مهمتك هي استخراج المعلومات التالية فقط:
 - سنة البكالوريا (مثال: 2024، 2023...)
-- اسم المادة وتخصصها (الشعبة) لكي تتطابق بدقة مع أحد المواد الموجودة في القائمة أسفله. يجب أن تختار اسم المادة بالضبط كما هو موجود في القائمة.
+- قائمة بأسماء المواد والتخصصات (الشعب) التي ينطبق عليها الموضوع. لكي تتطابق بدقة مع المواد الموجودة في القائمة أسفله. إذا كان الموضوع موجه لعدة شعب وتخصصات، قم بذكر جميع المواد المطابقة لها في القائمة. يجب أن يكون الاسم مطابقا تماما للقائمة.
 
 قائمة المواد المتاحة:
 ${subjectsList}`;
 
       const actualModel = (settingsData.ai_model && settingsData.ai_model !== 'gemini-2.5-flash') ? settingsData.ai_model : 'gemini-3-flash-preview';
+
+      setAnalyzingStep("جاري تصنيف الملفات حسب المادة والتخصص بالذكاء الاصطناعي...");
 
       const response = await ai.models.generateContent({
         model: actualModel,
@@ -87,9 +92,9 @@ ${subjectsList}`;
             type: Type.OBJECT,
             properties: {
               bac_year: { type: Type.STRING },
-              subject_name: { type: Type.STRING }
+              subject_names: { type: Type.ARRAY, items: { type: Type.STRING } }
             },
-            required: ["bac_year", "subject_name"]
+            required: ["bac_year", "subject_names"]
           }
         }
       });
@@ -98,29 +103,43 @@ ${subjectsList}`;
       const cleanedJson = textResponse.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
       const parsed = JSON.parse(cleanedJson);
       
-      if (!parsed.bac_year || !parsed.subject_name) {
-          throw new Error("لم يتمكن الذكاء الاصطناعي من استخراج السنة أو المادة.");
+      if (!parsed.bac_year || !parsed.subject_names || !Array.isArray(parsed.subject_names) || parsed.subject_names.length === 0) {
+          throw new Error("لم يتمكن الذكاء الاصطناعي من استخراج السنة أو المواد.");
       }
 
+      const matchedSubjects: any[] = [];
+      const notFoundSubjects: string[] = [];
       const norm = (str: string) => str.trim().replace(/\s+/g, ' ').replace(/[()[\]{}./\-_]/g, '');
-      let matchedSubject = dbSubjects.find(s => s.name.trim() === parsed.subject_name.trim());
       
-      if (!matchedSubject) {
-          matchedSubject = dbSubjects.find(s => norm(s.name) === norm(parsed.subject_name));
-      }
-      if (!matchedSubject) {
-          matchedSubject = dbSubjects.find(s => norm(s.name).includes(norm(parsed.subject_name)) || norm(parsed.subject_name).includes(norm(s.name)));
+      for (const subjName of parsed.subject_names) {
+          let matchedSubject = dbSubjects.find(s => s.name.trim() === subjName.trim());
+          if (!matchedSubject) {
+              matchedSubject = dbSubjects.find(s => norm(s.name) === norm(subjName));
+          }
+          if (!matchedSubject) {
+              matchedSubject = dbSubjects.find(s => norm(s.name).includes(norm(subjName)) || norm(subjName).includes(norm(s.name)));
+          }
+          if (matchedSubject) {
+              // Ensure uniqueness
+              if (!matchedSubjects.find(s => s.id === matchedSubject.id)) {
+                  matchedSubjects.push(matchedSubject);
+              }
+          } else {
+              notFoundSubjects.push(subjName);
+          }
       }
 
-      if (!matchedSubject) {
-          throw new Error(`تعرف الذكاء الاصطناعي على المادة "${parsed.subject_name}" ولكنها غير موجودة بدقة في القائمة. الرجاء التحقق من أسماء المواد.`);
+      if (matchedSubjects.length === 0) {
+          throw new Error(`تعرف الذكاء الاصطناعي على المواد التالية: [${notFoundSubjects.join('، ')}] ولكنها غير موجودة بدقة في القائمة. الرجاء التحقق من أسماء المواد.`);
       }
+
+      setAnalyzingStep("جاري رفع الملفات للسحابة وحفظها...");
 
       if (supabase) {
          let examUrl = '';
          let solutionUrl = null;
 
-         const examFileName = `exam_${Date.now()}_${examFile.name}`;
+         const examFileName = `exam_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${examFile.name.split('.').pop() || 'pdf'}`;
          const { data: examUploadData, error: examUploadError } = await supabase.storage
            .from('bac_files')
            .upload(examFileName, examFile);
@@ -136,7 +155,7 @@ ${subjectsList}`;
          examUrl = examPublicUrl;
 
          if (solutionFile) {
-           const solutionFileName = `solution_${Date.now()}_${solutionFile.name}`;
+           const solutionFileName = `solution_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${solutionFile.name.split('.').pop() || 'pdf'}`;
            const { error: solutionUploadError } = await supabase.storage
              .from('bac_files')
              .upload(solutionFileName, solutionFile);
@@ -152,13 +171,15 @@ ${subjectsList}`;
            solutionUrl = solutionPublicUrl;
          }
 
-         const { error } = await supabase.from('bac_exams').insert({
-             id: 'bac_' + Math.random().toString(36).substr(2, 9),
+         const inserts = matchedSubjects.map(s => ({
+             id: 'bac_' + Math.random().toString(36).substr(2, 9) + '_' + s.id.substring(0, 4),
              year: parsed.bac_year.toString(),
-             subject_id: matchedSubject.id,
+             subject_id: s.id,
              exam_file: examUrl,
              solution_file: solutionUrl
-         });
+         }));
+
+         const { error } = await supabase.from('bac_exams').insert(inserts);
          
          if (error) {
              if (error.code === '42P01') {
@@ -168,7 +189,7 @@ ${subjectsList}`;
          }
       }
 
-      triggerAlert(`تم حفظ موضوع بكالوريا ${parsed.bac_year} في مادة ${parsed.subject_name} بنجاح!`, "success");
+      triggerAlert(`تم حفظ موضوع بكالوريا ${parsed.bac_year} بنجاح لـ ${matchedSubjects.length} تخصصات!`, "success");
       setExamFile(null);
       setSolutionFile(null);
 
@@ -182,6 +203,7 @@ ${subjectsList}`;
       triggerAlert(errMsg, "error");
     } finally {
       setIsAnalyzing(false);
+      setAnalyzingStep('');
     }
   };
 
@@ -255,7 +277,7 @@ ${subjectsList}`;
           {isAnalyzing ? (
             <>
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              جاري الفحص والحفظ...
+              {analyzingStep || 'جاري الفحص والحفظ...'}
             </>
           ) : (
              <>

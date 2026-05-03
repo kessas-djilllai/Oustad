@@ -151,7 +151,7 @@ export function SubjectUnitsView({ subject, onBack, onUnitClick }: { subject: an
 }
 
 export function UnitDetailsView({ subject, unit, onBack, onSelectItem }: { subject: any, unit: any, onBack: () => void, onSelectItem: (type: 'lessons' | 'exercises', item: any) => void }) {
-  const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>('lessons');
+  const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>('exercises');
   const items = activeTab === 'lessons' ? (unit.lessons || []) : (unit.exercises || []);
 
   useEffect(() => {
@@ -173,18 +173,18 @@ export function UnitDetailsView({ subject, unit, onBack, onSelectItem }: { subje
 
         <div className="flex bg-slate-100 p-1 rounded-xl self-start sm:self-auto w-full sm:w-auto">
           <button
-            onClick={() => setActiveTab('lessons')}
-            className={`flex-1 sm:w-32 py-2 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'lessons' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <PlayCircle size={16} />
-            الدروس
-          </button>
-          <button
             onClick={() => setActiveTab('exercises')}
             className={`flex-1 sm:w-32 py-2 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'exercises' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <ClipboardList size={16} />
             التمارين
+          </button>
+          <button
+            onClick={() => setActiveTab('lessons')}
+            className={`flex-1 sm:w-32 py-2 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'lessons' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <PlayCircle size={16} />
+            الدروس
           </button>
         </div>
       </div>

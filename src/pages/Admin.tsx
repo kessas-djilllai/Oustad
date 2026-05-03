@@ -1955,7 +1955,8 @@ function AdminManageBac({ onBack }: { onBack: () => void }) {
            const parts = url.split('/');
            const fileName = parts[parts.length - 1];
            if (fileName) {
-             await supabase.storage.from('bac_files').remove([fileName]);
+             const { error: err } = await supabase.storage.from('bac_files').remove([fileName]);
+             if (err) console.warn("Storage deletion error:", err);
            }
          } catch(e) {}
        };
@@ -1963,8 +1964,12 @@ function AdminManageBac({ onBack }: { onBack: () => void }) {
        if (examUrl && examUrl.includes('bac_files/')) await deleteFile(examUrl);
        if (solutionUrl && solutionUrl.includes('bac_files/')) await deleteFile(solutionUrl);
 
-       const { error } = await supabase.from('bac_exams').delete().eq('id', id);
+       const { data, error } = await supabase.from('bac_exams').delete().eq('id', id).select();
        if (error) throw error;
+       
+       if (!data || data.length === 0) {
+           throw new Error("صلاحيات قاعدة البيانات (RLS) تمنع الحذف. يرجى تفعيل سياسة الحذف (DELETE policy) لجدول bac_exams.");
+       }
        
        setExams(exams.filter(e => e.id !== id));
        triggerAlert('تم الحذف بنجاح', 'success');
