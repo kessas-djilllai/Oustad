@@ -35,15 +35,22 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
   });
 
   const handleAnalyzeAndSave = async () => {
-    if (!examFile) {
-      triggerAlert("يرجى اختيار ملف الموضوع أولاً", "error");
+    if (!examFile && !solutionFile) {
+      triggerAlert("يرجى اختيار ملف الموضوع أو ملف التصحيح", "error");
       return;
     }
     
-    if (examFile.size > 5 * 1024 * 1024) {
-      triggerAlert("حجم الملف يجب أن لا يتجاوز 5MB", "error");
+    if (examFile && examFile.size > 5 * 1024 * 1024) {
+      triggerAlert("حجم ملف الموضوع يجب أن لا يتجاوز 5MB", "error");
       return;
     }
+    
+    if (solutionFile && solutionFile.size > 5 * 1024 * 1024) {
+      triggerAlert("حجم ملف التصحيح يجب أن لا يتجاوز 5MB", "error");
+      return;
+    }
+
+    const isOnlySolution = !examFile && !!solutionFile;
 
     try {
       setIsAnalyzing(true);
@@ -56,17 +63,19 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
       }
 
       setAnalyzingStep("جاري قراءة الملف وتجهيزه...");
-      const examBase64Data = await getBase64(examFile);
-      const solutionBase64Data = solutionFile ? await getBase64(solutionFile) : null;
+      
+      // Select the file to pass to Gemini
+      const fileToAnalyze = examFile || solutionFile;
+      const pdfBase64Data = await getBase64(fileToAnalyze!);
       
       const ai = new GoogleGenAI({ apiKey: settingsData.api_key });
 
       const subjectsList = dbSubjects.map(s => `- ${s.name}`).join('\n');
       
-      const prompt = `أنت خبير في تحليل مواضيع البكالوريا الجزائرية. تم إرفاق ملف PDF للأسئلة.
+      const prompt = `أنت خبير في تحليل مواضيع البكالوريا الجزائرية. تم إرفاق ملف PDF (إما لأسئلة الامتحان أو للتصحيح النموذجي).
 مهمتك هي استخراج المعلومات التالية فقط:
 - سنة البكالوريا (مثال: 2024، 2023...)
-- قائمة بأسماء المواد والتخصصات (الشعب) التي ينطبق عليها الموضوع. لكي تتطابق بدقة مع المواد الموجودة في القائمة أسفله. إذا كان الموضوع موجه لعدة شعب وتخصصات، قم بذكر جميع المواد المطابقة لها في القائمة. يجب أن يكون الاسم مطابقا تماما للقائمة.
+- قائمة بأسماء المواد والتخصصات (الشعب) التي ينطبق عليها الملف. لكي تتطابق بدقة مع المواد الموجودة في القائمة أسفله. إذا كان الملف موجه لعدة شعب وتخصصات، قم بذكر جميع المواد المطابقة لها في القائمة. يجب أن يكون الاسم مطابقا تماما للقائمة.
 
 قائمة المواد المتاحة:
 ${subjectsList}`;
@@ -82,7 +91,7 @@ ${subjectsList}`;
               role: 'user',
               parts: [
                 { text: prompt },
-                { inlineData: { data: examBase64Data, mimeType: 'application/pdf' } }
+                { inlineData: { data: pdfBase64Data, mimeType: 'application/pdf' } }
               ],
             }
         ],
@@ -134,24 +143,41 @@ ${subjectsList}`;
       }
 
       let finalMatchedSubjects = [...matchedSubjects];
+      let existingExamsToUpdate: any[] = [];
 
       if (supabase) {
-          setAnalyzingStep("جاري التحقق من التكرار...");
+          setAnalyzingStep(isOnlySolution ? "جاري البحث عن الموضوع لتحديثه..." : "جاري التحقق من التكرار...");
           const { data: existingExams, error: existingError } = await supabase
             .from('bac_exams')
-            .select('subject_id')
+            .select('id, subject_id')
             .eq('year', parsed.bac_year.toString())
             .in('subject_id', finalMatchedSubjects.map(s => s.id));
             
-          if (!existingError && existingExams && existingExams.length > 0) {
-              const existingSubjectIds = existingExams.map(e => e.subject_id);
-              finalMatchedSubjects = finalMatchedSubjects.filter(s => !existingSubjectIds.includes(s.id));
+          if (isOnlySolution) {
+              if (existingError || !existingExams || existingExams.length === 0) {
+                  throw new Error(`لا يوجد موضوع بكالوريا مسجل مسجل لهذه التخصصات لعام ${parsed.bac_year}. يرجى رفع الموضوع أولاً.`);
+              }
+              existingExamsToUpdate = existingExams;
               
-              if (finalMatchedSubjects.length === 0) {
-                  throw new Error(`موضوع بكالوريا ${parsed.bac_year} مضاف مسبقاً لهذه المواد/التخصصات: ${matchedSubjects.map(s => s.name).join('، ')}.`);
-              } else {
-                  const duplicatedNames = matchedSubjects.filter(s => existingSubjectIds.includes(s.id)).map(s => s.name);
-                  triggerAlert(`هذا الموضوع موجود مسبقاً في: ${duplicatedNames.join('، ')}. سيتم إضافته للتخصصات المتبقية فقط.`, "warning");
+              const existingSubjectIds = existingExams.map(e => e.subject_id);
+              const missingSubjects = finalMatchedSubjects.filter(s => !existingSubjectIds.includes(s.id));
+              
+              if (missingSubjects.length > 0) {
+                  triggerAlert(`بعض التخصصات لا يتوفر لها الموضوع بعد (${missingSubjects.map(s => s.name).join('، ')}). سيتم إرفاق التصحيح للتخصصات المتاحة فقط.`, "warning");
+              }
+              finalMatchedSubjects = finalMatchedSubjects.filter(s => existingSubjectIds.includes(s.id));
+              
+          } else {
+              if (!existingError && existingExams && existingExams.length > 0) {
+                  const existingSubjectIds = existingExams.map(e => e.subject_id);
+                  finalMatchedSubjects = finalMatchedSubjects.filter(s => !existingSubjectIds.includes(s.id));
+                  
+                  if (finalMatchedSubjects.length === 0) {
+                      throw new Error(`موضوع بكالوريا ${parsed.bac_year} مضاف مسبقاً لهذه المواد/التخصصات: ${matchedSubjects.map(s => s.name).join('، ')}.`);
+                  } else {
+                      const duplicatedNames = matchedSubjects.filter(s => existingSubjectIds.includes(s.id)).map(s => s.name);
+                      triggerAlert(`هذا الموضوع موجود مسبقاً في: ${duplicatedNames.join('، ')}. سيتم إضافته للتخصصات المتبقية فقط.`, "warning");
+                  }
               }
           }
       }
@@ -162,20 +188,22 @@ ${subjectsList}`;
          let examUrl = '';
          let solutionUrl = null;
 
-         const examFileName = `exam_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${examFile.name.split('.').pop() || 'pdf'}`;
-         const { data: examUploadData, error: examUploadError } = await supabase.storage
-           .from('bac_files')
-           .upload(examFileName, examFile);
-           
-         if (examUploadError) {
-             throw new Error("فشل رفع الموضوع: " + examUploadError.message + " (هل أنشأت دلو Storage المسمى bac_files؟)");
+         if (examFile) {
+             const examFileName = `exam_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${examFile.name.split('.').pop() || 'pdf'}`;
+             const { data: examUploadData, error: examUploadError } = await supabase.storage
+               .from('bac_files')
+               .upload(examFileName, examFile);
+               
+             if (examUploadError) {
+                 throw new Error("فشل رفع الموضوع: " + examUploadError.message + " (هل أنشأت دلو Storage المسمى bac_files؟)");
+             }
+             
+             const { data: { publicUrl: examPublicUrl } } = supabase.storage
+               .from('bac_files')
+               .getPublicUrl(examFileName);
+               
+             examUrl = examPublicUrl;
          }
-         
-         const { data: { publicUrl: examPublicUrl } } = supabase.storage
-           .from('bac_files')
-           .getPublicUrl(examFileName);
-           
-         examUrl = examPublicUrl;
 
          if (solutionFile) {
            const solutionFileName = `solution_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${solutionFile.name.split('.').pop() || 'pdf'}`;
@@ -194,28 +222,36 @@ ${subjectsList}`;
            solutionUrl = solutionPublicUrl;
          }
 
-         const inserts = finalMatchedSubjects.map((s: any) => ({
-             id: 'bac_' + Math.random().toString(36).substr(2, 9) + '_' + s.id.substring(0, 4),
-             year: parsed.bac_year.toString(),
-             subject_id: s.id,
-             exam_file: examUrl,
-             solution_file: solutionUrl
-         }));
+         if (isOnlySolution) {
+             if (solutionUrl && existingExamsToUpdate.length > 0) {
+                 const idsToUpdate = existingExamsToUpdate.map(e => e.id);
+                 const { error } = await supabase.from('bac_exams').update({ solution_file: solutionUrl }).in('id', idsToUpdate);
+                 if (error) throw error;
+             }
+         } else {
+             const inserts = finalMatchedSubjects.map((s: any) => ({
+                 id: 'bac_' + Math.random().toString(36).substr(2, 9) + '_' + s.id.substring(0, 4),
+                 year: parsed.bac_year.toString(),
+                 subject_id: s.id,
+                 exam_file: examUrl,
+                 solution_file: solutionUrl
+             }));
 
-         if (inserts.length > 0) {
-             const { error } = await supabase.from('bac_exams').insert(inserts);
-         
-             if (error) {
-                 if (error.code === '42P01') {
-                     throw new Error("الجدول bac_exams غير موجود في قاعدة البيانات! رجاء قم بإنشائه بواسطة كود SQL من واجهة الإعدادات.");
+             if (inserts.length > 0) {
+                 const { error } = await supabase.from('bac_exams').insert(inserts);
+             
+                 if (error) {
+                     if (error.code === '42P01') {
+                         throw new Error("الجدول bac_exams غير موجود في قاعدة البيانات! رجاء قم بإنشائه بواسطة كود SQL من واجهة الإعدادات.");
+                     }
+                     throw error;
                  }
-                 throw error;
              }
          }
       }
 
       if (finalMatchedSubjects.length > 0) {
-          triggerAlert(`تم حفظ موضوع بكالوريا ${parsed.bac_year} بنجاح للمواد/التخصصات: ${finalMatchedSubjects.map((s: any) => s.name).join('، ')}`, "success");
+          triggerAlert(`تم ${isOnlySolution ? 'إرفاق التصحيح لموضوع' : 'حفظ موضوع'} بكالوريا ${parsed.bac_year} بنجاح للمواد/التخصصات: ${finalMatchedSubjects.map((s: any) => s.name).join('، ')}`, "success");
       }
       setExamFile(null);
       setSolutionFile(null);
@@ -272,7 +308,7 @@ ${subjectsList}`;
                </div>
                <div className="pointer-events-none">
                  <p className="font-bold text-slate-700">{examFile ? examFile.name : "رفع موضوع الامتحان (PDF)"}</p>
-                 <p className="text-xs text-slate-500 mt-1">إجباري - الحد الأقصى 5MB</p>
+                 <p className="text-xs text-slate-500 mt-1">الحد الأقصى 5MB</p>
                </div>
             </div>
           </div>
@@ -290,7 +326,7 @@ ${subjectsList}`;
                </div>
                <div>
                  <p className="font-bold text-slate-700">{solutionFile ? solutionFile.name : "رفع التصحيح النموذجي (PDF)"}</p>
-                 <p className="text-xs text-slate-500 mt-1">اختياري - الحد الأقصى 5MB</p>
+                 <p className="text-xs text-slate-500 mt-1">الحد الأقصى 5MB</p>
                </div>
             </div>
           </div>
@@ -298,7 +334,7 @@ ${subjectsList}`;
 
         <button 
           onClick={handleAnalyzeAndSave} 
-          disabled={!examFile || isAnalyzing}
+          disabled={(!examFile && !solutionFile) || isAnalyzing}
           className="w-full max-w-xl mx-auto flex bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white font-bold rounded-xl py-4 shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed items-center justify-center gap-2 relative z-10"
         >
           {isAnalyzing ? (
@@ -309,7 +345,7 @@ ${subjectsList}`;
           ) : (
              <>
                <Save size={20} />
-               حفظ الموضوع
+               {!examFile && solutionFile ? 'حفظ التصحيح النموذجي' : 'حفظ الموضوع'}
              </>
           )}
         </button>
