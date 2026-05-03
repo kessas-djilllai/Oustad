@@ -150,41 +150,99 @@ export function SubjectUnitsView({ subject, onBack, onUnitClick }: { subject: an
   )
 }
 
-export function UnitDetailsView({ subject, unit, onBack, onSelectType }: { subject: any, unit: any, onBack: () => void, onSelectType: (t: 'lessons' | 'exercises') => void }) {
+export function UnitDetailsView({ subject, unit, onBack, onSelectItem }: { subject: any, unit: any, onBack: () => void, onSelectItem: (type: 'lessons' | 'exercises', item: any) => void }) {
+  const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>('lessons');
+  const items = activeTab === 'lessons' ? (unit.lessons || []) : (unit.exercises || []);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex items-center gap-3 md:gap-4 mb-2 md:mb-4">
-        <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold hover:scale-[1.05] active:scale-95">
-          <ChevronRight size={18} className="md:w-5 md:h-5" />
-        </button>
-        <div>
-          <h2 className="font-bold text-base md:text-xl text-slate-800">{unit.name}</h2>
-          <p className="text-[10px] md:text-xs text-slate-500 font-medium">{subject.name}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 md:mb-4 gap-4">
+        <div className="flex items-center gap-3 md:gap-4">
+          <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold hover:scale-[1.05] active:scale-95">
+            <ChevronRight size={18} className="md:w-5 md:h-5" />
+          </button>
+          <div>
+            <h2 className="font-bold text-base md:text-xl text-slate-800">{unit.name}</h2>
+            <p className="text-[10px] md:text-xs text-slate-500 font-medium">{subject.name}</p>
+          </div>
+        </div>
+
+        <div className="flex bg-slate-100 p-1 rounded-xl self-start sm:self-auto w-full sm:w-auto">
+          <button
+            onClick={() => setActiveTab('lessons')}
+            className={`flex-1 sm:w-32 py-2 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'lessons' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <PlayCircle size={16} />
+            الدروس
+          </button>
+          <button
+            onClick={() => setActiveTab('exercises')}
+            className={`flex-1 sm:w-32 py-2 text-xs md:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'exercises' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <ClipboardList size={16} />
+            التمارين
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-6">
-        <div 
-           onClick={() => onSelectType('lessons')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-blue-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-blue-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
-        >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-sm">
-             <PlayCircle size={28} className="md:w-10 md:h-10" />
-           </div>
-           <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-blue-700 transition-colors">الدروس</h3>
-           <p className="text-[10px] md:text-sm text-slate-500 leading-tight">مشاهدة الدروس والملخصات</p>
-        </div>
-
-        <div 
-           onClick={() => onSelectType('exercises')}
-           className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-emerald-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-emerald-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"
-        >
-           <div className="w-14 h-14 md:w-20 md:h-20 rounded-full bg-emerald-100 text-emerald-500 flex items-center justify-center mb-3 md:mb-6 group-hover:scale-110 group-hover:-rotate-3 transition-transform shadow-sm">
-             <ClipboardList size={28} className="md:w-10 md:h-10" />
-           </div>
-           <h3 className="font-bold text-lg md:text-2xl text-slate-800 mb-1 md:mb-2 group-hover:text-emerald-700 transition-colors">التمارين</h3>
-           <p className="text-[10px] md:text-sm text-slate-500 leading-tight">حل تمارين تطبيقية مع التصحيح</p>
-        </div>
+      <div className="glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 shadow-sm">
+        {items.length === 0 ? (
+          <div className="text-center py-10 text-slate-500 font-bold text-sm md:text-base">لا يوجد محتوى حالياً</div>
+        ) : (
+          <div className="space-y-2 md:space-y-3">
+            {activeTab === 'lessons' ? (
+              items.map((item: any, idx: number) => (
+                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 md:p-5 bg-white/70 hover:bg-white rounded-2xl md:rounded-3xl border border-slate-100 transition-all group">
+                  <div className="flex items-center gap-3 md:gap-4 mb-3 sm:mb-0">
+                    <div className={"w-8 h-8 md:w-10 md:h-10 shrink-0 rounded-full flex items-center justify-center font-bold text-xs md:text-sm shadow-sm bg-blue-50 text-blue-600 border border-blue-100"}>
+                      {idx + 1}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-xs md:text-base">{item.title}</h4>
+                      <p className="text-[10px] md:text-xs font-bold text-slate-400 mt-1 md:mt-1.5 flex items-center gap-1 md:gap-1.5">
+                        <ClipboardList size={10} className="text-emerald-500 md:w-3 md:h-3"/>
+                        {`يقابله: ${(unit.exercises && unit.exercises[idx]?.title) || 'لا يوجد تمرين'}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => onSelectItem('lessons', item)}
+                    className="px-4 py-2 md:px-6 md:py-2.5 rounded-xl text-[10px] md:text-sm font-bold text-white transition-all shadow-sm w-full sm:w-auto flex justify-center items-center gap-1.5 md:gap-2 bg-blue-600 hover:bg-blue-700 hover:shadow-md"
+                  >
+                    شاهد الدرس
+                    <ChevronLeft size={14} className="opacity-70 md:w-4 md:h-4" />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                {items.map((item: any, idx: number) => (
+                  <div 
+                    key={item.id} 
+                    onClick={() => onSelectItem('exercises', item)}
+                    className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 cursor-pointer group hover:bg-white transition-all border border-slate-200/50 hover:border-slate-300 relative overflow-hidden flex flex-col min-h-[140px]"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
+                        <ClipboardList size={20} className="md:w-6 md:h-6"/>
+                      </div>
+                      <span className="text-[10px] md:text-xs font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-md">تمرين {idx + 1}</span>
+                    </div>
+                    <h3 className="font-bold text-sm md:text-lg text-slate-800 group-hover:text-emerald-600 transition-colors line-clamp-2 leading-tight flex-1">{item.title}</h3>
+                    <div className="mt-4 flex items-center justify-between text-[10px] md:text-xs font-bold text-slate-500 relative z-10 w-full">
+                       <span>اضغط للبدء</span>
+                       <ChevronLeft size={14} className="text-emerald-500 group-hover:-translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

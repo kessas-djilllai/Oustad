@@ -572,16 +572,16 @@ function StudentPortal({ session }: { session: any }) {
         {view.type === 'dashboard' && mainTab === 'settings' && <SettingsView />}
         
         {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'unit_details', subject: currentSubject, unit: u })} />}
-        {view.type === 'unit_details' && <UnitDetailsView subject={currentSubject} unit={currentUnit} onBack={() => setView({ type: 'subject_units', subject: currentSubject })} onSelectType={(t) => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: t })} />}
-        {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} onSelectItem={(item) => {
-          if (view.listType === 'exercises') {
+        {view.type === 'unit_details' && <UnitDetailsView subject={currentSubject} unit={currentUnit} onBack={() => setView({ type: 'subject_units', subject: currentSubject })} onSelectItem={(type, item) => {
+          if (type === 'exercises') {
             setView({ type: 'solve_exercise', subject: currentSubject, unit: currentUnit, exercise: item });
           } else {
             setView({ type: 'view_lesson', subject: currentSubject, unit: currentUnit, lesson: item });
           }
         }} />}
-        {view.type === 'view_lesson' && <LessonDetailsView subject={currentSubject} unit={currentUnit} lesson={view.lesson} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'lessons' })} />}
-        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: 'exercises' })} />}
+        {/* We can remove or ignore ContentListView since UnitDetailsView handles it now, I'll just change list to unreachable or leave it */}
+        {view.type === 'view_lesson' && <LessonDetailsView subject={currentSubject} unit={currentUnit} lesson={view.lesson} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} />}
+        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} />}
         {view.type === 'quiz' && <QuizView subjects={subjects} onBack={() => setView({ type: 'dashboard' })} />}
       </div>
 
