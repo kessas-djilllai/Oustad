@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronRight, Target, CheckCircle, ChevronLeft, RefreshCw, Star, Trophy, BookOpen } from 'lucide-react';
+import { ChevronRight, Target, CheckCircle, ChevronLeft, RefreshCw, Star, Trophy, BookOpen, Flag } from 'lucide-react';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -25,6 +25,10 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
   const [completedAll, setCompletedAll] = useState(false);
   const [totalLevelsCount, setTotalLevelsCount] = useState(0);
   const [subjectCookiesStore, setSubjectCookiesStore] = useState<any>(null);
+
+  const totalQuizProgress = subjects.length > 0 
+    ? Math.round(subjects.reduce((acc, sub) => acc + (sub.quiz_progress || 0), 0) / subjects.length)
+    : 0;
 
   // Queue logic states
   const [questionsQueue, setQuestionsQueue] = useState<number[]>([]);
@@ -149,6 +153,13 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
       
       if (selectedSubject && nextIdx < questions.length) {
          saveProgress('cookie_qidx', `${selectedSubject.id}_${currentLevelIdx}`, nextIdx);
+         
+         let currentUnlocked = getProgressSync('cookie_level', selectedSubject.id) || 0;
+         if (currentLevelIdx === currentUnlocked) {
+             let levelFraction = nextIdx / questions.length;
+             let newProgress = Math.min(Math.round(((currentUnlocked + levelFraction) / totalLevelsCount) * 100), 100);
+             saveProgress('quiz_progress', selectedSubject.id, newProgress);
+         }
       }
     } else {
       setStep(3); // Result
@@ -158,13 +169,10 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
   const handleLevelFinishContinue = () => {
     if (selectedSubject) {
        let currentUnlocked = getProgressSync('cookie_level', selectedSubject.id) || 0;
-       saveProgress('cookie_level', selectedSubject.id, Math.max(currentUnlocked, currentLevelIdx + 1));
-       saveProgress('cookie_qidx', `${selectedSubject.id}_${currentLevelIdx}`, 0);
+       currentUnlocked = Math.max(currentUnlocked, currentLevelIdx + 1);
+       saveProgress('cookie_level', selectedSubject.id, currentUnlocked);
        
-       let currentProgress = getProgressSync('quiz_progress', selectedSubject.id);
-       let additionalProgress = Math.round(((currentLevelIdx + 1) / totalLevelsCount) * 100);
-       let newProgress = Math.min(Math.max(currentProgress || 0, additionalProgress), 100);
-       
+       let newProgress = Math.min(Math.round((currentUnlocked / totalLevelsCount) * 100), 100);
        saveProgress('quiz_progress', selectedSubject.id, newProgress);
     }
     if (xpEarned > 0) {
@@ -189,44 +197,75 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
         </div>
       </div>
 
-      <div className={`glass rounded-[2rem] p-6 shadow-sm bg-white/60 ${step === 0 ? 'md:p-8 bg-transparent border-none' : 'md:p-10'}`}>
+      <div className={`${step === 0 ? '' : 'glass rounded-[2rem] p-6 shadow-sm bg-white/60 md:p-10'}`}>
         {step === 0 && (
           <div className="w-full">
             <div className="text-center mb-10">
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6 shadow-sm">
-                 <Target size={32} className="md:w-10 md:h-10" />
+              <div className="relative w-28 h-28 md:w-36 md:h-36 mx-auto mb-6 flex items-center justify-center">
+                {/* Background Track */}
+                <svg className="absolute w-full h-full transform -rotate-90">
+                  <circle
+                    cx="50%"
+                    cy="50%"
+                    r="45%"
+                    fill="transparent"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    className="text-slate-100"
+                  />
+                  {/* Progress Fill */}
+                  <motion.circle
+                    cx="50%"
+                    cy="50%"
+                    r="45%"
+                    fill="transparent"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    strokeDasharray="100 100"
+                    initial={{ strokeDashoffset: 100 }}
+                    animate={{ strokeDashoffset: 100 - totalQuizProgress }}
+                    transition={{ duration: 1.5, ease: "easeOut" }}
+                    pathLength="100"
+                    strokeLinecap="round"
+                    className="text-blue-500"
+                  />
+                </svg>
+                
+                <div className="w-20 h-20 md:w-28 md:h-28 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center shadow-inner relative z-10">
+                   <div className="text-base md:text-2xl font-black">{totalQuizProgress}%</div>
+                </div>
               </div>
-              <h3 className="text-2xl md:text-3xl font-extrabold text-slate-800 mb-3">مراحل الكوكيز</h3>
+              <h3 className="text-2xl md:text-3xl font-extrabold text-slate-800 mb-3">تقدم الكويز</h3>
               <p className="text-sm md:text-base text-slate-500 font-medium max-w-md mx-auto">اختر المادة من القائمة لبدء تحدياتك وتخطي المراحل المتاحة.</p>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-5 active-tab-transition">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
               {subjects.map(sub => {
                 const Icon = sub.icon || BookOpen;
                 return (
                 <div 
                   key={`${sub.id}`}
                   onClick={() => loadSubjectQuiz(sub)}
-                  className="bg-white rounded-3xl md:rounded-[2rem] p-5 lg:p-6 flex flex-col justify-between cursor-pointer group hover:shadow-lg hover:shadow-blue-500/10 border border-slate-100 relative overflow-hidden transition-all duration-300 hover:-translate-y-1 active:scale-[0.98]"
+                  className="glass rounded-3xl md:rounded-[2rem] p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover relative overflow-hidden transition-transform hover:scale-[1.02] active:scale-[0.98]"
                 >
                   <div className={`absolute -left-10 -top-10 w-24 h-24 rounded-full blur-2xl opacity-10 group-hover:opacity-20 transition-all pointer-events-none ${sub.barColor}`} />
-                  <div className="flex justify-between items-start mb-5 md:mb-8 relative">
-                     <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${sub.bg || 'bg-blue-50'} ${sub.color || 'text-blue-500'} flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110`}>
+                  <div className="flex justify-between items-start mb-4 md:mb-6 relative">
+                     <div className={`w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl ${sub.bg || 'bg-blue-50'} ${sub.color || 'text-blue-500'} flex items-center justify-center shadow-sm`}>
                        {loading && selectedSubject?.id === sub.id ? (
-                           <div className="w-6 h-6 rounded-full border-2 border-current border-t-transparent animate-spin"></div>
+                           <div className="w-5 h-5 md:w-6 md:h-6 rounded-full border-2 border-current border-t-transparent animate-spin"></div>
                        ) : (
-                           <Icon size={24} className="md:w-7 md:h-7" />
+                           <Icon size={20} className="md:w-7 md:h-7" />
                        )}
                      </div>
                   </div>
                   <div>
-                     <h4 className="font-bold text-base md:text-lg text-slate-800 mb-3 md:mb-4 truncate group-hover:text-blue-600 transition-colors">{sub.name}</h4>
-                     <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
+                     <h4 className="font-bold text-sm md:text-lg text-slate-800 mb-2 md:mb-4 truncate">{sub.name}</h4>
+                     <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500 mb-1.5 md:mb-2">
                         <span>التقدم</span>
-                        <span className={sub.progress === 100 ? 'text-emerald-500 font-extrabold' : ''}>{sub.progress}%</span>
+                        <span className={sub.quiz_progress === 100 ? 'text-emerald-500 font-extrabold' : ''}>{sub.quiz_progress || 0}%</span>
                      </div>
-                     <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                       <div className={`h-full rounded-full transition-all duration-1000 ${sub.progress === 100 ? 'bg-emerald-500' : sub.barColor || 'bg-blue-500'}`} style={{ width: `${sub.progress}%` }} />
+                     <div className="w-full bg-slate-100 rounded-full h-1.5 md:h-2 overflow-hidden">
+                       <div className={`h-full rounded-full transition-all duration-1000 ${sub.quiz_progress === 100 ? 'bg-emerald-500' : sub.barColor || 'bg-blue-500'}`} style={{ width: `${sub.quiz_progress || 0}%` }} />
                      </div>
                   </div>
                 </div>
@@ -245,7 +284,14 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="mt-8 bg-emerald-50 text-emerald-700 p-6 rounded-3xl border border-emerald-200 text-sm font-bold flex flex-col items-center gap-3 text-center w-full shadow-sm">
                 <CheckCircle size={40} className="mb-2 text-emerald-500" />
                 <p className="text-xl">لقد أنهيت جميع مراحل هذه المادة بنجاح!</p>
-                <button onClick={() => { saveProgress('cookie_level', selectedSubject.id, 0); loadSubjectQuiz(selectedSubject); }} className="mt-4 px-6 py-3 bg-emerald-600 text-white rounded-xl text-base font-bold shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 active:scale-95 transition-all">إعادة من البداية</button>
+                <button onClick={() => { 
+                  saveProgress('cookie_level', selectedSubject.id, 0); 
+                  saveProgress('quiz_progress', selectedSubject.id, 0); 
+                  for(let i=0; i<totalLevelsCount; i++) {
+                     saveProgress('cookie_qidx', `${selectedSubject.id}_${i}`, 0);
+                  }
+                  loadSubjectQuiz(selectedSubject); 
+                }} className="mt-4 px-6 py-3 bg-emerald-600 text-white rounded-xl text-base font-bold shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 active:scale-95 transition-all">إعادة من البداية</button>
               </motion.div>
             )}
             
@@ -256,29 +302,32 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
           <div className="max-w-xl mx-auto">
             {/* Progress Bar over levels */}
             <div className="relative mb-10 overflow-hidden px-2 md:px-4" dir="rtl">
-              <div className="absolute top-1/2 right-[1.5rem] md:right-[2rem] left-[1.5rem] md:left-[2rem] h-1.5 md:h-2 bg-slate-200 rounded-full -translate-y-1/2 z-0">
+              <div className="absolute top-1/2 right-[1.5rem] md:right-[2.5rem] left-[1.5rem] md:left-[2.5rem] h-1.5 md:h-2 bg-slate-200 rounded-full -translate-y-1/2 z-0">
                   <div 
                       className="absolute top-0 right-0 h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
                       style={{ 
                           width: `${
-                              totalLevelsCount <= 1 ? 100 :
-                              ((currentLevelIdx + (answeredCorrectIds.size / questions.length)) / (totalLevelsCount - 1)) * 100
+                              ((currentLevelIdx + (answeredCorrectIds.size / questions.length)) / totalLevelsCount) * 100
                           }%`,
                           maxWidth: '100%'
                       }}
                   />
               </div>
               <div className="flex justify-between relative z-10 w-full" style={{ padding: '0 0.5rem' }}>
+                 {/* The Start Node */}
+                 <div className={`flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all duration-500 bg-emerald-500 border-4 border-emerald-500 text-white shadow-md shadow-emerald-500/30`}>
+                    <Flag size={16} className="md:w-5 md:h-5 text-white" />
+                 </div>
+
                  {Array.from({ length: totalLevelsCount }).map((_, i) => {
                      const isPast = i < currentLevelIdx;
                      const isCurrent = i === currentLevelIdx;
                      
                      let bgClass = "bg-white border-4 border-slate-200 text-slate-400";
                      if (isPast) bgClass = "bg-emerald-500 border-4 border-emerald-500 text-white shadow-md shadow-emerald-500/30";
-                     else if (isCurrent) bgClass = "bg-white border-4 border-emerald-500 text-emerald-600 shadow-lg shadow-emerald-500/20 glow";
                      
                      return (
-                         <div key={i} className={`flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all duration-500 ${bgClass} ${isCurrent ? 'scale-[1.15]' : ''}`}>
+                         <div key={i} className={`flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all duration-500 ${bgClass}`}>
                              {isPast ? <CheckCircle size={16} className="md:w-5 md:h-5 text-white" /> : (i + 1)}
                          </div>
                      )

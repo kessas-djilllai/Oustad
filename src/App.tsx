@@ -333,8 +333,21 @@ function StudentPortal({ session }: { session: any }) {
       if (!supabase) {
         // compute progress for SUBJECTS_DATA
         const computedSubjects = SUBJECTS_DATA.map((sub: any) => {
-          const p = getProgressSync('quiz_progress', sub.id) || 0;
-          return { ...sub, progress: p };
+          let totalItems = 0;
+          let completedItems = 0;
+          sub.units?.forEach((u: any) => {
+            u.lessons?.forEach((l: any) => {
+              totalItems++;
+              if (getProgressSync('completed_lesson', l.id) === 1) completedItems++;
+            });
+            u.exercises?.forEach((e: any) => {
+              totalItems++;
+              if (getProgressSync('completed_exercise', e.id) === 1) completedItems++;
+            });
+          });
+          const p = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+          const qp = getProgressSync('quiz_progress', sub.id) || 0;
+          return { ...sub, progress: p, quiz_progress: qp };
         });
         if (JSON.stringify(computedSubjects) !== JSON.stringify(subjects)) {
             setSubjects(computedSubjects);
@@ -363,6 +376,13 @@ function StudentPortal({ session }: { session: any }) {
         const lessonsData = lessRes.data || [];
         const exercisesData = exRes.data || [];
 
+        let globalSubjectCookies: any = {};
+        if (adminRes.data && adminRes.data.subject_cookies) {
+            try {
+                globalSubjectCookies = JSON.parse(adminRes.data.subject_cookies);
+            } catch(e) {}
+        }
+        
         if (adminRes.data && adminRes.data.bac_date) {
             setBacDate(adminRes.data.bac_date);
         }
@@ -405,13 +425,44 @@ function StudentPortal({ session }: { session: any }) {
                 exercises: exercisesData.filter((e: any) => e.unit_id === u.id).sort((a: any, b: any) => a.exercise_order - b.exercise_order),
             }));
 
-            const p = getProgressSync('quiz_progress', sub.id) || 0;
+            let totalItems = 0;
+            let completedItems = 0;
+            formattedUnits.forEach((u: any) => {
+              u.lessons?.forEach((l: any) => {
+                totalItems++;
+                if (getProgressSync('completed_lesson', l.id) === 1) completedItems++;
+              });
+              u.exercises?.forEach((e: any) => {
+                totalItems++;
+                if (getProgressSync('completed_exercise', e.id) === 1) completedItems++;
+              });
+            });
+
+            const p = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+            
+            let qp = 0;
+            const subjectCookie = globalSubjectCookies[sub.id];
+            if (subjectCookie && subjectCookie.levels && subjectCookie.levels.length > 0) {
+               const totalLevelsCount = subjectCookie.levels.length;
+               const currentUnlocked = getProgressSync('cookie_level', sub.id) || 0;
+               if (currentUnlocked >= totalLevelsCount) {
+                   qp = 100;
+               } else {
+                   const activeLevelData = subjectCookie.levels[currentUnlocked];
+                   const totalQuestionsInActive = activeLevelData?.questions?.length || 1;
+                   const savedQidx = getProgressSync('cookie_qidx', `${sub.id}_${currentUnlocked}`) || 0;
+                   const levelFraction = Math.min(savedQidx / totalQuestionsInActive, 1);
+                   qp = Math.min(Math.round(((currentUnlocked + levelFraction) / totalLevelsCount) * 100), 100);
+               }
+            }
+            
             
             return {
               ...sub,
               name: displayName,
               barColor: sub.bar_color || 'bg-blue-500',
               progress: p,
+              quiz_progress: qp,
               icon: Calculator, // In a real app, map icon_name to actual Lucide component
               units: formattedUnits
             };
@@ -997,13 +1048,17 @@ function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subject
               </div>
               <div>
                  <h4 className="font-bold text-sm md:text-lg text-slate-800 mb-2 md:mb-4 truncate">{sub.name}</h4>
-                 <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500 mb-1.5 md:mb-2">
-                    <span>التقدم</span>
-                    <span>{sub.progress}%</span>
-                 </div>
-                 <div className="w-full bg-slate-100 rounded-full h-1.5 md:h-2 overflow-hidden">
-                   <div className={`h-full rounded-full ${sub.barColor}`} style={{ width: `${sub.progress}%` }} />
-                 </div>
+                 {listType !== 'topics' && (
+                   <>
+                     <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500 mb-1.5 md:mb-2">
+                        <span>التقدم</span>
+                        <span>{sub.progress}%</span>
+                     </div>
+                     <div className="w-full bg-slate-100 rounded-full h-1.5 md:h-2 overflow-hidden">
+                       <div className={`h-full rounded-full ${sub.barColor}`} style={{ width: `${sub.progress}%` }} />
+                     </div>
+                   </>
+                 )}
               </div>
             </div>
           ))}

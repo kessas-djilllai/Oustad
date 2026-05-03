@@ -133,9 +133,9 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
 
   const [unitsMap, setUnitsMap] = useState<Record<string, {name: string, subject_id: string}>>({});
 
-  const fetchItems = async () => {
+  const fetchItems = async (silent = false) => {
     if (!supabase) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       if (type !== 'subjects') {
         const { data: subData } = await supabase.from('subjects').select('id, name');
@@ -183,11 +183,13 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
     try {
       const { data, error } = await supabase.from(type).delete().eq('id', id).select();
       if (error) throw error;
-      if (data && data.length === 0) {
-        throw new Error('لم يتم الحذف. غالباً بسبب سياسات الأمان (RLS) في قاعدة البيانات. يمكن حل هذا بتشغيل أمر SQL للسماح بالحذف.');
-      }
+      
+      // Optimistic update to keep scroll position stable
+      setItems(prev => prev.filter(item => item.id !== id));
+      
       triggerAlert("تم الحذف بنجاح", "success");
-      fetchItems();
+      // Refresh in background if needed
+      fetchItems(true);
     } catch (e: any) {
       // Return a detailed string to be displayed
       let detailedError = "خطأ في الحذف: " + e.message;
@@ -250,9 +252,14 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
               }, {});
 
               return Object.entries(groupedItems).map(([groupName, groupItems]: any) => (
-                <div key={groupName} className="mb-4 md:mb-6 last:mb-0 bg-white p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm">
+                <motion.div 
+                  key={groupName} 
+                  layout 
+                  className="mb-4 md:mb-6 last:mb-0 bg-white p-2 md:p-4 rounded-xl md:rounded-2xl border border-slate-200 shadow-sm"
+                >
                   <h5 className="font-bold text-slate-700 mb-3 text-xs md:text-sm px-2 md:px-3 flex items-center border-r-2 md:border-r-4 border-indigo-500">{groupName}</h5>
-                  <div className="space-y-2">
+                  <div className="space-y-2 relative min-h-[40px]">
+                    <AnimatePresence initial={false}>
                     {groupItems.map((item: any) => {
                        let displayTitle = item.title || item.name;
                        let subtitle = "";
@@ -266,7 +273,14 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
                        }
                        
                        return (
-                      <div key={item.id} className="flex justify-between items-start md:items-center p-2.5 md:p-4 bg-slate-50 rounded-lg md:rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm gap-2">
+                      <motion.div 
+                        key={item.id} 
+                        layout
+                        initial={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0, marginBottom: 0, overflow: 'hidden' }}
+                        transition={{ duration: 0.2 }}
+                        className="flex justify-between items-start md:items-center p-2.5 md:p-4 bg-slate-50 rounded-lg md:rounded-xl border border-slate-100 transition-colors hover:bg-white hover:border-slate-200 hover:shadow-sm gap-2"
+                      >
                         <div className="flex-1 min-w-0">
                           <h4 className="font-bold text-slate-800 text-sm md:text-base break-words">{displayTitle}</h4>
                           {subtitle && <p className="text-xs text-indigo-600 mt-1">{subtitle}</p>}
@@ -284,10 +298,11 @@ function AdminEntityList({ type, title }: { type: 'subjects' | 'units' | 'lesson
                             <Trash size={16} />
                           )}
                         </button>
-                      </div>
+                      </motion.div>
                     )})}
+                    </AnimatePresence>
                   </div>
-                </div>
+                </motion.div>
               ));
             })()
           )}
@@ -948,7 +963,7 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase || !selectedSubjectId) return;
+    if (!supabase) return;
 
     if (isBulkMode) {
       if (!jsonInput) {
@@ -957,29 +972,53 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
       }
       setIsSubmitting(true);
       try {
-        let items: any[] = [];
+        let parsed: any;
         try {
-          items = JSON.parse(jsonInput);
+          parsed = JSON.parse(jsonInput);
         } catch (e) {
           triggerAlert('صيغة JSON غير صحيحة.', 'error');
           setIsSubmitting(false);
           return;
         }
 
-        if (!Array.isArray(items)) {
-          triggerAlert('يجب أن يكون JSON عبارة عن مصفوفة (Array).', 'error');
-          setIsSubmitting(false);
-          return;
+        let unitsToInsert: any[] = [];
+        let finalSubjectId = selectedSubjectId;
+        let finalTrimestre = trimestre;
+
+        if (!Array.isArray(parsed) && typeof parsed === 'object' && parsed !== null) {
+          const { specialization, subject, trimestre: t, units } = parsed;
+          if (!specialization || !subject || !units) {
+             throw new Error('الـ JSON يجب أن يحتوي على: specialization, subject, units');
+          }
+          const fullSubjectName = specialization === 'جميع الشعب' ? subject : `${subject} (${specialization})`;
+          const foundSub = subjects.find(s => s.name === fullSubjectName);
+          if (!foundSub) {
+             throw new Error(`المادة "${fullSubjectName}" غير موجودة. يرجى إضافتها أولاً.`);
+          }
+          finalSubjectId = foundSub.id;
+          finalTrimestre = String(t || '1');
+          unitsToInsert = units;
+        } else if (Array.isArray(parsed)) {
+          if (!selectedSubjectId) {
+             throw new Error('يرجى اختيار المادة أولاً أو استخدام صيغة JSON الكاملة.');
+          }
+          unitsToInsert = parsed;
+        } else {
+           throw new Error('تنسيق JSON غير مدعوم.');
         }
 
-        const inserts = items.map((item, index) => {
+        if (!Array.isArray(unitsToInsert)) {
+           throw new Error('قائمة الوحدات (units) يجب أن تكون مصفوفة.');
+        }
+
+        const inserts = unitsToInsert.map((item, index) => {
           const nameStr = typeof item === 'string' ? item : item.name || item.title;
-          if (!nameStr) throw new Error('لا يمكن العثور على اسم في أحد العناصر.');
+          if (!nameStr) throw new Error('لا يمكن العثور على اسم في أحد عناصر الوحدات.');
           return {
             id: 'u_' + Math.random().toString(36).substr(2, 9) + index,
-            subject_id: selectedSubjectId,
+            subject_id: finalSubjectId,
             name: nameStr,
-            trimestre: parseInt(trimestre),
+            trimestre: parseInt(finalTrimestre),
             unit_order: 99
           };
         });
@@ -997,7 +1036,10 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
         setIsSubmitting(false);
       }
     } else {
-      if (!name) return;
+      if (!selectedSubjectId || !name) {
+         triggerAlert('الرجاء اختيار المادة وكتابة اسم الوحدة.', 'error');
+         return;
+      }
       setIsSubmitting(true);
       try {
         const id = 'u_' + Math.random().toString(36).substr(2, 9);
@@ -1044,18 +1086,20 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
 
       {activeTab === 'add' ? (
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-2">اختر المادة</label>
-          <select 
-            value={selectedSubjectId} 
-            onChange={(e) => setSelectedSubjectId(e.target.value)}
-            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-            required
-          >
-            <option value="">-- يرجى الاختيار --</option>
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </div>
+        {!isBulkMode && (
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">اختر المادة</label>
+            <select 
+              value={selectedSubjectId} 
+              onChange={(e) => setSelectedSubjectId(e.target.value)}
+              className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+              required
+            >
+              <option value="">-- يرجى الاختيار --</option>
+              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        )}
 
         <div className="flex bg-slate-100 p-1 rounded-xl">
           <button
@@ -1075,44 +1119,46 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
         </div>
 
         {!isBulkMode ? (
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">اسم الوحدة</label>
-            <input 
-              type="text" 
-              value={name} 
-              onChange={(e) => setName(e.target.value)}
-              placeholder="مثال: الميكانيك الكلاسيكية"
-              className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-              required={!isBulkMode}
-            />
-          </div>
+          <>
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">اسم الوحدة</label>
+              <input 
+                type="text" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)}
+                placeholder="مثال: الميكانيك الكلاسيكية"
+                className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                required={!isBulkMode}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2">الفصل الدراسي</label>
+              <select 
+                value={trimestre} 
+                onChange={(e) => setTrimestre(e.target.value)}
+                className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
+                required
+              >
+                <option value="1">الفصل الأول</option>
+                <option value="2">الفصل الثاني</option>
+                <option value="3">الفصل الثالث</option>
+              </select>
+            </div>
+          </>
         ) : (
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">النص (JSON Array)</label>
+            <label className="block text-sm font-bold text-slate-700 mb-2">النص (JSON Object)</label>
             <textarea 
               value={jsonInput} 
               onChange={(e) => setJsonInput(e.target.value)}
-              placeholder='مثال:&#10;["الوحدة الأولى", "الوحدة الثانية"]&#10;أو&#10;[{"name": "الوحدة الأولى"}, {"name": "الوحدة الثانية"}]'
-              className="w-full h-32 bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm text-left focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-mono"
+              placeholder='مثال:&#10;{&#10;  "specialization": "علوم تجريبية",&#10;  "subject": "الفيزياء",&#10;  "trimestre": 1,&#10;  "units": ["الوحدة الأولى", "الوحدة الثانية"]&#10;}'
+              className="w-full h-48 bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm text-left focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-mono"
               dir="ltr"
               required={isBulkMode}
             />
           </div>
         )}
-
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-2">الفصل الدراسي</label>
-          <select 
-            value={trimestre} 
-            onChange={(e) => setTrimestre(e.target.value)}
-            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
-            required
-          >
-            <option value="1">الفصل الأول</option>
-            <option value="2">الفصل الثاني</option>
-            <option value="3">الفصل الثالث</option>
-          </select>
-        </div>
 
         <button 
           type="submit" 
