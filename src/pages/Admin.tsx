@@ -34,7 +34,9 @@ import {
   Upload,
   Users,
   AlertCircle,
-  Trash2
+  Trash2,
+  Sparkles,
+  CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import AdminUsers from "./users";
@@ -370,8 +372,8 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase || !selectedUnitId) {
-      triggerAlert('الرجاء اختيار الوحدة.', 'error');
+    if (!supabase || (!selectedUnitId && !isBulkMode)) {
+      triggerAlert('الرجاء التأكد من اختيار الوحدة وإعداد قاعدة البيانات (Supabase).', 'error');
       return;
     }
 
@@ -382,31 +384,55 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
       }
       setIsSubmitting(true);
       try {
-        let items: any[] = [];
+        let parsed: any;
         try {
-          items = JSON.parse(jsonInput);
+          parsed = JSON.parse(jsonInput);
         } catch (e) {
           triggerAlert('صيغة JSON غير صحيحة.', 'error');
           setIsSubmitting(false);
           return;
         }
 
-        if (!Array.isArray(items)) {
-          triggerAlert('يجب أن يكون JSON عبارة عن مصفوفة (Array).', 'error');
-          setIsSubmitting(false);
-          return;
-        }
+        let inserts: any[] = [];
 
-        const inserts = items.map((item, index) => {
-          const titleStr = typeof item === 'string' ? item : item.title || item.name;
-          if (!titleStr) throw new Error('لا يمكن العثور على عنوان في أحد العناصر.');
-          return {
-            id: 'l_' + Math.random().toString(36).substr(2, 9) + index,
-            unit_id: selectedUnitId,
-            title: titleStr,
-            lesson_order: 99
-          };
-        });
+        const parseItems = (itemsObj: any, unitId: string) => {
+           let items: any[] = [];
+           if (Array.isArray(itemsObj)) {
+               items = itemsObj;
+           } else if (typeof itemsObj === 'object' && itemsObj !== null) {
+               items = Object.entries(itemsObj).map(([key, val]) => ({
+                   number: parseInt(key) || 99,
+                   title: val
+               }));
+           }
+           return items.map((item, index) => {
+              const titleStr = typeof item === 'string' ? item : item.title || item.name;
+              const orderNum = typeof item === 'object' && item.number ? parseInt(item.number) : 99;
+              if (!titleStr) throw new Error('لا يمكن العثور على عنوان في أحد العناصر.');
+              return {
+                 id: 'l_' + Math.random().toString(36).substr(2, 9) + index,
+                 unit_id: unitId,
+                 title: titleStr,
+                 lesson_order: orderNum
+              };
+           });
+        };
+
+        if (Array.isArray(parsed) && parsed.length > 0 && ('unit' in parsed[0] || 'lessons' in parsed[0] || 'items' in parsed[0])) {
+           for (const unitObj of parsed) {
+              const unitName = String(unitObj.unit || unitObj.name || '').trim();
+              const foundUnit = units.find(u => String(u.name || '').trim().replace(/\s+/g, ' ') === unitName.replace(/\s+/g, ' '));
+              if (!foundUnit) {
+                  throw new Error(`لم يتم العثور على الوحدة: ${unitName} في المادة المحددة.`);
+              }
+              const unitItemsObj = unitObj.lessons || unitObj.items || unitObj.exercises || [];
+              inserts.push(...parseItems(unitItemsObj, foundUnit.id));
+           }
+        } else if (selectedUnitId) {
+           inserts.push(...parseItems(parsed, selectedUnitId));
+        } else {
+           throw new Error("يجب اختيار الوحدة من القائمة أو تضمين اسم الوحدة (unit) داخل ملف JSON.");
+        }
 
         const { error } = await supabase.from('lessons').insert(inserts);
         if (!error) {
@@ -484,12 +510,12 @@ function AdminAddLesson({ onBack }: { onBack: () => void }) {
         </div>
 
         <div>
-           <label className="block text-sm font-bold text-slate-700 mb-2">اختر الوحدة</label>
+           <label className="block text-sm font-bold text-slate-700 mb-2">اختر الوحدة {isBulkMode && '(اختياري)'}</label>
             <select 
               value={selectedUnitId} 
               onChange={(e) => setSelectedUnitId(e.target.value)}
               className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all disabled:opacity-50"
-              required
+              required={!isBulkMode}
               disabled={!selectedSubjectId}
             >
               <option value="">-- يرجى الاختيار --</option>
@@ -569,6 +595,10 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<any[]>([]);
+  const [addMode, setAddMode] = useState<'single' | 'bulk' | 'ai'>('single');
+  const [jsonInput, setJsonInput] = useState('');
+  const [aiGeneratedExercises, setAiGeneratedExercises] = useState<any[]>([]);
+  const [isGeneratingBulk, setIsGeneratingBulk] = useState(false);
 
   useEffect(() => {
     async function fetchSubjects() {
@@ -652,12 +682,209 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supabase || !selectedUnitId || !title) {
-       triggerAlert('الرجاء التأكد من تعبئة جميع الحقول وإعداد قاعدة البيانات (Supabase).', 'error');
+  const generateExercisesTitlesWithAI = async () => {
+    let apiKey = '';
+    let aiModel = 'gemini-3-flash-preview';
+    if (supabase) {
+      const { data } = await supabase.from('admin_settings').select('api_key, ai_model').limit(1).single();
+      if (data && data.api_key) {
+        apiKey = data.api_key;
+        aiModel = (data.ai_model && data.ai_model !== 'gemini-2.5-flash') ? data.ai_model : 'gemini-3-flash-preview';
+      }
+    }
+    
+    if (!apiKey) {
+      triggerAlert("الرجاء إعداد مفتاح Gemini API من صفحة الإعدادات أولاً.", 'error');
+      return;
+    }
+    if (!selectedSubjectId) {
+       triggerAlert("الرجاء اختيار المادة أولاً.", 'error');
        return;
     }
+    if (units.length === 0) {
+       triggerAlert("لا توجد وحدات لهذه المادة.", 'error');
+       return;
+    }
+
+    setIsGeneratingBulk(true);
+    setAiGeneratedExercises([]);
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const subjectName = subjects.find(s => s.id === selectedSubjectId)?.name || '';
+      
+      const unitsListStr = units.map(u => u.name).join('، ');
+
+      const prompt = `أنت خبير تربوي في إعداد المحتوى التعليمي. بناءً على المادة التالية: ${subjectName}. وهذه هي قائمة الوحدات التابعة لها: ${unitsListStr}. رجاءً قم باقتراح حوالي 3 تمارين أو مواضيع لكل وحدة، وارجع ذلك بهيكلة JSON تتضمن اسم الوحدة ومصفوفة بأسماء التمارين لكي تضاف كتمارين.`;
+
+      const response = await ai.models.generateContent({
+        model: aiModel,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                unitName: { type: Type.STRING, description: "اسم الوحدة تماما كما تم توفيره." },
+                exercises: { 
+                  type: Type.ARRAY, 
+                  items: { type: Type.STRING },
+                  description: "قائمة بأسماء التمارين المناسبة لهذه الوحدة"
+                }
+              },
+              required: ["unitName", "exercises"]
+            }
+          }
+        }
+      });
+      
+      const jsonStr = response.text.trim();
+      const parsedData = JSON.parse(jsonStr);
+      
+      let inserts: any[] = [];
+      for (const unitObj of parsedData) {
+          const unitName = String(unitObj.unitName || '').trim();
+          const foundUnit = units.find(u => String(u.name || '').trim().replace(/\s+/g, ' ') === unitName.replace(/\s+/g, ' '));
+          
+          if (foundUnit && Array.isArray(unitObj.exercises)) {
+              for (let i = 0; i < unitObj.exercises.length; i++) {
+                 inserts.push({
+                     unit_id: foundUnit.id,
+                     title: unitObj.exercises[i],
+                     exercise_order: i + 1,
+                     content: null
+                 });
+              }
+          }
+      }
+      
+      if (inserts.length > 0) {
+         setAiGeneratedExercises(inserts);
+         triggerAlert(`تم توليد ${inserts.length} تمارين لـ ${parsedData.length} وحدات. يمكنك الآن حفظها.`, 'success', false);
+      } else {
+         triggerAlert("فشل الذكاء الاصطناعي في مطابقة الوحدات. حاول مرة أخرى.", 'error');
+      }
+
+    } catch (err: any) {
+      console.error(err);
+      let errMsg = err.message || String(err);
+      triggerAlert("حدث خطأ أثناء التوليد: " + errMsg, 'error');
+    } finally {
+      setIsGeneratingBulk(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supabase || (!selectedUnitId && addMode !== 'bulk' && addMode !== 'ai')) {
+       triggerAlert('الرجاء التأكد من اختيار الوحدة وإعداد قاعدة البيانات (Supabase).', 'error');
+       return;
+    }
+    
+    if (addMode === 'bulk') {
+      if (!jsonInput) {
+        triggerAlert('الرجاء إدخال نص JSON صالحة.', 'error');
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        let parsed: any;
+        try {
+          parsed = JSON.parse(jsonInput);
+        } catch (e) {
+          triggerAlert('صيغة JSON غير صحيحة.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+
+        let inserts: any[] = [];
+
+        const parseItems = (itemsObj: any, unitId: string) => {
+           let items: any[] = [];
+           if (Array.isArray(itemsObj)) {
+               items = itemsObj;
+           } else if (typeof itemsObj === 'object' && itemsObj !== null) {
+               items = Object.entries(itemsObj).map(([key, val]) => ({
+                   number: parseInt(key) || 99,
+                   title: val
+               }));
+           }
+           return items.map((item, index) => {
+              const titleStr = typeof item === 'string' ? item : item.title || item.name;
+              const orderNum = typeof item === 'object' && item.number ? parseInt(item.number) : 99;
+              if (!titleStr) throw new Error('لا يمكن العثور على عنوان في أحد العناصر.');
+              return {
+                 id: 'e_' + Math.random().toString(36).substr(2, 9) + index,
+                 unit_id: unitId,
+                 title: titleStr,
+                 exercise_order: orderNum,
+                 content: null
+              };
+           });
+        };
+
+        if (Array.isArray(parsed) && parsed.length > 0 && ('unit' in parsed[0] || 'exercises' in parsed[0] || 'items' in parsed[0])) {
+           for (const unitObj of parsed) {
+              const unitName = String(unitObj.unit || unitObj.name || '').trim();
+              const foundUnit = units.find(u => String(u.name || '').trim().replace(/\s+/g, ' ') === unitName.replace(/\s+/g, ' '));
+              if (!foundUnit) {
+                  throw new Error(`لم يتم العثور على الوحدة: ${unitName} في المادة المحددة.`);
+              }
+              const unitItemsObj = unitObj.exercises || unitObj.items || [];
+              inserts.push(...parseItems(unitItemsObj, foundUnit.id));
+           }
+        } else if (selectedUnitId) {
+           inserts.push(...parseItems(parsed, selectedUnitId));
+        } else {
+           throw new Error("يجب اختيار الوحدة من القائمة أو تضمين اسم الوحدة (unit) داخل ملف JSON.");
+        }
+
+        const { error } = await supabase.from('exercises').insert(inserts);
+        if (!error) {
+          triggerAlert(`تم إضافة ${inserts.length} تمرين بنجاح!`, 'success');
+          setJsonInput('');
+        } else {
+          triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
+        }
+      } catch (err: any) {
+        triggerAlert('حدث خطأ: ' + err.message, 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+    
+    if (addMode === 'ai') {
+      if (!aiGeneratedExercises || aiGeneratedExercises.length === 0) {
+        triggerAlert('الرجاء توليد التمارين أولاً.', 'error');
+        return;
+      }
+      setIsSubmitting(true);
+      try {
+        const { error } = await supabase.from('exercises').insert(aiGeneratedExercises.map((ex, index) => ({
+             ...ex,
+             id: 'e_' + Math.random().toString(36).substr(2, 9) + index
+        })));
+        if (!error) {
+          triggerAlert(`تم إضافة ${aiGeneratedExercises.length} تمرين من الذكاء الاصطناعي بنجاح!`, 'success');
+          setAiGeneratedExercises([]);
+        } else {
+          triggerAlert('حدث خطأ أثناء الإضافة: ' + error.message, 'error');
+        }
+      } catch (err: any) {
+        triggerAlert('حدث خطأ: ' + err.message, 'error');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    if (!title) {
+       triggerAlert('الرجاء تعبئة عنوان التمرين.', 'error');
+       return;
+    }
+
     setIsSubmitting(true);
     try {
       const exercise_id = 'e_' + Math.random().toString(36).substr(2, 9);
@@ -720,33 +947,99 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
           </select>
         </div>
 
+        {addMode !== 'ai' && (
         <div>
-           <label className="block text-sm font-bold text-slate-700 mb-2">اختر الوحدة</label>
+           <label className="block text-sm font-bold text-slate-700 mb-2">اختر الوحدة {addMode === 'bulk' && '(اختياري)'}</label>
             <select 
               value={selectedUnitId} 
               onChange={(e) => setSelectedUnitId(e.target.value)}
               className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all disabled:opacity-50"
-              required
+              required={addMode === 'single'}
               disabled={!selectedSubjectId}
             >
               <option value="">-- يرجى الاختيار --</option>
               {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
         </div>
+        )}
 
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-2">عنوان التمرين</label>
-          <input 
-            type="text" 
-            value={title} 
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="مثال: تمرين حول المكتسبات القبلية"
-            className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-            required
-          />
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setAddMode('single')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${addMode === 'single' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            إضافة فردية
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddMode('bulk')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${addMode === 'bulk' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            إضافة متعددة (JSON)
+          </button>
+          <button
+            type="button"
+            onClick={() => setAddMode('ai')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${addMode === 'ai' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            توليد بالذكاء الاصطناعي
+          </button>
         </div>
 
+        {addMode === 'single' && (
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">عنوان التمرين</label>
+            <input 
+              type="text" 
+              value={title} 
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="مثال: تمرين حول المكتسبات القبلية"
+              className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+              required={addMode === 'single'}
+            />
+          </div>
+        )}
+
+        {addMode === 'bulk' && (
+          <div>
+            <label className="block text-sm font-bold text-slate-700 mb-2">النص (JSON)</label>
+            <textarea 
+              value={jsonInput} 
+              onChange={(e) => setJsonInput(e.target.value)}
+              placeholder='مثال:&#10;{"1": "الاهتلاكات", "2": "الالتزامات"}&#10;أو&#10;[{"title": "الاهتلاكات", "number": 1}]'
+              className="w-full h-32 bg-white/80 border border-slate-200 rounded-xl py-3 px-4 text-sm text-left focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all font-mono"
+              dir="ltr"
+              required={addMode === 'bulk'}
+            />
+          </div>
+        )}
+
+        {addMode === 'ai' && (
+          <div>
+             <button 
+                type="button"
+                onClick={generateExercisesTitlesWithAI}
+                disabled={isGeneratingBulk || !selectedSubjectId}
+                className="w-full relative group overflow-hidden bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold rounded-xl py-4 hover:from-purple-700 hover:to-fuchsia-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30 disabled:opacity-50"
+             >
+                <div className="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                {isGeneratingBulk ? (
+                  <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full" />
+                ) : (
+                  <>توليد التمارين (الذكاء الاصطناعي) لجميع الوحدات <Sparkles size={18} /></>
+                )}
+             </button>
+             {aiGeneratedExercises.length > 0 && (
+                <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-200">
+                   <p className="text-sm font-bold text-emerald-800 flex items-center gap-2"><CheckCircle2 size={18} /> جاهز للحفظ: تم توليد {aiGeneratedExercises.length} تمارين لجميع الوحدات المتاحة.</p>
+                </div>
+             )}
+          </div>
+        )}
+
         <div className="flex flex-col md:flex-row gap-4 mt-8">
+          {addMode === 'single' && (
           <button 
             type="button" 
             onClick={generateWithAI}
@@ -763,6 +1056,7 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
                </>
             )}
           </button>
+          )}
           
           <button 
             type="submit" 
@@ -1017,10 +1311,21 @@ function AdminAddUnit({ onBack }: { onBack: () => void }) {
           const targetSub = subject.trim();
           const fullSubjectName = targetSpec === 'جميع الشعب' ? targetSub : `${targetSub} (${targetSpec})`;
           
-          const foundSub = subjects.find(s => 
-            s.name.trim() === fullSubjectName || 
-            (targetSpec !== 'جميع الشعب' && s.name.includes(targetSub) && s.name.includes(targetSpec))
-          );
+          const foundSub = subjects.find(s => {
+            const sn = s.name.trim().replace(/\s+/g, ' ');
+            const fsn = fullSubjectName.replace(/\s+/g, ' ');
+            if (sn === fsn) return true;
+            
+            if (targetSpec !== 'جميع الشعب') {
+              const match = sn.match(/\((.*?)\)/);
+              if (match) {
+                 const dbSpec = match[1].trim();
+                 const dbSub = sn.split('(')[0].trim();
+                 if (dbSpec === targetSpec && dbSub.includes(targetSub)) return true;
+              }
+            }
+            return false;
+          });
 
           if (!foundSub) {
              throw new Error(`المادة "${fullSubjectName}" غير موجودة. تأكد من مطابقة الاسم والتخصص.`);
