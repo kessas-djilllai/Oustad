@@ -273,7 +273,7 @@ const SUBJECTS_DATA = [
 
 function StudentPortal({ session }: { session: any }) {
   const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
-  const [mainTab, setMainTab] = useState<'home' | 'lessons' | 'exercises' | 'topics' | 'settings'>('home');
+  const [mainTab, setMainTab] = useState<'home' | 'subjects' | 'topics' | 'settings'>('home');
   
   const [view, setViewState] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any, lesson?: any }>(() => {
     const saved = localStorage.getItem('portal_view');
@@ -567,12 +567,13 @@ function StudentPortal({ session }: { session: any }) {
     <>
       <div key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}>
         {view.type === 'dashboard' && mainTab === 'home' && <DashboardHomeView subjects={subjects} bacDate={bacDate} onStartQuiz={() => setView({ type: 'quiz' })} />}
-        {view.type === 'dashboard' && (mainTab === 'lessons' || mainTab === 'exercises') && <DashboardSubjectsView subjects={subjects} listType={mainTab} onSubjectClick={(s) => setView({ type: 'subject_units', subject: s, listType: mainTab })} />}
+        {view.type === 'dashboard' && mainTab === 'subjects' && <DashboardSubjectsView subjects={subjects} listType={mainTab} onSubjectClick={(s) => setView({ type: 'subject_units', subject: s })} />}
         {view.type === 'dashboard' && mainTab === 'topics' && <TopicsView subjects={subjects} />}
         {view.type === 'dashboard' && mainTab === 'settings' && <SettingsView />}
         
-        {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} listType={view.listType} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'list', subject: currentSubject, unit: u, listType: view.listType })} />}
-        {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'subject_units', subject: currentSubject, listType: view.listType })} onSelectItem={(item) => {
+        {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'unit_details', subject: currentSubject, unit: u })} />}
+        {view.type === 'unit_details' && <UnitDetailsView subject={currentSubject} unit={currentUnit} onBack={() => setView({ type: 'subject_units', subject: currentSubject })} onSelectType={(t) => setView({ type: 'list', subject: currentSubject, unit: currentUnit, listType: t })} />}
+        {view.type === 'list' && <ContentListView subject={currentSubject} unit={currentUnit} listType={view.listType!} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} onSelectItem={(item) => {
           if (view.listType === 'exercises') {
             setView({ type: 'solve_exercise', subject: currentSubject, unit: currentUnit, exercise: item });
           } else {
@@ -587,8 +588,7 @@ function StudentPortal({ session }: { session: any }) {
       {view.type === 'dashboard' && (
         <div className="fixed bottom-0 left-0 right-0 h-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-800/50 z-40 flex items-center justify-around px-2 sm:px-6 pb-2 text-slate-500 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.05)]">
           <BottomNavItem icon={<Home size={22} />} label="الرئيسية" active={mainTab === 'home'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('home'); }} />
-          <BottomNavItem icon={<ClipboardList size={22} />} label="التمارين" active={mainTab === 'exercises'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('exercises'); }} />
-          <BottomNavItem icon={<PlayCircle size={22} />} label="الدروس" active={mainTab === 'lessons'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('lessons'); }} />
+          <BottomNavItem icon={<BookOpen size={22} />} label="المواد" active={mainTab === 'subjects'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('subjects'); }} />
           <BottomNavItem icon={<FileText size={22} />} label="مواضيع" active={mainTab === 'topics'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('topics'); }} />
           <BottomNavItem icon={<Settings size={22} />} label="الإعدادات" active={mainTab === 'settings'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('settings'); }} />
         </div>
@@ -1023,13 +1023,13 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz }: { subjects: any[]
   )
 }
 
-function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subjects: any[], listType: 'lessons' | 'exercises' | 'topics', onSubjectClick: (s: any) => void }) {
+function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subjects: any[], listType: 'lessons' | 'exercises' | 'topics' | 'subjects', onSubjectClick: (s: any) => void }) {
   return (
     <div className="animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-6 md:mb-8 gap-3">
         <h3 className="font-bold text-2xl text-slate-800 flex items-center gap-2">
-          {listType === 'lessons' ? <PlayCircle size={24} className="text-blue-500" /> : listType === 'exercises' ? <ClipboardList size={24} className="text-blue-500" /> : <FileText size={24} className="text-blue-500" />}
-          {listType === 'lessons' ? 'الدروس' : listType === 'exercises' ? 'التمارين' : 'المواد'}
+          {listType === 'lessons' ? <PlayCircle size={24} className="text-blue-500" /> : listType === 'exercises' ? <ClipboardList size={24} className="text-blue-500" /> : listType === 'topics' ? <FileText size={24} className="text-blue-500" /> : <BookOpen size={24} className="text-blue-500" />}
+          {listType === 'lessons' ? 'الدروس' : listType === 'exercises' ? 'التمارين' : listType === 'topics' ? 'مواضيع البكالوريا' : 'المواد'}
         </h3>
       </div>
       

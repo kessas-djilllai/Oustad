@@ -177,6 +177,7 @@ ${subjectsList}`;
       let errMsg = e.message || String(e);
       if (errMsg.includes('504') || errMsg.includes('503')) errMsg = "الخادم يواجه ضغطاً. حاول لاحقاً.";
       else if (errMsg.includes('Failed to fetch')) errMsg = "انقطع الاتصال بالإنترنت أو الخادم.";
+      else if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) errMsg = "لقد استنفدت الحصة المجانية لمفتاح Gemini API هذا. يرجى إضافة مفتاح API جديد من الإعدادات.";
       setErrorMsg(errMsg);
       triggerAlert(errMsg, "error");
     } finally {

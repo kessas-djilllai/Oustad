@@ -55,9 +55,7 @@ export function SubjectTypeView({ subject, onBack, onSelectType }: { subject: an
   )
 }
 
-export function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { subject: any, listType?: 'lessons' | 'exercises', onBack: () => void, onUnitClick: (u: any) => void }) {
-  const isLessons = listType === 'lessons';
-
+export function SubjectUnitsView({ subject, onBack, onUnitClick }: { subject: any, onBack: () => void, onUnitClick: (u: any) => void }) {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -68,8 +66,8 @@ export function SubjectUnitsView({ subject, listType, onBack, onUnitClick }: { s
         <button onClick={onBack} className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl glass hover:bg-white flex items-center justify-center text-slate-600 transition-all font-bold">
           <ChevronRight size={18} className="md:w-5 md:h-5" />
         </button>
-        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl ${isLessons ? 'bg-blue-100 text-blue-600' : 'bg-emerald-100 text-emerald-600'} flex items-center justify-center shadow-sm`}>
-           {isLessons ? <PlayCircle size={16} className="md:w-5 md:h-5"/> : <ClipboardList size={16} className="md:w-5 md:h-5"/>}
+        <div className={`w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-sm`}>
+           <subject.icon size={16} className="md:w-5 md:h-5"/>
         </div>
         <div>
           <h2 className="font-bold text-base md:text-xl text-slate-800">{subject.name}</h2>

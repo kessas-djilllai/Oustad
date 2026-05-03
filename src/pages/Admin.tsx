@@ -714,7 +714,7 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
       
       const unitsListStr = units.map(u => u.name).join('، ');
 
-      const prompt = `أنت خبير تربوي في إعداد المحتوى التعليمي. بناءً على المادة التالية: ${subjectName}. وهذه هي قائمة الوحدات التابعة لها: ${unitsListStr}. رجاءً قم باقتراح حوالي 3 تمارين أو مواضيع لكل وحدة، وارجع ذلك بهيكلة JSON تتضمن اسم الوحدة ومصفوفة بأسماء التمارين لكي تضاف كتمارين.`;
+      const prompt = `أنت مفتش وخبير تربوي في إعداد المحتوى التعليمي. بناءً على المادة التالية: ${subjectName}. وهذه هي قائمة الوحدات التابعة لها: ${unitsListStr}. رجاءً قم باقتراح تمارين أو مواضيع لكل وحدة، وفقاً للتدرج السنوي لوزارة التربية الوطنية في الجزائر. يجب أن يتناسب عدد التمارين المقترحة مع حجم وأهمية الوحدة (الوحدات الطويلة والمعقدة تتطلب تمارين أكثر). لا تتقيد بعدد محدد، وارجع الناتج بهيكلة JSON تتضمن اسم الوحدة (unitName) ومصفوفة بأسماء التمارين (exercises).`;
 
       const response = await ai.models.generateContent({
         model: aiModel,
@@ -769,6 +769,10 @@ function AdminAddExercise({ onBack }: { onBack: () => void }) {
     } catch (err: any) {
       console.error(err);
       let errMsg = err.message || String(err);
+      if (errMsg.includes('504') || errMsg.includes('503')) errMsg = "الخادم يواجه ضغطاً (503/504). المحاولة لاحقاً.";
+      else if (errMsg.includes('Failed to fetch')) errMsg = "انقطع الاتصال بالإنترنت أو الخادم أثناء التحليل.";
+      else if (errMsg.includes('token limit')) errMsg = "تجاوز التوليد الحد الأقصى للنصوص المسموح بها.";
+      else if (errMsg.includes('429') || errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) errMsg = "لقد استنفدت الحصة المجانية لمفتاح Gemini API هذا. يرجى إضافة مفتاح API جديد أو المحاولة بنموذج أخر من الإعدادات.";
       triggerAlert("حدث خطأ أثناء التوليد: " + errMsg, 'error');
     } finally {
       setIsGeneratingBulk(false);
