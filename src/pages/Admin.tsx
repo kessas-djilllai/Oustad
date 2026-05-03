@@ -36,7 +36,8 @@ import {
   AlertCircle,
   Trash2,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  AlertTriangle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import AdminUsers from "./users";
@@ -1918,6 +1919,9 @@ function AdminManageBac({ onBack }: { onBack: () => void }) {
   const [subjectsMap, setSubjectsMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  const [filterSubjectId, setFilterSubjectId] = useState<string>('all');
+  const [confirmDelete, setConfirmDelete] = useState<{id: string, examUrl: string, solutionUrl: string | null} | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -1947,7 +1951,7 @@ function AdminManageBac({ onBack }: { onBack: () => void }) {
   }, []);
 
   const handleDelete = async (id: string, examUrl: string, solutionUrl: string | null) => {
-    if (!supabase || !confirm('هل أنت متأكد من حذف هذه البكالوريا؟')) return;
+    if (!supabase) return;
     setDeletingId(id);
     try {
        const deleteFile = async (url: string) => {
@@ -1977,12 +1981,15 @@ function AdminManageBac({ onBack }: { onBack: () => void }) {
       triggerAlert('خطأ أثناء الحذف: ' + e.message, 'error');
     } finally {
       setDeletingId(null);
+      setConfirmDelete(null);
     }
   };
+  
+  const filteredExams = exams.filter(exam => filterSubjectId === 'all' || exam.subject_id === filterSubjectId);
 
   return (
-    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100">
-      <div className="flex items-center gap-4 mb-8">
+    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 relative">
+      <div className="flex items-center gap-4 mb-4">
         <button onClick={onBack} className="w-10 h-10 rounded-xl bg-slate-50 hover:bg-slate-100 flex items-center justify-center text-slate-600 transition-all font-bold">
            <ChevronRight size={20} className="rotate-180" />
         </button>
@@ -1991,16 +1998,30 @@ function AdminManageBac({ onBack }: { onBack: () => void }) {
           <p className="text-xs text-slate-500 font-medium">عرض جميع مواضيع البكالوريا المضافة مسبقاً لحذفها أو تصفحها.</p>
         </div>
       </div>
+      
+      <div className="mb-6 bg-slate-50 border border-slate-100 p-4 rounded-xl flex items-center gap-4">
+        <label className="text-sm font-bold text-slate-700 whitespace-nowrap">تصنيف حسب المادة:</label>
+        <select
+          value={filterSubjectId}
+          onChange={(e) => setFilterSubjectId(e.target.value)}
+          className="w-full bg-white border border-slate-200 rounded-lg py-2.5 px-4 text-sm font-bold text-slate-700 focus:outline-none focus:border-indigo-500 transition-colors"
+        >
+          <option value="all">الكل</option>
+          {Object.entries(subjectsMap).map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
+          ))}
+        </select>
+      </div>
 
       {loading ? (
          <div className="text-center py-10"><div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto"></div></div>
-      ) : exams.length === 0 ? (
+      ) : filteredExams.length === 0 ? (
          <div className="text-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
            <p className="text-slate-500 font-bold mb-4">لا توجد مواضيع بكالوريا مضافة حالياً.</p>
          </div>
       ) : (
          <div className="grid gap-3">
-           {exams.map((exam, index) => (
+           {filteredExams.map((exam, index) => (
               <div key={exam.id || index} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100 gap-4 transition-all hover:bg-white hover:shadow-md">
                  <div>
                     <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -2018,7 +2039,7 @@ function AdminManageBac({ onBack }: { onBack: () => void }) {
                  </div>
                  
                  <button 
-                   onClick={() => handleDelete(exam.id, exam.exam_file, exam.solution_file)}
+                   onClick={() => setConfirmDelete({id: exam.id, examUrl: exam.exam_file, solutionUrl: exam.solution_file})}
                    disabled={deletingId === exam.id}
                    className="w-full md:w-auto px-4 py-2.5 bg-red-50 hover:bg-red-500 hover:text-white text-red-600 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                  >
@@ -2028,6 +2049,38 @@ function AdminManageBac({ onBack }: { onBack: () => void }) {
               </div>
            ))}
          </div>
+      )}
+      
+      {/* Delete Confirmation Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl p-6 shadow-2xl max-w-sm w-full border border-slate-100"
+          >
+            <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-center text-slate-800 mb-2">تأكيد الحذف</h3>
+            <p className="text-center text-slate-500 text-sm mb-8 font-medium">سيتم حذف هذا الموضوع والحل المرتبط به نهائياً (بما في ذلك الملفات). هل أنت متأكد؟</p>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors text-sm"
+              >
+                إلغاء
+              </button>
+              <button 
+                onClick={() => handleDelete(confirmDelete.id, confirmDelete.examUrl, confirmDelete.solutionUrl)}
+                className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl transition-colors text-sm shadow-lg shadow-red-500/30 flex justify-center items-center gap-2"
+              >
+                <Trash size={16}/> نعم، إحذف
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
