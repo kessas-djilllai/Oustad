@@ -2621,13 +2621,40 @@ export function AdminLogin() {
     e.preventDefault();
     setIsLoading(true);
 
-    if (username.trim() === 'bacdz' && password.trim() === '0759508642bacdz') {
-      navigate('/admin');
-    } else {
-      triggerAlert('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');
+    if (!supabase) {
+      triggerAlert('قاعدة البيانات غير متصلة!', 'error');
+      setIsLoading(false);
+      return;
     }
-    
-    setIsLoading(false);
+
+    try {
+      // Hash the password before sending it to the database
+      const hashedPassword = await hashString(password.trim());
+
+      // التحقق من قاعدة البيانات مباشرة (جدول admin_credentials) لتجنب تخزين كلمة السر في الكود
+      const { data, error } = await supabase
+        .from('admin_credentials')
+        .select('*')
+        .eq('username', username.trim())
+        .eq('password', hashedPassword)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code === '42P01' || error.message.includes('relation "public.admin_credentials" does not exist')) {
+          triggerAlert('يرجى أولاً إنشاء جدول admin_credentials في Supabase وإضافة (username) و (password).', 'error');
+        } else {
+          triggerAlert('حدث خطأ أثناء الاتصال بقاعدة البيانات.', 'error');
+        }
+      } else if (data) {
+        navigate('/admin');
+      } else {
+        triggerAlert('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');
+      }
+    } catch (err) {
+      triggerAlert('حدث خطأ غير متوقع.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
