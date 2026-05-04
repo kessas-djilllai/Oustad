@@ -130,11 +130,20 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
 
     if (isCorrect) {
       setAnsweredCorrectIds(prev => new Set(prev).add(actualQIdx));
-      if (isFirstTime) {
-        setFirstTryCorrect(prev => prev + 1);
-        setXpEarned(prev => prev + XP_PER_QUESTION);
+      
+      const isReplay = selectedSubject && (getProgressSync('cookie_level', selectedSubject.id) || 0) > currentLevelIdx;
+      
+      if (!isReplay) {
+          if (isFirstTime) {
+            setFirstTryCorrect(prev => prev + 1);
+            setXpEarned(prev => prev + XP_PER_QUESTION);
+          } else {
+            setXpEarned(prev => prev + XP_RETRY_QUESTION);
+          }
       } else {
-        setXpEarned(prev => prev + XP_RETRY_QUESTION);
+          if (isFirstTime) {
+              setFirstTryCorrect(prev => prev + 1);
+          }
       }
     } else {
       if (isFirstTime) {
@@ -174,15 +183,24 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
        
        let newProgress = Math.min(Math.round((currentUnlocked / totalLevelsCount) * 100), 100);
        saveProgress('quiz_progress', selectedSubject.id, newProgress);
-    }
-    if (xpEarned > 0) {
-      addXP(xpEarned);
-    }
 
-    if (currentLevelIdx + 1 < totalLevelsCount && subjectCookiesStore) {
-        setupLevel(subjectCookiesStore, currentLevelIdx + 1);
-    } else {
-        setStep(4); // Fully completed
+       if (xpEarned > 0) {
+         addXP(xpEarned);
+       }
+
+       if (currentLevelIdx < (getProgressSync('cookie_level', selectedSubject.id) || 0) - 1) {
+           // They just finished a replay of a past level. Take them back to their current active highest level!
+           const targetLevel = getProgressSync('cookie_level', selectedSubject.id) || 0;
+           if (targetLevel < totalLevelsCount && subjectCookiesStore) {
+               setupLevel(subjectCookiesStore, targetLevel);
+           } else {
+               setStep(4);
+           }
+       } else if (currentLevelIdx + 1 < totalLevelsCount && subjectCookiesStore) {
+           setupLevel(subjectCookiesStore, currentLevelIdx + 1);
+       } else {
+           setStep(4); // Fully completed
+       }
     }
   };
 
@@ -307,7 +325,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                       className="absolute top-0 right-0 h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
                       style={{ 
                           width: `${
-                              ((currentLevelIdx + (answeredCorrectIds.size / questions.length)) / totalLevelsCount) * 100
+                              (((selectedSubject ? getProgressSync('cookie_level', selectedSubject.id) || 0 : 0) + (currentLevelIdx === (selectedSubject ? getProgressSync('cookie_level', selectedSubject.id) || 0 : 0) ? answeredCorrectIds.size / questions.length : 0)) / totalLevelsCount) * 100
                           }%`,
                           maxWidth: '100%'
                       }}
@@ -320,15 +338,32 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                  </div>
 
                  {Array.from({ length: totalLevelsCount }).map((_, i) => {
-                     const isPast = i < currentLevelIdx;
-                     const isCurrent = i === currentLevelIdx;
+                     const currentUnlocked = selectedSubject ? (getProgressSync('cookie_level', selectedSubject.id) || 0) : 0;
+                     const isCompleted = i < currentUnlocked;
+                     const isCurrentActive = i === currentLevelIdx;
+                     const isClickable = i <= currentUnlocked;
                      
                      let bgClass = "bg-white border-4 border-slate-200 text-slate-400";
-                     if (isPast) bgClass = "bg-emerald-500 border-4 border-emerald-500 text-white shadow-md shadow-emerald-500/30";
+                     if (isCompleted) bgClass = "bg-emerald-500 border-4 border-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer hover:scale-110";
+                     if (i === currentUnlocked) bgClass = "bg-white border-4 border-blue-500 text-blue-500 shadow-md shadow-blue-500/30 cursor-pointer hover:scale-110";
+                     if (isCurrentActive) bgClass = "bg-blue-500 border-4 border-blue-500 text-white shadow-md shadow-blue-500/30 ring-4 ring-blue-100 scale-110";
                      
                      return (
-                         <div key={i} className={`flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all duration-500 ${bgClass}`}>
-                             {isPast ? <CheckCircle size={16} className="md:w-5 md:h-5 text-white" /> : (i + 1)}
+                         <div 
+                             key={i} 
+                             onClick={() => {
+                               if (isClickable && i !== currentLevelIdx) {
+                                 // If clicking a completed level, reset its questions to the beginning
+                                 if (i < currentUnlocked) {
+                                    saveProgress('cookie_qidx', `${selectedSubject.id}_${i}`, 0);
+                                 }
+                                 setupLevel(subjectCookiesStore, i, selectedSubject);
+                               }
+                             }}
+                             title={i < currentUnlocked ? "إعادة المرحلة" : (i === currentUnlocked ? "المرحلة الحالية" : "مرحلة مقفلة")}
+                             className={`flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all duration-500 ${bgClass}`}
+                         >
+                             {isCompleted && !isCurrentActive ? <CheckCircle size={16} className="md:w-5 md:h-5 text-white" /> : (i + 1)}
                          </div>
                      )
                  })}
@@ -455,7 +490,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                 className="w-2/3 bg-emerald-500 text-white font-bold rounded-2xl py-4 hover:bg-emerald-600 active:scale-95 transition-all shadow-lg shadow-emerald-500/20 text-sm md:text-base flex items-center justify-center gap-2"
               >
                 <ChevronRight size={20} className="rotate-180" />
-                <span>متابعة للمرحلة التالية</span>
+                <span>{selectedSubject && currentLevelIdx < (getProgressSync('cookie_level', selectedSubject.id) || 0) - 1 ? 'العودة لمرحلتك الحالية' : 'متابعة للمرحلة التالية'}</span>
               </button>
             </div>
           </div>
