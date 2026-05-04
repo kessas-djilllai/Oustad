@@ -581,8 +581,9 @@ function StudentPortal({ session }: { session: any }) {
         }} />}
         {/* We can remove or ignore ContentListView since UnitDetailsView handles it now, I'll just change list to unreachable or leave it */}
         {view.type === 'view_lesson' && <LessonDetailsView subject={currentSubject} unit={currentUnit} lesson={view.lesson} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} />}
-        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} />}
+        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} onPay={() => setView({ type: 'payment' })} />}
         {view.type === 'quiz' && <QuizView subjects={subjects} onBack={() => setView({ type: 'dashboard' })} />}
+        {view.type === 'payment' && <PaymentView onBack={() => setView({ type: 'dashboard' })} />}
       </div>
 
       {view.type === 'dashboard' && (
@@ -1065,4 +1066,29 @@ function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subject
       </div>
     </div>
   )
+}
+
+function PaymentView({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="max-w-md mx-auto pt-10 pb-20 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500" dir="rtl">
+      <div className="flex items-center mb-8 gap-4">
+        <button onClick={onBack} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 shadow-sm border border-slate-100 shrink-0">
+          <ChevronRight size={20} />
+        </button>
+        <h2 className="text-2xl font-black text-slate-800">ترقية الحساب</h2>
+      </div>
+
+      <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 text-center flex flex-col items-center justify-center min-h-[300px]">
+         <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-6 mx-auto">
+            <svg xmlns="http://www.w3.org/.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+         </div>
+         <h3 className="text-xl font-bold text-slate-800 mb-4">لا يوجد اي طريقة دفع</h3>
+         <p className="text-slate-500 leading-relaxed max-w-sm mb-8">الصفحة قيد التطوير.</p>
+         
+         <button onClick={onBack} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-4 rounded-2xl transition-colors">
+            العودة
+         </button>
+      </div>
+    </div>
+  );
 }

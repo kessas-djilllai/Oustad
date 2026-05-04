@@ -25,10 +25,16 @@ export const preprocessMath = (text: string) => {
   processed = processed.replace(/^\t+/gm, '  ');
 
   // Fix literal JSON parsed escapes that break KaTeX
-  processed = processed.replace(/(\\|\t)?t?ext\s*\{/g, '\\\\text{');
-  processed = processed.replace(/(\\|\x08)?b?egin\s*\{/g, '\\\\begin{');
-  processed = processed.replace(/(\\|\x0C)?f?rac/g, '\\\\frac');
-  processed = processed.replace(/(\\|\x0D)?r?ight/g, '\\\\right');
+  processed = processed.replace(/(\\|\t)?t?ext/g, '\\text');
+  processed = processed.replace(/(\\|\x08)?b?egin\s*\{/g, '\\begin{');
+  processed = processed.replace(/(\\|\x08)?e?nd\s*\{/g, '\\end{');
+  processed = processed.replace(/(\\|\x0C)?f?rac\s*\{/g, '\\frac{');
+  processed = processed.replace(/(\\|\x0D)?r?ight/g, '\\right');
+  processed = processed.replace(/(\\|\x0C)?l?eft/g, '\\left');
+  processed = processed.replace(/\\(lim|sqrt|sum|int|infty|rightarrow)/g, '\\$1');
+  
+  // Wrap naked \begin{cases} in $$ if they aren't enclosed
+  processed = processed.replace(/(?<!\$)(?<!\$\$)\s*(\\begin\{(cases|align|equation|pmatrix|bmatrix)\}[\s\S]*?\\end\{\2\})\s*(?!\$)(?!\$\$)/g, '\n\n$$$$ $1 $$$$\n\n');
 
   // Ensure markdown tables have a preceding newline to be parsed correctly by remark-gfm
   // This looks for a non-newline character, followed by a newline, followed by a table header and separator.

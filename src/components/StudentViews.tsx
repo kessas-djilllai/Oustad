@@ -401,11 +401,18 @@ export function LessonDetailsView({ subject, unit, lesson, onBack }: { subject: 
   );
 }
 
-export function InteractiveExerciseView({ subject, unit, exercise, onBack }: { subject: any, unit: any, exercise: any, onBack: () => void }) {
+export function InteractiveExerciseView({ subject, unit, exercise, onBack, onPay }: { subject: any, unit: any, exercise: any, onBack: () => void, onPay?: () => void }) {
   const [showAnswers, setShowAnswers] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const solutionRef = useRef<HTMLDivElement>(null);
+  
+  const getInitialCount = () => {
+    if (!exercise?.id) return 0;
+    return parseInt(localStorage.getItem(`exercise_gen_count_${exercise.id}`) || '0', 10);
+  };
+  
+  const [genCount, setGenCount] = useState(() => getInitialCount());
   
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -445,6 +452,10 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack }: { s
   const [currentExercise, setCurrentExercise] = useState(() => getExerciseData());
 
   const generateNewExercise = async () => {
+    if (genCount >= 2) {
+      if (onPay) onPay();
+      return;
+    }
     setErrorMsg(null);
     let apiKey = '';
     let aiModel = 'gemini-3-flash-preview';
@@ -465,7 +476,7 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack }: { s
     try {
       const ai = new GoogleGenAI({ apiKey });
       const prompt = getSubjectPrompt(subject?.name || '', unit?.name || '', exercise?.title || '');
-      const newPrompt = prompt + "\n\nملاحظة مهمة: يرجى توليد تمرين مشابه للتمرين السابق من حيث الفكرة، لكن بمعطيات جديدة أو أرقام مختلفة تماماً، لكي يتدرب الطالب بشكل أفضل.";
+      const newPrompt = prompt + "\n\nملاحظة مهمة: يرجى توليد تمرين مشابه للتمرين السابق من حيث الفكرة، لكن بمعطيات جديدة أو أرقام مختلفة تماماً. **بالنسبة للرياضيات**: يجب استخدام علامات `$$ ... $$` للمعادلات المفصولة و`$ ... $` للمعادلات ضمن السطر. لا تنس أبداً وضع سياق الـ LaTeX بشكل سليم واضافة علامة `\\` قبل أي دالة مثل `\\begin{cases}`, `\\frac`, `\\lim`, `\\sqrt` الخ.";
 
       const response = await ai.models.generateContent({
         model: aiModel,
@@ -488,6 +499,11 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack }: { s
         const parsedData = JSON.parse(jsonStr);
         setCurrentExercise(parsedData);
         setShowAnswers(false);
+        const newCount = genCount + 1;
+        setGenCount(newCount);
+        if (exercise?.id) {
+           localStorage.setItem(`exercise_gen_count_${exercise.id}`, newCount.toString());
+        }
       } else {
         throw new Error("لم يتم إرجاع أي استجابة من المولد.");
       }
@@ -514,10 +530,19 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack }: { s
            <button 
              onClick={generateNewExercise}
              disabled={isGenerating}
-             className="px-4 md:px-5 py-2 bg-blue-100 text-blue-700 font-bold rounded-xl hover:bg-blue-200 transition flex items-center justify-center gap-2 text-sm shadow-sm flex-1 md:flex-none disabled:opacity-50"
+             className={`px-4 md:px-5 py-2 font-bold rounded-xl transition flex items-center justify-center gap-2 text-sm shadow-sm flex-1 md:flex-none disabled:opacity-50 ${genCount >= 2 ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
            >
-             <RefreshCw size={16} className={isGenerating ? "animate-spin" : ""} /> 
-             <span>{isGenerating ? 'جاري التوليد...' : 'تمرين جديد'}</span>
+             {genCount >= 2 ? (
+                <>
+                   <RefreshCw size={16} />
+                   <span>ادفع لزيادة حجم التوليد</span>
+                </>
+             ) : (
+                <>
+                   <RefreshCw size={16} className={isGenerating ? "animate-spin" : ""} /> 
+                   <span>{isGenerating ? 'جاري التوليد...' : `تمرين جديد (${2 - genCount} مجاني)`}</span>
+                </>
+             )}
            </button>
            <button 
              onClick={() => {
