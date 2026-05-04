@@ -2596,18 +2596,55 @@ export function AdminLayout() {
   );
 }
 
+const hashString = async (message: string) => {
+  const msgBuffer = new TextEncoder().encode(message);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 export function AdminLogin() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+
+    if (!supabase) {
+      triggerAlert('قاعدة البيانات غير متصلة', 'error');
       setIsLoading(false);
-      navigate('/admin');
-    }, 1500);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.from('admin_settings').select('admin_username, admin_password_hash').limit(1).single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+             triggerAlert('لا توجد إعدادات مسؤول في قاعدة البيانات.', 'error');
+        } else {
+             triggerAlert('يرجى تحديث قاعدة البيانات وتشغيل: ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS admin_username TEXT; ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS admin_password_hash TEXT;', 'error');
+        }
+        setIsLoading(false);
+        return;
+      }
+
+      const inputHash = await hashString(password);
+
+      if (data && data.admin_username === username && data.admin_password_hash === inputHash) {
+         navigate('/admin');
+      } else {
+         triggerAlert('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');
+      }
+    } catch (e: any) {
+      triggerAlert('خطأ في تسجيل الدخول: ' + e.message, 'error');
+    }
+    
+    setIsLoading(false);
   };
 
   return (
@@ -2625,17 +2662,18 @@ export function AdminLogin() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-slate-800 to-slate-900 flex items-center justify-center text-white mb-4 shadow-xl">
              <Lock size={32} />
           </div>
-          <h1 className="font-bold text-2xl text-slate-800 text-center">أدمين منصة بكالوريا</h1>
+          <h1 className="font-bold text-2xl text-slate-800 text-center">أدمين منصة نجاحي</h1>
           <p className="text-sm text-slate-500 mt-2 text-center">يرجى تسجيل الدخول للوصول إلى لوحة التحكم</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-2">البريد الإلكتروني للإدارة</label>
+            <label className="block text-xs font-bold text-slate-700 mb-2">اسم المستخدم</label>
             <div className="relative">
               <input 
-                type="email" 
-                defaultValue="admin@bacpro.dz"
+                type="text" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 pr-10 pl-4 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-left"
                 dir="ltr"
               />
@@ -2648,8 +2686,10 @@ export function AdminLogin() {
             <div className="relative">
               <input 
                 type={showPassword ? "text" : "password"}
-                defaultValue="supersecret123"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-white/80 border border-slate-200 rounded-xl py-3 pr-10 pl-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all text-left font-mono"
+
                 dir="ltr"
               />
               <Lock className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
