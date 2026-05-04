@@ -16,6 +16,10 @@ export default function AdminUsers() {
   const [editingXp, setEditingXp] = useState<string | null>(null);
   const [tempXp, setTempXp] = useState<string>('');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [tempName, setTempName] = useState<string>('');
+  const [tempSpec, setTempSpec] = useState<string>('');
+
   
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -116,6 +120,34 @@ export default function AdminUsers() {
     fetchUsers();
   }, []);
 
+  const handleSaveMeta = async (userId: string) => {
+    if (!supabase) return;
+    if (!tempName.trim()) {
+      triggerAlert('الرجاء إدخال اسم المصلحة.', 'error');
+      return;
+    }
+    
+    try {
+      const { error } = await supabase.rpc('update_user_meta_by_id', { 
+         user_id: userId, 
+         new_name: tempName.trim(), 
+         new_spec: tempSpec 
+      });
+      if (error) {
+         if (error.message.includes('function update_user_meta_by_id does not exist')) {
+            throw new Error("يجب تحديث قاعدة البيانات وتشغيل كود الـ SQL الخاص بتعديل الاسم.");
+         }
+         throw error;
+      }
+      
+      triggerAlert('تم تحديث البيانات بنجاح', 'success');
+      setEditingName(null);
+      fetchUsers();
+    } catch (err: any) {
+      triggerAlert('خطأ أثناء حفظ البيانات: ' + err.message, 'error');
+    }
+  };
+
   const handleSaveXp = async (userId: string) => {
     if (!supabase) return;
     const newXp = parseInt(tempXp);
@@ -211,6 +243,22 @@ $$ language plpgsql security definer;
 
 -- 4. إعطاء صلاحية تنفيذ الوظيفة للـ API
 grant execute on function public.delete_user_by_id(uuid) to anon, authenticated;
+
+-- 5. إنشاء وظيفة (Function) لتغيير اسم المستخدم والتخصص
+create or replace function public.update_user_meta_by_id(user_id uuid, new_name text, new_spec text)
+returns void as $$
+begin
+  update auth.users
+  set raw_user_meta_data = jsonb_set(
+      jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{full_name}', to_jsonb(new_name)),
+      '{specialization}', to_jsonb(new_spec)
+  )
+  where id = user_id;
+end;
+$$ language plpgsql security definer;
+
+-- 6. إعطاء صلاحية لتنفيذ تغيير الاسم
+grant execute on function public.update_user_meta_by_id(uuid, text, text) to anon, authenticated;
 `}
         </div>
         <button onClick={fetchUsers} className="mt-6 w-full lg:w-auto px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all">
@@ -276,10 +324,46 @@ grant execute on function public.delete_user_by_id(uuid) to anon, authenticated;
                   return (
                   <tr key={user.id} className="bg-slate-50 hover:bg-slate-100 transition-colors rounded-2xl group">
                     <td className="py-3 px-4 rounded-r-2xl border-y border-r border-slate-100 group-hover:border-slate-200">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-800">{user.raw_user_meta_data?.full_name || 'بدون اسم'}</span>
-                        <span className="text-xs text-slate-500">{user.raw_user_meta_data?.specialization || 'غير محدد'}</span>
-                      </div>
+                      {editingName === user.id ? (
+                        <div className="flex flex-col gap-2">
+                           <input 
+                             type="text" 
+                             value={tempName} 
+                             onChange={(e) => setTempName(e.target.value)} 
+                             className="w-full px-2 py-1 rounded bg-white border border-slate-300 text-sm focus:outline-none focus:border-blue-500" 
+                             placeholder="الاسم الكامل"
+                             autoFocus
+                           />
+                           <select 
+                             value={tempSpec} 
+                             onChange={(e) => setTempSpec(e.target.value)} 
+                             className="w-full px-2 py-1 rounded bg-white border border-slate-300 text-xs focus:outline-none focus:border-blue-500" 
+                           >
+                             <option value="علوم تجريبية">علوم تجريبية</option>
+                             <option value="تقني رياضي">تقني رياضي</option>
+                             <option value="رياضيات">رياضيات</option>
+                             <option value="تسيير واقتصاد">تسيير واقتصاد</option>
+                             <option value="آداب وفلسفة">آداب وفلسفة</option>
+                             <option value="لغات أجنبية">لغات أجنبية</option>
+                           </select>
+                           <div className="flex gap-2">
+                             <button onClick={() => handleSaveMeta(user.id)} className="w-6 h-6 bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center rounded">
+                               <Check size={14} />
+                             </button>
+                             <button onClick={() => setEditingName(null)} className="w-6 h-6 bg-slate-300 hover:bg-slate-400 text-slate-700 flex items-center justify-center rounded text-xs font-bold">
+                               ✕
+                             </button>
+                           </div>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between items-start group/name cursor-pointer" onClick={() => { setEditingName(user.id); setTempName(user.raw_user_meta_data?.full_name || ''); setTempSpec(user.raw_user_meta_data?.specialization || 'علوم تجريبية'); }}>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-800">{user.raw_user_meta_data?.full_name || 'بدون اسم'}</span>
+                            <span className="text-xs text-slate-500">{user.raw_user_meta_data?.specialization || 'غير محدد'}</span>
+                          </div>
+                          <Edit2 size={12} className="opacity-0 group-hover/name:opacity-100 mt-1 text-slate-400 hover:text-blue-500 transition-opacity" />
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-sm font-mono text-slate-600 border-y border-slate-100 group-hover:border-slate-200">
                       {user.email}
