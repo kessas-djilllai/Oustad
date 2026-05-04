@@ -269,7 +269,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
               <p className="text-sm md:text-base text-slate-500 font-medium max-w-md mx-auto">اختر المادة من القائمة لبدء تحدياتك وتخطي المراحل المتاحة.</p>
             </div>
             
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
               {subjects.map(sub => {
                 const Icon = sub.icon || BookOpen;
                 return (
@@ -331,7 +331,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
         {step === 2 && questions.length > 0 && typeof questionsQueue[currentQueueIdx] !== 'undefined' && (
           <div className="max-w-xl mx-auto">
             {/* Progress Bar over levels */}
-            <div className="relative mb-10 overflow-x-auto pb-4 hide-scrollbar scroll-smooth" dir="rtl" id="levels-progress-container">
+            <div className="relative mb-10 overflow-x-auto pb-4 hide-scrollbar scroll-smooth" id="levels-progress-container">
               <div className="min-w-full inline-flex relative px-4 md:px-6 py-2">
                 
                 <div className="absolute top-1/2 right-[2rem] md:right-[3rem] left-[2rem] md:left-[3rem] h-1.5 md:h-2 bg-slate-200 rounded-full -translate-y-1/2 z-0 min-w-max">
@@ -396,7 +396,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
                <span className="text-blue-600 font-bold flex flex-col sm:flex-row items-end sm:items-center gap-1.5"><Target size={16} className="text-blue-500" /> <span className="line-clamp-1 bg-blue-50 px-2 py-1 rounded-lg">المرحلة {currentLevelIdx + 1}</span></span>
             </div>
             
-            <div className="text-lg md:text-2xl font-bold text-slate-800 mb-8 md:mb-10 leading-relaxed text-center markdown-body quiz-markdown prose max-w-none" dir="rtl">
+            <div className="text-lg md:text-2xl font-bold text-slate-800 mb-8 md:mb-10 leading-relaxed text-center markdown-body quiz-markdown prose max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex, rehypeRaw]}>
                 {preprocessMath(questions[questionsQueue[currentQueueIdx]].q)}
               </ReactMarkdown>

@@ -2638,7 +2638,7 @@ export function AdminLogin() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-slate-800 to-slate-900 flex items-center justify-center text-white mb-4 shadow-xl">
              <Lock size={32} />
           </div>
-          <h1 className="font-bold text-2xl text-slate-800 text-center">أدمين منصة نجاحي</h1>
+          <h1 className="font-bold text-2xl text-slate-800 text-center">أدمين منصة بكالوريا</h1>
           <p className="text-sm text-slate-500 mt-2 text-center">يرجى تسجيل الدخول للوصول إلى لوحة التحكم</p>
         </div>
 

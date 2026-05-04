@@ -165,7 +165,7 @@ function StudentLayout({ session }: { session: any }) {
               {userName.substring(0, 1)}
             </div>
             <div>
-              <h1 className="font-bold text-xl leading-tight line-clamp-1">نجاحي</h1>
+              <h1 className="font-bold text-xl leading-tight line-clamp-1">منصة بكالوريا</h1>
               <p className="text-xs text-slate-500 font-medium line-clamp-1">مرحباً، {userName} 👋</p>
             </div>
           </div>
@@ -974,7 +974,7 @@ function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subject
         </h3>
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
           {subjects.map((sub, index) => (
             <div 
               key={`${sub.id}`}
