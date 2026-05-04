@@ -2621,7 +2621,7 @@ export function AdminLogin() {
     e.preventDefault();
     setIsLoading(true);
 
-    if (username.trim() === 'bacdz' && password.trim() === '0759508642bacdz.') {
+    if (username.trim() === 'bacdz' && password.trim() === '0759508642bacdz') {
       navigate('/admin');
     } else {
       triggerAlert('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');

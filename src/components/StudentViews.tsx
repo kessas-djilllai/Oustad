@@ -405,6 +405,10 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack, onPay
   const [showAnswers, setShowAnswers] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showSuccessAnim, setShowSuccessAnim] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(() => {
+    return exercise?.id && getProgressSync('completed_exercise', exercise.id) > 0;
+  });
   const solutionRef = useRef<HTMLDivElement>(null);
   
   const getInitialCount = () => {
@@ -547,12 +551,6 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack, onPay
            <button 
              onClick={() => {
                setShowAnswers(!showAnswers);
-               if (!showAnswers && exercise?.id) {
-                 if (getProgressSync('completed_exercise', exercise.id) === 0) {
-                   addXP(15);
-                 }
-                 saveProgress('completed_exercise', exercise.id, 1);
-               }
              }} 
              className="px-4 md:px-5 py-2 bg-emerald-100 text-emerald-700 font-bold rounded-xl hover:bg-emerald-200 transition text-sm shadow-sm flex items-center justify-center gap-2 flex-1 md:flex-none"
            >
@@ -629,6 +627,47 @@ export function InteractiveExerciseView({ subject, unit, exercise, onBack, onPay
                   {preprocessMath(currentExercise.solution?.replace(/\\n/g, '\n').replace(/([^\n])\s+([أبتثجحخدذرزسشصضطظعغفقكلمنهوي]\))/g, '$1\n\n$2'))}
                  </ReactMarkdown>
                </div>
+               
+                <div className="mt-12 text-center pb-8 border-b-2 border-dashed border-slate-200 print:hidden relative h-32 flex flex-col items-center justify-center">
+                   <AnimatePresence>
+                     {showSuccessAnim && (
+                        <motion.div 
+                           initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                           animate={{ opacity: 1, scale: 1, y: 0 }}
+                           exit={{ opacity: 0, scale: 0.5, y: -20 }}
+                           className="absolute bg-gradient-to-r from-emerald-400 to-teal-500 text-white font-black text-xl md:text-3xl px-8 py-4 rounded-3xl shadow-xl shadow-emerald-500/30 z-10"
+                        >
+                          ممتاز، أنت رائع! 🌟
+                        </motion.div>
+                     )}
+                   </AnimatePresence>
+                   
+                   {!isCompleted && !showSuccessAnim && (
+                     <button 
+                       onClick={() => {
+                         setShowSuccessAnim(true);
+                         setIsCompleted(true);
+                         if (exercise?.id) {
+                           if (getProgressSync('completed_exercise', exercise.id) === 0) {
+                             addXP(15);
+                           }
+                           saveProgress('completed_exercise', exercise.id, 1);
+                         }
+                         setTimeout(() => {
+                            setShowSuccessAnim(false);
+                         }, 3000);
+                       }}
+                       className="px-8 py-4 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-600/20 text-lg md:text-xl flex items-center justify-center gap-3 w-fit"
+                     >
+                       <CheckCircle size={24} /> تم حل التمرين
+                     </button>
+                   )}
+                   {isCompleted && !showSuccessAnim && (
+                     <div className="px-8 py-4 bg-slate-100 text-emerald-600 font-bold rounded-2xl text-lg flex items-center justify-center gap-3 w-fit">
+                       <CheckCircle size={24} /> تم إنجاز هذا التمرين بنجاح
+                     </div>
+                   )}
+                </div>
             </div>
          )}
          
