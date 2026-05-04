@@ -2614,7 +2614,7 @@ export function AdminLogin() {
     e.preventDefault();
     setIsLoading(true);
 
-    if (username === 'bacdz' && password === '0759508642bacdz.') {
+    if (username.trim() === 'bacdz' && password.trim() === '0759508642bacdz.') {
       navigate('/admin');
     } else {
       triggerAlert('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');
@@ -2625,6 +2625,7 @@ export function AdminLogin() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-slate-50 px-4">
+      <AlertModal />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-indigo-200/50 blur-[100px] pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-blue-200/50 blur-[100px] pointer-events-none" />
       
