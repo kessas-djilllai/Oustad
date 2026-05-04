@@ -1905,6 +1905,13 @@ function AdminDashboard({ setView }: { setView: (v: string) => void }) {
               </div>
               <ChevronLeft size={16} className="text-slate-400 group-hover:text-emerald-500 transition-colors" />
             </button>
+            <button onClick={() => setView('manage_users')} className="w-full flex items-center justify-between p-4 glass rounded-2xl hover:bg-orange-50 border-transparent hover:border-orange-100 transition-all text-right group border">
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center group-hover:scale-110 transition-transform"><Users size={16}/></div>
+                 <span className="font-bold text-sm text-slate-700 group-hover:text-orange-600 transition-colors">إدارة الطلاب والنقاط</span>
+              </div>
+              <ChevronLeft size={16} className="text-slate-400 group-hover:text-orange-500 transition-colors" />
+            </button>
           </div>
         </div>
       </div>

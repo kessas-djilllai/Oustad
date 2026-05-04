@@ -28,7 +28,7 @@ export function SubjectTypeView({ subject, onBack, onSelectType }: { subject: an
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 md:gap-6">
         <div 
            onClick={() => onSelectType('lessons')}
            className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-8 cursor-pointer group hover:bg-blue-50/50 hover:-translate-y-1 active:translate-y-0 transition-all duration-300 border-2 border-transparent hover:border-blue-200 text-center flex flex-col items-center justify-center h-48 md:h-64 shadow-sm"

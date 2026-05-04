@@ -1,38 +1,60 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { triggerAlert } from "./Admin";
-import { Trash2, Search, User as UserIcon, AlertCircle } from "lucide-react";
+import { Trash2, Search, User as UserIcon, AlertCircle, Edit2, Check, Star, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<any[]>([]);
+  const [userXpMap, setUserXpMap] = useState<Record<string, {id: number, xp: number}>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [deletingUser, setDeletingUser] = useState<any | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [setupRequired, setSetupRequired] = useState(false);
+  const [editingXp, setEditingXp] = useState<string | null>(null);
+  const [tempXp, setTempXp] = useState<string>('');
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
 
   const fetchUsers = async () => {
     if (!supabase) return;
     setLoading(true);
     setSetupRequired(false);
     try {
-      // Assuming there's a view named users_view
-      const { data, error } = await supabase.from('users_view').select('*').order('created_at', { ascending: false });
-      if (error) {
-        if (error.code === '42P01' || error.code === 'PGRST204' || error.message.includes('Could not find the table')) {
-          // Table or view doesn't exist
+      // Fetch users
+      const { data: usersData, error: usersError } = await supabase.from('users_view').select('*').order('created_at', { ascending: false });
+      
+      if (usersError) {
+        if (usersError.code === '42P01' || usersError.code === 'PGRST204' || usersError.message.includes('Could not find the table')) {
           setSetupRequired(true);
+          return;
         } else {
-          throw error;
+          throw usersError;
         }
-      } else {
-        setUsers(data || []);
       }
+
+      // Fetch all xp progress
+      const { data: xpData, error: xpError } = await supabase
+        .from('user_progress')
+        .select('id, user_id, progress_value')
+        .eq('item_type', 'gamification')
+        .eq('item_id', 'xp');
+        
+      if (xpError) throw xpError;
+
+      const xpMap: Record<string, {id: number, xp: number}> = {};
+      if (xpData) {
+         xpData.forEach(p => {
+             xpMap[p.user_id] = { id: p.id, xp: p.progress_value };
+         });
+      }
+
+      setUsers(usersData || []);
+      setUserXpMap(xpMap);
     } catch (err: any) {
       console.error(err);
-      triggerAlert("خطأ في جلب المستخدمين: " + err.message, "error");
+      triggerAlert("خطأ في جلب البيانات: " + err.message, "error");
     } finally {
       setLoading(false);
     }
@@ -41,6 +63,37 @@ export default function AdminUsers() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handleSaveXp = async (userId: string) => {
+    if (!supabase) return;
+    const newXp = parseInt(tempXp);
+    if (isNaN(newXp) || newXp < 0) {
+      triggerAlert('الرجاء إدخال رقم صحيح', 'error');
+      return;
+    }
+    
+    try {
+      const existing = userXpMap[userId];
+      if (existing) {
+        const { error } = await supabase.from('user_progress').update({ progress_value: newXp }).eq('id', existing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('user_progress').insert({
+           user_id: userId,
+           item_type: 'gamification',
+           item_id: 'xp',
+           progress_value: newXp
+        });
+        if (error) throw error;
+      }
+      
+      triggerAlert('تم تحديث نقاط التلميذ (XP) بنجاح', 'success');
+      setEditingXp(null);
+      fetchUsers(); // refresh data
+    } catch (err: any) {
+      triggerAlert('خطأ أثناء حفظ النقاط: ' + err.message, 'error');
+    }
+  };
 
   const handleDelete = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,19 +173,25 @@ grant execute on function public.delete_user_by_id(uuid) to anon, authenticated;
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <UserIcon className="text-blue-500" /> إدارة المستخدمين
+            <UserIcon className="text-blue-500" /> إدارة المستخدمين والنقاط
           </h2>
           <p className="text-sm text-slate-500 mt-1">العدد الإجمالي: {users.length} مستخدم</p>
         </div>
-        <div className="relative w-full md:w-64">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="البحث بالاسم أو البريد..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pr-10 pl-4 text-sm focus:outline-none focus:border-blue-500 transition-all font-medium"
-          />
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+          <div className="relative w-full md:w-64">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="البحث بالاسم أو البريد..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2 pr-10 pl-4 text-sm focus:outline-none focus:border-blue-500 transition-all font-medium"
+            />
+          </div>
+          <button onClick={() => setShowAddUserModal(true)} className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors w-full md:w-auto shrink-0 shadow-sm shadow-blue-500/20">
+            <Plus size={18} />
+            إضافة مستخدم
+          </button>
         </div>
       </div>
 
@@ -147,6 +206,7 @@ grant execute on function public.delete_user_by_id(uuid) to anon, authenticated;
               <tr className="text-sm text-slate-500">
                 <th className="font-bold py-2 px-4 whitespace-nowrap">الاسم والتخصص</th>
                 <th className="font-bold py-2 px-4 whitespace-nowrap">البريد الإلكتروني</th>
+                <th className="font-bold py-2 px-4 whitespace-nowrap">نقاط XP</th>
                 <th className="font-bold py-2 px-4 whitespace-nowrap">تاريخ التسجيل</th>
                 <th className="font-bold py-2 px-4 text-left whitespace-nowrap">إجراءات</th>
               </tr>
@@ -154,10 +214,14 @@ grant execute on function public.delete_user_by_id(uuid) to anon, authenticated;
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="text-center py-10 text-slate-500">لا يوجد مستخدمين لعرضهم</td>
+                  <td colSpan={5} className="text-center py-10 text-slate-500">لا يوجد مستخدمين لعرضهم</td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
+                filteredUsers.map((user) => {
+                  const xpObj = userXpMap[user.id];
+                  const userXp = xpObj ? xpObj.xp : 0;
+                  
+                  return (
                   <tr key={user.id} className="bg-slate-50 hover:bg-slate-100 transition-colors rounded-2xl group">
                     <td className="py-3 px-4 rounded-r-2xl border-y border-r border-slate-100 group-hover:border-slate-200">
                       <div className="flex flex-col">
@@ -167,6 +231,27 @@ grant execute on function public.delete_user_by_id(uuid) to anon, authenticated;
                     </td>
                     <td className="py-3 px-4 text-sm font-mono text-slate-600 border-y border-slate-100 group-hover:border-slate-200">
                       {user.email}
+                    </td>
+                    <td className="py-3 px-4 text-sm font-bold text-slate-600 border-y border-slate-100 group-hover:border-slate-200" dir="ltr">
+                      {editingXp === user.id ? (
+                        <div className="flex items-center gap-2">
+                           <input 
+                             type="number" 
+                             value={tempXp} 
+                             onChange={(e) => setTempXp(e.target.value)} 
+                             className="w-20 px-2 py-1 rounded bg-white border border-slate-300 text-center text-sm focus:outline-none focus:border-amber-500" 
+                             autoFocus
+                           />
+                           <button onClick={() => handleSaveXp(user.id)} className="w-6 h-6 bg-emerald-500 hover:bg-emerald-600 text-white flex items-center justify-center rounded">
+                             <Check size={14} />
+                           </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end gap-2 items-center text-amber-500 group/xp cursor-pointer" onClick={() => { setEditingXp(user.id); setTempXp(userXp.toString()); }}>
+                           <span>{userXp}</span> <Star size={14} className="fill-amber-500" />
+                           <Edit2 size={12} className="opacity-0 group-hover/xp:opacity-100 text-slate-400 hover:text-blue-500 mix-blend-multiply" />
+                        </div>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-sm text-slate-600 border-y border-slate-100 group-hover:border-slate-200">
                       {new Date(user.created_at).toLocaleDateString('ar-DZ', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -181,12 +266,54 @@ grant execute on function public.delete_user_by_id(uuid) to anon, authenticated;
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       )}
+
+      {/* Add User Info Modal */}
+      <AnimatePresence>
+        {showAddUserModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-hidden"
+            >
+               <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2 text-blue-600">
+                  <UserIcon size={24} /> إضافة مستخدم جديد
+               </h3>
+               
+               <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-6">
+                 <p className="text-slate-700 text-sm leading-relaxed mb-4 font-medium">
+                   للحفاظ على أمان قاعدة البيانات وتجنب مشكلات الجلسات (Sessions)، <b>أفضل طريقة لإضافة مستخدم جديد هي أن يقوم شخصياً بالدخول لرابط المنصة والتسجيل</b> من واجهة الدخول (أو يمكنك فتح المنصة في نافذة تصفح متخفي والتسجيل كطالب).
+                 </p>
+                 <p className="text-slate-600 text-xs leading-relaxed">
+                   بمجرد قيامه بالتسجيل، سيظهر حسابه فوراً في هذه القائمة، وستتمكن من تعديل نقاط الـ XP الخاصة به بحرية لمساعدته في تصدر لوحة المتصدرين.
+                 </p>
+               </div>
+               
+               <div className="flex gap-3">
+                 <button 
+                   onClick={() => setShowAddUserModal(false)}
+                   className="flex-1 py-3 px-4 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                 >
+                   حسناً، فهمت
+                 </button>
+               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>

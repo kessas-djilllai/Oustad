@@ -974,7 +974,7 @@ function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subject
         </h3>
       </div>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
           {subjects.map((sub, index) => (
             <div 
               key={`${sub.id}`}
@@ -1123,7 +1123,7 @@ function LeaderboardView({ session }: { session: any }) {
           {/* 2nd Place */}
           {second && (
           <div className="flex-1 flex flex-col items-center animate-in zoom-in duration-500 delay-100 group relative">
-             <div className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-purple-400 to-purple-500 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-lg mb-3 shadow-purple-500/30 border-4 ${second.isCurrentUser ? 'border-blue-500 dark:border-blue-400 ring-4 ring-blue-500/30' : 'border-white dark:border-slate-800'} z-10 relative`}>
+             <div className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-purple-400 to-purple-500 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-lg mb-3 shadow-purple-500/30 border-4 border-white dark:border-slate-800 z-10 relative`}>
                {second.name.charAt(0)}
                <div className="absolute -bottom-2 -right-2 w-6 h-6 md:w-8 md:h-8 rounded-full bg-white dark:bg-slate-800 shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-purple-500">
                  <span className="font-bold text-xs md:text-sm">2</span>
@@ -1147,7 +1147,7 @@ function LeaderboardView({ session }: { session: any }) {
                 <Crown size={48} fill="currentColor" strokeWidth={1.5} />
              </div>
              
-             <div className={`w-20 h-20 md:w-28 md:h-28 bg-gradient-to-tr from-amber-400 to-yellow-500 rounded-full flex items-center justify-center text-4xl md:text-5xl font-black text-white shadow-xl shadow-amber-500/40 mb-3 border-[5px] ${first.isCurrentUser ? 'border-blue-500 dark:border-blue-400 ring-4 ring-blue-500/30' : 'border-white dark:border-slate-800'} relative z-10`}>
+             <div className={`w-20 h-20 md:w-28 md:h-28 bg-gradient-to-tr from-amber-400 to-yellow-500 rounded-full flex items-center justify-center text-4xl md:text-5xl font-black text-white shadow-xl shadow-amber-500/40 mb-3 border-[5px] border-white dark:border-slate-800 relative z-10`}>
                {first.name.charAt(0)}
                <div className="absolute -bottom-2 -left-2 md:-bottom-3 md:-left-3 bg-white dark:bg-slate-800 w-8 h-8 md:w-10 md:h-10 rounded-full shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-amber-500">
                  <span className="font-black text-lg md:text-xl">1</span>
@@ -1167,7 +1167,7 @@ function LeaderboardView({ session }: { session: any }) {
           {/* 3rd Place */}
           {third && (
           <div className="flex-1 flex flex-col items-center animate-in zoom-in duration-500 delay-200 group relative">
-             <div className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-slate-400 to-slate-500 dark:from-slate-600 dark:to-slate-700 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-md mb-3 shadow-slate-400/20 border-4 ${third.isCurrentUser ? 'border-blue-500 dark:border-blue-400 ring-4 ring-blue-500/30' : 'border-white dark:border-slate-800'} z-10 relative`}>
+             <div className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-slate-400 to-slate-500 dark:from-slate-600 dark:to-slate-700 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-md mb-3 shadow-slate-400/20 border-4 border-white dark:border-slate-800 z-10 relative`}>
                {third.name.charAt(0)}
                <div className="absolute -bottom-2 -left-2 w-6 h-6 md:w-8 md:h-8 rounded-full bg-white dark:bg-slate-800 shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-500">
                  <span className="font-bold text-xs md:text-sm">3</span>

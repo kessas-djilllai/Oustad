@@ -269,7 +269,7 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
               <p className="text-sm md:text-base text-slate-500 font-medium max-w-md mx-auto">اختر المادة من القائمة لبدء تحدياتك وتخطي المراحل المتاحة.</p>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
               {subjects.map(sub => {
                 const Icon = sub.icon || BookOpen;
                 return (
