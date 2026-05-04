@@ -16,6 +16,58 @@ export default function AdminUsers() {
   const [editingXp, setEditingXp] = useState<string | null>(null);
   const [tempXp, setTempXp] = useState<string>('');
   const [showAddUserModal, setShowAddUserModal] = useState(false);
+  
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserSpec, setNewUserSpec] = useState('علوم تجريبية');
+  const [isAddingUser, setIsAddingUser] = useState(false);
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserName || !newUserEmail || !newUserPassword) {
+      triggerAlert('الرجاء تعبئة جميع الحقول.', 'error');
+      return;
+    }
+    
+    setIsAddingUser(true);
+    try {
+      const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
+      
+      const { createClient } = await import('@supabase/supabase-js');
+      const tempClient = createClient(supabaseUrl, supabaseAnonKey, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        }
+      });
+      
+      const { error } = await tempClient.auth.signUp({
+        email: newUserEmail,
+        password: newUserPassword,
+        options: {
+          data: {
+            full_name: newUserName,
+            specialization: newUserSpec
+          }
+        }
+      });
+      
+      if (error) throw error;
+      
+      triggerAlert('تم إضافة المستخدم بنجاح!', 'success');
+      setShowAddUserModal(false);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPassword('');
+      fetchUsers();
+    } catch (err: any) {
+      triggerAlert('خطأ أثناء إضافة المستخدم: ' + err.message, 'error');
+    } finally {
+      setIsAddingUser(false);
+    }
+  };
 
   const fetchUsers = async () => {
     if (!supabase) return;
@@ -293,23 +345,51 @@ grant execute on function public.delete_user_by_id(uuid) to anon, authenticated;
                   <UserIcon size={24} /> إضافة مستخدم جديد
                </h3>
                
-               <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-6">
-                 <p className="text-slate-700 text-sm leading-relaxed mb-4 font-medium">
-                   للحفاظ على أمان قاعدة البيانات وتجنب مشكلات الجلسات (Sessions)، <b>أفضل طريقة لإضافة مستخدم جديد هي أن يقوم شخصياً بالدخول لرابط المنصة والتسجيل</b> من واجهة الدخول (أو يمكنك فتح المنصة في نافذة تصفح متخفي والتسجيل كطالب).
-                 </p>
-                 <p className="text-slate-600 text-xs leading-relaxed">
-                   بمجرد قيامه بالتسجيل، سيظهر حسابه فوراً في هذه القائمة، وستتمكن من تعديل نقاط الـ XP الخاصة به بحرية لمساعدته في تصدر لوحة المتصدرين.
-                 </p>
-               </div>
-               
-               <div className="flex gap-3">
-                 <button 
-                   onClick={() => setShowAddUserModal(false)}
-                   className="flex-1 py-3 px-4 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-                 >
-                   حسناً، فهمت
-                 </button>
-               </div>
+               <form onSubmit={handleAddUser} className="space-y-4">
+                 <div>
+                   <label className="block text-sm font-semibold text-slate-700 mb-1">الاسم الكامل</label>
+                   <input type="text" value={newUserName} onChange={e => setNewUserName(e.target.value)} required className="w-full border-slate-200 rounded-xl p-3 bg-slate-50 border outline-none focus:border-blue-500 focus:bg-white" />
+                 </div>
+                 
+                 <div>
+                   <label className="block text-sm font-semibold text-slate-700 mb-1">البريد الإلكتروني</label>
+                   <input type="email" value={newUserEmail} onChange={e => setNewUserEmail(e.target.value)} required className="w-full border-slate-200 rounded-xl p-3 bg-slate-50 border outline-none focus:border-blue-500 focus:bg-white" />
+                 </div>
+                 
+                 <div>
+                   <label className="block text-sm font-semibold text-slate-700 mb-1">كلمة المرور</label>
+                   <input type="password" value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} required className="w-full border-slate-200 rounded-xl p-3 bg-slate-50 border outline-none focus:border-blue-500 focus:bg-white" minLength={6} />
+                 </div>
+
+                 <div>
+                   <label className="block text-sm font-semibold text-slate-700 mb-1">الشعبة</label>
+                   <select value={newUserSpec} onChange={e => setNewUserSpec(e.target.value)} className="w-full border-slate-200 rounded-xl p-3 bg-slate-50 border outline-none focus:border-blue-500 focus:bg-white text-right" dir="rtl">
+                     <option value="علوم تجريبية">علوم تجريبية</option>
+                     <option value="تقني رياضي">تقني رياضي</option>
+                     <option value="رياضيات">رياضيات</option>
+                     <option value="تسيير واقتصاد">تسيير واقتصاد</option>
+                     <option value="آداب وفلسفة">آداب وفلسفة</option>
+                     <option value="لغات أجنبية">لغات أجنبية</option>
+                   </select>
+                 </div>
+                 
+                 <div className="flex gap-3 mt-6">
+                   <button 
+                     type="button"
+                     onClick={() => setShowAddUserModal(false)}
+                     className="flex-1 py-3 px-4 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                   >
+                     إلغاء
+                   </button>
+                   <button 
+                     type="submit"
+                     disabled={isAddingUser}
+                     className="flex-1 py-3 px-4 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                   >
+                     {isAddingUser ? 'جاري الإضافة...' : 'إضافة مستخدم'}
+                   </button>
+                 </div>
+               </form>
             </motion.div>
           </motion.div>
         )}
