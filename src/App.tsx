@@ -9,7 +9,7 @@ import { supabase } from "./lib/supabase";
 import { AdminLayout, AdminLogin } from "./pages/Admin";
 import { PdfBacAnalis } from "./pages/PdfBacAnalis";
 import { AuthPage } from "./pages/Auth";
-import { loadUserProgress, getProgressSync, saveProgress, checkDailyLogin, getXP, getStreak, addXP } from "./lib/progress";
+import { loadUserProgress, getProgressSync, saveProgress, checkDailyLogin, getXP, getStreak, addXP, getLeaderboard } from "./lib/progress";
 import { GoogleGenAI, Type } from "@google/genai";
 import { getSubjectPrompt } from "./lib/prompts";
 import { preprocessMath } from "./lib/utils";
@@ -54,7 +54,17 @@ import {
   Star,
   Sun,
   Moon,
-  Home
+  Home,
+  Trophy,
+  Medal,
+  Crown,
+  Rocket,
+  Zap,
+  Lightbulb,
+  Dumbbell,
+  Shield,
+  Activity,
+  Heart
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -156,7 +166,7 @@ function StudentLayout({ session }: { session: any }) {
               {userName.substring(0, 1)}
             </div>
             <div>
-              <h1 className="font-bold text-xl leading-tight line-clamp-1">بكالوريا برو</h1>
+              <h1 className="font-bold text-xl leading-tight line-clamp-1">نجاحي</h1>
               <p className="text-xs text-slate-500 font-medium line-clamp-1">مرحباً، {userName} 👋</p>
             </div>
           </div>
@@ -273,7 +283,7 @@ const SUBJECTS_DATA = [
 
 function StudentPortal({ session }: { session: any }) {
   const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
-  const [mainTab, setMainTab] = useState<'home' | 'subjects' | 'topics' | 'settings'>('home');
+  const [mainTab, setMainTab] = useState<'home' | 'subjects' | 'topics' | 'settings' | 'leaderboard'>('home');
   
   const [view, setViewState] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any, lesson?: any }>(() => {
     const saved = localStorage.getItem('portal_view');
@@ -569,6 +579,7 @@ function StudentPortal({ session }: { session: any }) {
         {view.type === 'dashboard' && mainTab === 'home' && <DashboardHomeView subjects={subjects} bacDate={bacDate} onStartQuiz={() => setView({ type: 'quiz' })} />}
         {view.type === 'dashboard' && mainTab === 'subjects' && <DashboardSubjectsView subjects={subjects} listType={mainTab} onSubjectClick={(s) => setView({ type: 'subject_units', subject: s })} />}
         {view.type === 'dashboard' && mainTab === 'topics' && <TopicsView subjects={subjects} />}
+        {view.type === 'dashboard' && mainTab === 'leaderboard' && <LeaderboardView session={session} />}
         {view.type === 'dashboard' && mainTab === 'settings' && <SettingsView />}
         
         {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'unit_details', subject: currentSubject, unit: u })} />}
@@ -590,6 +601,7 @@ function StudentPortal({ session }: { session: any }) {
         <div className="fixed bottom-0 left-0 right-0 h-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-800/50 z-40 flex items-center justify-around px-2 sm:px-6 pb-2 text-slate-500 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.05)]">
           <BottomNavItem icon={<Home size={22} />} label="الرئيسية" active={mainTab === 'home'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('home'); }} />
           <BottomNavItem icon={<BookOpen size={22} />} label="المواد" active={mainTab === 'subjects'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('subjects'); }} />
+          <BottomNavItem icon={<Trophy size={22} />} label="الصدارة" active={mainTab === 'leaderboard'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('leaderboard'); }} />
           <BottomNavItem icon={<FileText size={22} />} label="مواضيع" active={mainTab === 'topics'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('topics'); }} />
           <BottomNavItem icon={<Settings size={22} />} label="الإعدادات" active={mainTab === 'settings'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('settings'); }} />
         </div>
@@ -1088,6 +1100,238 @@ function PaymentView({ onBack }: { onBack: () => void }) {
          <button onClick={onBack} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-4 rounded-2xl transition-colors">
             العودة
          </button>
+      </div>
+    </div>
+  );
+}
+
+function LeaderboardView({ session }: { session: any }) {
+  const [xp, setXp] = useState(0);
+  const [leaders, setLeaders] = useState<any[]>([]);
+  const [userRank, setUserRank] = useState<number | null>(null);
+  
+  const userName = session?.user?.user_metadata?.full_name || 'أنت';
+  const currentUserId = session?.user?.id;
+
+  const getStyleForUser = (userId: string, isCurrentUser: boolean, realName?: string) => {
+    if (!userId) return { name: 'مجهول', Icon: UserCircle, color: 'text-slate-400' };
+    
+    // Generate consistent visual styles based on user ID
+    const seed = parseInt(userId.substring(0, 4), 16) || 0;
+    const icons = [Rocket, Sparkles, Zap, Star, Target, Crown, Flame, Lightbulb, Trophy, Dumbbell, Shield, Activity, Heart];
+    const colors = ['text-blue-500', 'text-amber-500', 'text-emerald-500', 'text-purple-500', 'text-orange-500', 'text-rose-500'];
+    
+    const names = ['أحمد', 'ياسر', 'أمين', 'لينا', 'سارة', 'فارس', 'كريم', 'ريان', 'يوسف', 'مريم', 'عمر', 'إسلام'];
+    let finalName = isCurrentUser ? (userName !== 'أنت' ? `أنت (${userName})` : 'أنت') : realName;
+    if (!finalName) {
+         finalName = `${names[seed % names.length]} ${userId.substring(0, 3)}`;
+    }
+
+    return {
+      name: finalName,
+      Icon: icons[seed % icons.length],
+      color: colors[seed % colors.length]
+    };
+  };
+
+  useEffect(() => {
+    setXp(getXP() || 0); 
+    const handleProgress = () => {
+      setXp(getXP() || 0);
+    };
+    window.addEventListener('progress_updated', handleProgress);
+    
+    // Fetch real leaderboard
+    getLeaderboard().then(data => {
+        let rank = null;
+        let formattedData = data.map((item: any, index: number) => {
+            const isCurrent = item.user_id === currentUserId;
+            if (isCurrent) rank = index + 1;
+            
+            const realName = item.user_meta?.full_name;
+            const style = getStyleForUser(item.user_id, isCurrent, realName);
+            
+            return {
+                id: index + 1,
+                userId: item.user_id,
+                name: style.name,
+                xp: item.progress_value,
+                Icon: isCurrent ? UserCircle : style.Icon,
+                color: isCurrent ? 'text-teal-500' : style.color,
+                isCurrentUser: isCurrent
+            };
+        });
+        
+        setLeaders(formattedData);
+        setUserRank(rank);
+    });
+
+    return () => window.removeEventListener('progress_updated', handleProgress);
+  }, [currentUserId, userName, xp]);
+
+  // Top 3
+  const first = leaders.length > 0 ? leaders[0] : null;
+  const second = leaders.length > 1 ? leaders[1] : null;
+  const third = leaders.length > 2 ? leaders[2] : null;
+  
+  // Rest
+  const competitors = leaders.slice(3);
+
+  return (
+    <div className="w-full pb-24" dir="rtl">
+      <div className="max-w-xl mx-auto px-4 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        
+        {/* Header */}
+        <div className="flex items-center justify-center mb-8">
+           <div className="flex items-center gap-3">
+             <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">لوحة المتصدرين</h1>
+           </div>
+        </div>
+
+        {/* Podium Area */}
+        {leaders.length >= 3 && (
+        <div className="flex items-end justify-center gap-2 md:gap-4 mb-20 px-2 pt-6">
+          
+          {/* 2nd Place */}
+          {second && (
+          <div className="flex-1 flex flex-col items-center animate-in zoom-in duration-500 delay-100 group relative">
+             <div className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-purple-400 to-purple-500 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-lg mb-3 shadow-purple-500/30 border-4 ${second.isCurrentUser ? 'border-blue-500 dark:border-blue-400 ring-4 ring-blue-500/30' : 'border-white dark:border-slate-800'} z-10 relative`}>
+               {second.name.charAt(0)}
+               <div className="absolute -bottom-2 -right-2 w-6 h-6 md:w-8 md:h-8 rounded-full bg-white dark:bg-slate-800 shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-purple-500">
+                 <span className="font-bold text-xs md:text-sm">2</span>
+               </div>
+             </div>
+             
+             <div className="flex flex-col items-center relative z-10 text-center w-full">
+               <span className="font-bold text-slate-800 dark:text-white text-xs md:text-base mb-1 drop-shadow-sm max-w-[80px] break-words md:max-w-full leading-tight">{second.name}</span>
+               <div className="bg-purple-50 dark:bg-purple-900/30 rounded-full px-2 py-1 md:px-3 flex items-center gap-1 border border-purple-100 dark:border-purple-800/50 text-purple-600 dark:text-purple-400 shadow-sm mt-1">
+                 <span className="text-xs md:text-sm font-bold leading-none">{second.xp.toLocaleString('en-US').replace(',', '.')}</span>
+                 <Star size={10} fill="currentColor" />
+               </div>
+             </div>
+          </div>
+          )}
+
+          {/* 1st Place */}
+          {first && (
+          <div className="flex-[1.2] flex flex-col items-center animate-in zoom-in duration-500 group relative z-20">
+             <div className="absolute -top-12 text-amber-500 animate-bounce drop-shadow-lg z-20">
+                <Crown size={48} fill="currentColor" strokeWidth={1.5} />
+             </div>
+             
+             <div className={`w-20 h-20 md:w-28 md:h-28 bg-gradient-to-tr from-amber-400 to-yellow-500 rounded-full flex items-center justify-center text-4xl md:text-5xl font-black text-white shadow-xl shadow-amber-500/40 mb-3 border-[5px] ${first.isCurrentUser ? 'border-blue-500 dark:border-blue-400 ring-4 ring-blue-500/30' : 'border-white dark:border-slate-800'} relative z-10`}>
+               {first.name.charAt(0)}
+               <div className="absolute -bottom-2 -left-2 md:-bottom-3 md:-left-3 bg-white dark:bg-slate-800 w-8 h-8 md:w-10 md:h-10 rounded-full shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-amber-500">
+                 <span className="font-black text-lg md:text-xl">1</span>
+               </div>
+             </div>
+             
+             <div className="flex flex-col items-center relative z-10 w-full text-center">
+               <span className="font-bold text-slate-800 dark:text-white text-sm md:text-lg mb-1 drop-shadow-sm max-w-full break-words leading-tight">{first.name}</span>
+               <div className="bg-amber-50 dark:bg-amber-900/30 rounded-full px-3 py-1 md:px-4 md:py-1.5 flex items-center gap-1.5 border border-amber-200 dark:border-amber-800/50 text-amber-600 dark:text-amber-400 shadow-sm mt-1 ring-2 ring-amber-500/10 dark:ring-amber-500/20">
+                 <span className="text-sm md:text-base font-bold leading-none">{first.xp.toLocaleString('en-US').replace(',', '.')}</span>
+                 <Star size={12} fill="currentColor" />
+               </div>
+             </div>
+          </div>
+          )}
+
+          {/* 3rd Place */}
+          {third && (
+          <div className="flex-1 flex flex-col items-center animate-in zoom-in duration-500 delay-200 group relative">
+             <div className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-slate-400 to-slate-500 dark:from-slate-600 dark:to-slate-700 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-md mb-3 shadow-slate-400/20 border-4 ${third.isCurrentUser ? 'border-blue-500 dark:border-blue-400 ring-4 ring-blue-500/30' : 'border-white dark:border-slate-800'} z-10 relative`}>
+               {third.name.charAt(0)}
+               <div className="absolute -bottom-2 -left-2 w-6 h-6 md:w-8 md:h-8 rounded-full bg-white dark:bg-slate-800 shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-500">
+                 <span className="font-bold text-xs md:text-sm">3</span>
+               </div>
+             </div>
+             
+             <div className="flex flex-col items-center relative z-10 text-center w-full">
+               <span className="font-bold text-slate-800 dark:text-white text-xs md:text-base mb-1 drop-shadow-sm max-w-[80px] break-words md:max-w-full leading-tight">{third.name}</span>
+               <div className="bg-slate-50 dark:bg-slate-800 rounded-full px-2 py-1 md:px-3 flex items-center gap-1 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 shadow-sm mt-1">
+                 <span className="text-xs md:text-sm font-bold leading-none">{third.xp.toLocaleString('en-US').replace(',', '.')}</span>
+                 <Star size={10} fill="currentColor" />
+               </div>
+             </div>
+          </div>
+          )}
+        </div>
+        )}
+        
+        {/* Loading / Less than 3 visual */}
+        {leaders.length > 0 && leaders.length < 3 && (
+            <div className="mb-10 text-center text-slate-500 p-8 glass rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[250px]">
+                <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center mb-4">
+                   <Crown className="text-amber-500" size={36} />
+                </div>
+                <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-2">لوحة الشرف قيد التكوين!</h3>
+                <p className="text-sm">كن أنت من الأوائل وانطلق في تجميع النقاط...</p>
+            </div>
+        )}
+
+        {/* Current User Stats Card */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-400 rounded-3xl p-6 mb-10 shadow-lg shadow-blue-500/20 flex items-center justify-between border border-white/20 relative overflow-hidden text-white">
+           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10" />
+           <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-900/10 rounded-full blur-2xl -ml-10 -mb-10" />
+           
+           <div className="flex flex-col items-center relative z-10 w-1/2 border-l border-blue-300/30 pl-2">
+              <div className="bg-blue-400/30 rounded-xl p-2 mb-2 backdrop-blur-md">
+                 <Star size={20} fill="currentColor" className="opacity-90" />
+              </div>
+              <span className="text-blue-50 text-xs md:text-sm font-medium mb-1">نقاطك الإجمالية</span>
+              <span className="font-black text-3xl drop-shadow-sm">{xp.toLocaleString('en-US').replace(',', '.')}</span>
+           </div>
+           
+           <div className="flex flex-col items-center relative z-10 w-1/2 pr-2">
+              <div className="bg-blue-400/30 rounded-xl p-2 mb-2 backdrop-blur-md">
+                 <Trophy size={20} fill="currentColor" className="opacity-90" />
+              </div>
+              <span className="text-blue-50 text-xs md:text-sm font-medium mb-1">مرتبتك الحالية</span>
+              <span className="font-black text-3xl drop-shadow-sm">{userRank ? `#${userRank}` : '--'}</span>
+           </div>
+        </div>
+
+        {/* Divider */}
+        {competitors.length > 0 && (
+            <div className="flex items-center gap-4 mb-6">
+               <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
+               <span className="text-xs font-bold text-slate-400 dark:text-slate-500 px-2 flex items-center gap-2">
+                 <Users size={14} /> التصنيف الكامل
+               </span>
+               <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
+            </div>
+        )}
+
+        {/* Competitor List */}
+        <div className="space-y-3">
+          {competitors.map((user) => (
+             <div key={user.id} className={`flex items-center p-3 md:p-4 rounded-[1.5rem] shadow-sm border transition-colors relative overflow-hidden group ${user.isCurrentUser ? 'border-blue-400 bg-gradient-to-r from-blue-50 to-white dark:from-blue-900/30 dark:to-slate-900 ring-2 ring-blue-400/30' : 'glass border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700'}`}>
+                {user.isCurrentUser && <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />}
+                {user.isCurrentUser && <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-300/20 rounded-full blur-xl -ml-10 -mb-10 pointer-events-none" />}
+                
+                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center font-bold shrink-0 relative z-10 ${user.isCurrentUser ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/60 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border-white dark:border-slate-800 shadow-inner'} text-base border group-hover:scale-105 transition-transform`}>
+                  {user.id}
+                </div>
+                
+                <div className="flex-1 flex flex-row items-center justify-between pr-4 relative z-10">
+                  <div className="flex items-center gap-2">
+                     <span className={`font-bold md:text-lg ${user.isCurrentUser ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-white'}`}>{user.name}</span>
+                  </div>
+                  <div className={`flex items-center gap-1.5 font-bold px-3 py-1 rounded-full border ${user.isCurrentUser ? 'text-amber-600 bg-amber-100/50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/30 dark:border-amber-800' : 'text-amber-500 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/50'}`}>
+                     <span>{user.xp.toLocaleString('en-US').replace(',', '.')}</span>
+                     <Star size={14} fill="currentColor" />
+                  </div>
+                </div>
+             </div>
+          ))}
+          {leaders.length === 0 && (
+              <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-4">
+                 <div className="w-12 h-12 border-4 border-slate-200 border-t-teal-500 rounded-full animate-spin"></div>
+                 <p className="font-medium text-sm">جاري تحميل التصنيف...</p>
+              </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

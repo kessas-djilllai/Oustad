@@ -19,6 +19,18 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
   const [step, setStep] = useState(0); // 0: select subject, 2: question answers, 3: result, 4: complete all
   const [selectedSubject, setSelectedSubject] = useState<any>(null);
   const [currentLevelIdx, setCurrentLevelIdx] = useState(0);
+
+  // Auto-scroll progress bar when level changes
+  useEffect(() => {
+    if (step === 2) {
+      setTimeout(() => {
+        const activeNode = document.getElementById(`level-node-${currentLevelIdx}`);
+        if (activeNode) {
+          activeNode.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      }, 100);
+    }
+  }, [currentLevelIdx, step]);
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -319,54 +331,58 @@ export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => 
         {step === 2 && questions.length > 0 && typeof questionsQueue[currentQueueIdx] !== 'undefined' && (
           <div className="max-w-xl mx-auto">
             {/* Progress Bar over levels */}
-            <div className="relative mb-10 overflow-hidden px-2 md:px-4" dir="rtl">
-              <div className="absolute top-1/2 right-[1.5rem] md:right-[2.5rem] left-[1.5rem] md:left-[2.5rem] h-1.5 md:h-2 bg-slate-200 rounded-full -translate-y-1/2 z-0">
-                  <div 
-                      className="absolute top-0 right-0 h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
-                      style={{ 
-                          width: `${
-                              (((selectedSubject ? getProgressSync('cookie_level', selectedSubject.id) || 0 : 0) + (currentLevelIdx === (selectedSubject ? getProgressSync('cookie_level', selectedSubject.id) || 0 : 0) ? answeredCorrectIds.size / questions.length : 0)) / totalLevelsCount) * 100
-                          }%`,
-                          maxWidth: '100%'
-                      }}
-                  />
-              </div>
-              <div className="flex justify-between relative z-10 w-full" style={{ padding: '0 0.5rem' }}>
-                 {/* The Start Node */}
-                 <div className={`flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all duration-500 bg-emerald-500 border-4 border-emerald-500 text-white shadow-md shadow-emerald-500/30`}>
-                    <Flag size={16} className="md:w-5 md:h-5 text-white" />
-                 </div>
+            <div className="relative mb-10 overflow-x-auto pb-4 hide-scrollbar scroll-smooth" dir="rtl" id="levels-progress-container">
+              <div className="min-w-full inline-flex relative px-4 md:px-6 py-2">
+                
+                <div className="absolute top-1/2 right-[2rem] md:right-[3rem] left-[2rem] md:left-[3rem] h-1.5 md:h-2 bg-slate-200 rounded-full -translate-y-1/2 z-0 min-w-max">
+                    <div 
+                        className="absolute top-0 right-0 h-full bg-emerald-500 rounded-full transition-all duration-700 ease-out"
+                        style={{ 
+                            width: `${
+                                (((selectedSubject ? getProgressSync('cookie_level', selectedSubject.id) || 0 : 0) + (currentLevelIdx === (selectedSubject ? getProgressSync('cookie_level', selectedSubject.id) || 0 : 0) ? answeredCorrectIds.size / questions.length : 0)) / totalLevelsCount) * 100
+                            }%`,
+                            maxWidth: '100%'
+                        }}
+                    />
+                </div>
+                
+                <div className="flex justify-between items-center w-full gap-4 md:gap-8 relative z-10 min-w-max px-2">
+                   {/* The Start Node */}
+                   <div className={`shrink-0 flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all duration-500 bg-emerald-500 border-4 border-emerald-500 text-white shadow-md shadow-emerald-500/30`}>
+                      <Flag size={16} className="md:w-5 md:h-5 text-white" />
+                   </div>
 
-                 {Array.from({ length: totalLevelsCount }).map((_, i) => {
-                     const currentUnlocked = selectedSubject ? (getProgressSync('cookie_level', selectedSubject.id) || 0) : 0;
-                     const isCompleted = i < currentUnlocked;
-                     const isCurrentActive = i === currentLevelIdx;
-                     const isClickable = i <= currentUnlocked;
-                     
-                     let bgClass = "bg-white border-4 border-slate-200 text-slate-400";
-                     if (isCompleted) bgClass = "bg-emerald-500 border-4 border-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer hover:scale-110";
-                     if (i === currentUnlocked) bgClass = "bg-white border-4 border-blue-500 text-blue-500 shadow-md shadow-blue-500/30 cursor-pointer hover:scale-110";
-                     if (isCurrentActive) bgClass = "bg-blue-500 border-4 border-blue-500 text-white shadow-md shadow-blue-500/30 ring-4 ring-blue-100 scale-110";
-                     
-                     return (
-                         <div 
-                             key={i} 
-                             onClick={() => {
-                               if (isClickable && i !== currentLevelIdx) {
-                                 // If clicking a completed level, reset its questions to the beginning
-                                 if (i < currentUnlocked) {
-                                    saveProgress('cookie_qidx', `${selectedSubject.id}_${i}`, 0);
+                   {Array.from({ length: totalLevelsCount }).map((_, i) => {
+                       const currentUnlocked = selectedSubject ? (getProgressSync('cookie_level', selectedSubject.id) || 0) : 0;
+                       const isCompleted = i < currentUnlocked;
+                       const isCurrentActive = i === currentLevelIdx;
+                       const isClickable = i <= currentUnlocked;
+                       
+                       let bgClass = "bg-white border-4 border-slate-200 text-slate-400";
+                       if (isCompleted) bgClass = "bg-emerald-500 border-4 border-emerald-500 text-white shadow-md shadow-emerald-500/30 cursor-pointer hover:scale-110";
+                       if (i === currentUnlocked) bgClass = "bg-white border-4 border-blue-500 text-blue-500 shadow-md shadow-blue-500/30 cursor-pointer hover:scale-110";
+                       if (isCurrentActive) bgClass = "bg-blue-500 border-4 border-blue-500 text-white shadow-md shadow-blue-500/30 ring-4 ring-blue-100 scale-110";
+                       
+                       return (
+                           <div 
+                               key={i} 
+                               id={`level-node-${i}`}
+                               onClick={() => {
+                                 if (isClickable && i !== currentLevelIdx) {
+                                   if (i < currentUnlocked) {
+                                      saveProgress('cookie_qidx', `${selectedSubject.id}_${i}`, 0);
+                                   }
+                                   setupLevel(subjectCookiesStore, i, selectedSubject);
                                  }
-                                 setupLevel(subjectCookiesStore, i, selectedSubject);
-                               }
-                             }}
-                             title={i < currentUnlocked ? "إعادة المرحلة" : (i === currentUnlocked ? "المرحلة الحالية" : "مرحلة مقفلة")}
-                             className={`flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all duration-500 ${bgClass}`}
-                         >
-                             {isCompleted && !isCurrentActive ? <CheckCircle size={16} className="md:w-5 md:h-5 text-white" /> : (i + 1)}
-                         </div>
-                     )
-                 })}
+                               }}
+                               title={i < currentUnlocked ? "إعادة المرحلة" : (i === currentUnlocked ? "المرحلة الحالية" : "مرحلة مقفلة")}
+                               className={`shrink-0 flex items-center justify-center w-8 h-8 md:w-10 md:h-10 rounded-full font-bold text-xs md:text-sm transition-all duration-500 ${bgClass}`}
+                           >
+                               {isCompleted && !isCurrentActive ? <CheckCircle size={16} className="md:w-5 md:h-5 text-white" /> : (i + 1)}
+                           </div>
+                       )
+                   })}
+                </div>
               </div>
             </div>
 

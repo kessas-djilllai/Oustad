@@ -97,6 +97,51 @@ export const getStreak = () => {
     return getProgressSync('gamification', 'streak');
 }
 
+export const getLeaderboard = async () => {
+    if (!supabase) return [];
+    try {
+        const { data, error } = await supabase
+            .from('user_progress')
+            .select('user_id, progress_value')
+            .eq('item_type', 'gamification')
+            .eq('item_id', 'xp')
+            .order('progress_value', { ascending: false })
+            .limit(100);
+            
+        if (error) {
+            console.error("Error fetching leaderboard", error);
+            return [];
+        }
+
+        if (!data || data.length === 0) return [];
+
+        const userIds = data.map(d => d.user_id);
+        const { data: userData, error: userError } = await supabase
+            .from('users_view')
+            .select('id, raw_user_meta_data')
+            .in('id', userIds);
+
+        if (userError) {
+             console.error("Error fetching user data for leaderboard", userError);
+        }
+
+        const userMap = new Map();
+        if (userData) {
+             userData.forEach(u => {
+                 userMap.set(u.id, u.raw_user_meta_data);
+             });
+        }
+
+        return data.map(d => ({
+            ...d,
+            user_meta: userMap.get(d.user_id) || null
+        }));
+    } catch (e) {
+        console.error("Could not fetch leaderboard", e);
+        return [];
+    }
+};
+
 export const checkDailyLogin = async () => {
     const today = new Date();
     const dateInt = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
