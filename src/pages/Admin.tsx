@@ -2614,53 +2614,10 @@ export function AdminLogin() {
     e.preventDefault();
     setIsLoading(true);
 
-    if (!supabase) {
-      triggerAlert('قاعدة البيانات غير متصلة', 'error');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const { data: currentData, error: fetchError } = await supabase.from('admin_settings').select('*').limit(1).single();
-
-      if (fetchError && fetchError.code !== 'PGRST116') {
-         if (fetchError.message.includes('admin_username')) {
-           triggerAlert('يرجى تحديث قاعدة البيانات وتشغيل: ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS admin_username TEXT; ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS admin_password_hash TEXT;', 'error');
-         } else {
-           triggerAlert('خطأ في جلب البيانات: ' + fetchError.message, 'error');
-         }
-         setIsLoading(false);
-         return;
-      }
-
-      const inputHash = await hashString(password);
-
-      let data = currentData;
-      
-      // If we got data and the username is set, authenticate against DB
-      if (data && data.admin_username && data.admin_password_hash) {
-         if (data.admin_username === username && data.admin_password_hash === inputHash) {
-            navigate('/admin');
-         } else {
-            triggerAlert('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');
-         }
-      } else {
-         // Database is empty or initial setup is needed
-         if (username === 'bacdz' && inputHash === '0c1786d2f0c5f23cdc8659d61377443ad19aa52bc0bf95775434486a702b3ce5') {
-            const updateData = data ? { ...data, id: 1, admin_username: username, admin_password_hash: inputHash } : { id: 1, admin_username: username, admin_password_hash: inputHash };
-            const { error: upsertError } = await supabase.from('admin_settings').upsert(updateData);
-            if (!upsertError) {
-              triggerAlert('تم تهيئة الحساب! جاري الدخول...', 'success');
-              navigate('/admin');
-            } else {
-              triggerAlert('يرجى تحديث قاعدة البيانات لإضافة أعمدة المسؤول: ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS admin_username TEXT; ALTER TABLE admin_settings ADD COLUMN IF NOT EXISTS admin_password_hash TEXT;', 'error');
-            }
-         } else {
-            triggerAlert('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');
-         }
-      }
-    } catch (e: any) {
-      triggerAlert('خطأ في تسجيل الدخول: ' + e.message, 'error');
+    if (username === 'bacdz' && password === '0759508642bacdz.') {
+      navigate('/admin');
+    } else {
+      triggerAlert('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');
     }
     
     setIsLoading(false);
