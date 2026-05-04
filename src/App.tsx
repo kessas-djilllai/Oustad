@@ -115,7 +115,7 @@ export default function App() {
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/" element={session ? <StudentLayout session={session} /> : <Navigate to="/auth" replace />} />
-        <Route path="/admin" element={<AdminLayout />} />
+        <Route path="/admin/*" element={<AdminLayout />} />
         <Route path="/admin/login" element={<AdminLogin />} />
       </Routes>
     </BrowserRouter>
@@ -128,7 +128,6 @@ export default function App() {
 // ==========================================
 
 function StudentLayout({ session }: { session: any }) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   const userName = session?.user?.user_metadata?.full_name || 'الطالب';
@@ -182,10 +181,11 @@ function StudentLayout({ session }: { session: any }) {
               <Bell size={20} />
             </button>
             <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="w-10 h-10 rounded-2xl glass glass-hover flex items-center justify-center text-slate-600 dark:text-slate-300 transition-all shrink-0"
+              onClick={handleLogout}
+              className="w-10 h-10 rounded-2xl glass glass-hover flex items-center justify-center text-red-500 dark:text-red-400 transition-all shrink-0"
+              title="تسجيل الخروج"
             >
-              <Menu size={20} />
+              <LogOut size={20} />
             </button>
           </div>
         </header>
@@ -193,67 +193,8 @@ function StudentLayout({ session }: { session: any }) {
         <StudentPortal session={session} />
 
       </div>
-
-      {/* Sidebar Drawer */}
-      {/* Mobile Overlay */}
-      <div 
-        onClick={() => setIsSidebarOpen(false)}
-        className={`fixed inset-0 bg-slate-900/40 z-40 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-      />
-      
-      {/* Sidebar */}
-      <div
-        className={`fixed top-0 right-0 bottom-0 w-64 bg-white dark:bg-slate-900 z-50 p-6 flex flex-col border-l border-slate-100 dark:border-slate-800 shadow-2xl rounded-l-[2rem] transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}
-      >
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-              {userName.substring(0, 1)}
-            </div>
-            <h2 className="font-bold text-lg text-slate-800">القائمة</h2>
-          </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-            <ChevronRight size={18} />
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-2">
-          <SidebarItem icon={<BookOpen size={18} />} title="الرئيسية" active />
-          <SidebarItem icon={<Calendar size={18} />} title="جدول المراجعة" />
-          <SidebarItem icon={<Target size={18} />} title="الإمتحانات" badge="2" />
-          <SidebarItem icon={<MessageCircle size={18} />} title="المجتمع" />
-        </div>
-
-        <div className="border-t border-slate-100 dark:border-slate-800 pt-4 space-y-2">
-          <SidebarItem icon={<Settings size={18} />} title="الإعدادات" />
-          <div onClick={() => navigate('/admin')} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 cursor-pointer">
-            <Target size={18} />
-            <span>لوحة التحكم (للتجريب)</span>
-          </div>
-          <div onClick={handleLogout} className="w-full flex items-center gap-3 font-bold text-sm px-4 py-3 rounded-xl transition-all text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 cursor-pointer">
-            <LogOut size={18} />
-            <span>تسجيل الخروج</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
-}
-
-function SidebarItem({ icon, title, active, badge }: { icon: React.ReactNode, title: string, active?: boolean, badge?: string }) {
-  return (
-    <div className={`flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-all ${active ? 'bg-blue-50 text-blue-600 dark:bg-blue-600/20 dark:text-blue-400' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
-      <div className="flex items-center gap-3 font-bold text-sm">
-        {icon}
-        <span>{title}</span>
-      </div>
-      {badge && (
-        <span className="bg-red-500 text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
-          {badge}
-        </span>
-      )}
-    </div>
-  )
 }
 
 const SUBJECTS_DATA = [
@@ -603,7 +544,6 @@ function StudentPortal({ session }: { session: any }) {
           <BottomNavItem icon={<BookOpen size={22} />} label="المواد" active={mainTab === 'subjects'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('subjects'); }} />
           <BottomNavItem icon={<Trophy size={22} />} label="الصدارة" active={mainTab === 'leaderboard'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('leaderboard'); }} />
           <BottomNavItem icon={<FileText size={22} />} label="مواضيع" active={mainTab === 'topics'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('topics'); }} />
-          <BottomNavItem icon={<Settings size={22} />} label="الإعدادات" active={mainTab === 'settings'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('settings'); }} />
         </div>
       )}
     </>
@@ -838,21 +778,9 @@ function SettingsView() {
         <h2 className="font-bold text-2xl text-slate-800">الإعدادات</h2>
       </div>
       <div className="bg-white rounded-[2rem] p-3 md:p-6 border border-slate-100 shadow-sm space-y-4">
-         <button 
-           onClick={() => navigate('/admin')}
-           className="w-full flex items-center justify-between p-4 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-50 active:bg-slate-100 transition-colors group text-right"
-         >
-           <div className="flex items-center gap-4">
-             <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center border border-orange-100 transition-transform group-hover:scale-105">
-               <Target size={24} />
-             </div>
-             <div>
-               <h4 className="font-bold text-slate-800 text-lg">لوحة التحكم</h4>
-               <p className="text-sm text-slate-500 font-medium transition-colors">إدارة المحتوى وتعديل قاعدة البيانات</p>
-             </div>
-           </div>
-           <ChevronRight size={20} className="text-slate-400 group-hover:text-orange-500 transition-transform group-hover:-translate-x-1" />
-         </button>
+         <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50">
+            <h4 className="font-bold text-slate-800 text-lg">لا توجد إعدادات إضافية حالياً</h4>
+         </div>
       </div>
     </div>
   )
