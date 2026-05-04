@@ -2643,7 +2643,8 @@ export function AdminLogin() {
         if (error.code === '42P01' || error.message.includes('relation "public.admin_credentials" does not exist')) {
           triggerAlert('يرجى أولاً إنشاء جدول admin_credentials في Supabase وإضافة (username) و (password).', 'error');
         } else {
-          triggerAlert('حدث خطأ أثناء الاتصال بقاعدة البيانات.', 'error');
+          triggerAlert('حدث خطأ أثناء الاتصال بقاعدة البيانات: ' + error.message, 'error');
+          console.error("Supabase Login Error:", error);
         }
       } else if (data) {
         navigate('/admin');
