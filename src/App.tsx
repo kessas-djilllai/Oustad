@@ -1029,49 +1029,61 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz }: { subjects: any[]
           </div>
         </div>
 
-        <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 fill-mode-both" dir="rtl">
+        <div className="col-span-2 md:col-span-3 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 fill-mode-both" dir="rtl">
           <h3 className="font-bold text-lg md:text-xl text-slate-800 mb-4 px-1">استكشف المراجعة السريعة</h3>
-          <div className="flex gap-4 overflow-x-auto pb-4 px-1 -mx-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <div className="flex gap-3 md:gap-5 overflow-x-auto pb-4 -mx-4 px-4 sm:-mx-1 sm:px-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             
             <button 
               onClick={() => {}} 
-              className="min-w-[220px] md:min-w-[260px] snap-center shrink-0 relative glass rounded-3xl p-5 flex flex-col items-start gap-4 bg-gradient-to-br from-white to-purple-50/50 group hover:shadow-md transition-all overflow-hidden border border-purple-100/50 text-right"
+              className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-purple-50/50 group hover:shadow-lg transition-all overflow-hidden border border-purple-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
-              <div className="absolute -left-10 -bottom-10 w-24 h-24 bg-purple-400/20 rounded-full blur-2xl group-hover:bg-purple-400/30 transition-all pointer-events-none" />
-              <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 mb-2 relative z-10">
-                <Calendar size={24} />
+              <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-purple-400/20 rounded-full blur-2xl group-hover:bg-purple-400/30 transition-all pointer-events-none" />
+              <div className="relative z-10 flex-1">
+                <div className="inline-flex items-center gap-1 text-[10px] md:text-xs text-purple-600 font-bold bg-purple-100 px-2 py-1 rounded-lg mb-2">
+                  <Calendar size={12} />
+                  مراجعة سريعة
+                </div>
+                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">تواريخ التاريخ</h4>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">مرجع لجميع التواريخ والأحداث الهامة في مادة التاريخ.</p>
               </div>
-              <div className="relative z-10 w-full">
-                <h4 className="font-black text-slate-800 text-base md:text-lg mb-1 leading-tight">تواريخ التاريخ</h4>
-                <p className="text-xs md:text-sm text-slate-500 line-clamp-2">مرجع سريع لجميع التواريخ والأحداث الهامة في مادة التاريخ.</p>
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-purple-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-purple-100">
+                <Calendar className="w-6 h-6 md:w-8 md:h-8" />
               </div>
             </button>
 
             <button 
               onClick={() => {}} 
-              className="min-w-[220px] md:min-w-[260px] snap-center shrink-0 relative glass rounded-3xl p-5 flex flex-col items-start gap-4 bg-gradient-to-br from-white to-emerald-50/50 group hover:shadow-md transition-all overflow-hidden border border-emerald-100/50 text-right"
+              className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-emerald-50/50 group hover:shadow-lg transition-all overflow-hidden border border-emerald-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
-              <div className="absolute -left-10 -bottom-10 w-24 h-24 bg-emerald-400/20 rounded-full blur-2xl group-hover:bg-emerald-400/30 transition-all pointer-events-none" />
-              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mb-2 relative z-10">
-                <BookOpen size={24} />
+              <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-emerald-400/20 rounded-full blur-2xl group-hover:bg-emerald-400/30 transition-all pointer-events-none" />
+              <div className="relative z-10 flex-1">
+                <div className="inline-flex items-center gap-1 text-[10px] md:text-xs text-emerald-600 font-bold bg-emerald-100 px-2 py-1 rounded-lg mb-2">
+                  <BookOpen size={12} />
+                  مراجعة سريعة
+                </div>
+                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">مصطلحات التاريخ والجغرافيا</h4>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">قاموس لجميع المصطلحات والمفاهيم المقررة في المنهج.</p>
               </div>
-              <div className="relative z-10 w-full">
-                <h4 className="font-black text-slate-800 text-base md:text-lg mb-1 leading-tight">مصطلحات التاريخ والجغرافيا</h4>
-                <p className="text-xs md:text-sm text-slate-500 line-clamp-2">قاموس شامل لجميع المصطلحات والمفاهيم المقررة في المنهج.</p>
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-emerald-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-emerald-100">
+                <BookOpen className="w-6 h-6 md:w-8 md:h-8" />
               </div>
             </button>
 
             <button 
               onClick={() => {}} 
-              className="min-w-[220px] md:min-w-[260px] snap-center shrink-0 relative glass rounded-3xl p-5 flex flex-col items-start gap-4 bg-gradient-to-br from-white to-rose-50/50 group hover:shadow-md transition-all overflow-hidden border border-rose-100/50 text-right"
+              className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-rose-50/50 group hover:shadow-lg transition-all overflow-hidden border border-rose-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
-              <div className="absolute -left-10 -bottom-10 w-24 h-24 bg-rose-400/20 rounded-full blur-2xl group-hover:bg-rose-400/30 transition-all pointer-events-none" />
-              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mb-2 relative z-10">
-                <Users size={24} />
+              <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-rose-400/20 rounded-full blur-2xl group-hover:bg-rose-400/30 transition-all pointer-events-none" />
+              <div className="relative z-10 flex-1">
+                <div className="inline-flex items-center gap-1 text-[10px] md:text-xs text-rose-600 font-bold bg-rose-100 px-2 py-1 rounded-lg mb-2">
+                  <Users size={12} />
+                  مراجعة سريعة
+                </div>
+                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">شخصيات التاريخ</h4>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">تعريف بأبرز الشخصيات التاريخية ودورها في الأحداث.</p>
               </div>
-              <div className="relative z-10 w-full">
-                <h4 className="font-black text-slate-800 text-base md:text-lg mb-1 leading-tight">شخصيات التاريخ</h4>
-                <p className="text-xs md:text-sm text-slate-500 line-clamp-2">تعريف مفصل بأبرز الشخصيات التاريخية ودورها في الأحداث.</p>
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-rose-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-rose-100">
+                <Users className="w-6 h-6 md:w-8 md:h-8" />
               </div>
             </button>
 
