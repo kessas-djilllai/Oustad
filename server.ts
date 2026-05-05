@@ -9,6 +9,13 @@ async function startServer() {
 
   // Add JSON body parsing middleware
   app.use(express.json());
+  
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (err instanceof SyntaxError && 'status' in err && err.status === 400 && 'body' in err) {
+      return res.status(400).json({ error: "Invalid JSON payload sent from browser" });
+    }
+    next(err);
+  });
 
   // Email API Route
   app.post("/api/send-emails", async (req, res) => {
@@ -81,9 +88,16 @@ async function startServer() {
         })
       });
 
-      const data = await response.json();
+      const responseText = await response.text();
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : {};
+      } catch(e) {
+        throw new Error(`Empty or invalid response from chargily: ${response.status} ${responseText}`);
+      }
+
       if (!response.ok) {
-        throw new Error(data.message || "Failed to create checkout");
+        throw new Error(data.message || data.error || "Failed to create checkout");
       }
 
       res.json({ checkout_url: data.checkout_url });

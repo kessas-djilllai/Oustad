@@ -30,9 +30,20 @@ export function VIP({ onBack, session }: { onBack: () => void, session?: any }) 
                 })
             });
 
-            const data = await response.json();
+            console.log("Response status:", response.status);
+            const textResponse = await response.text();
+            console.log("Raw response text:", textResponse);
+
+            let data;
+            try {
+                data = textResponse ? JSON.parse(textResponse) : {};
+            } catch (parseError) {
+                console.error("JSON Parse Error:", parseError, textResponse);
+                throw new Error(`تعذر قراءة رد الخادم. (${response.status})`);
+            }
+
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to initialize payment');
+                throw new Error(data.error || data.message || 'Failed to initialize payment');
             }
 
             if (data.checkout_url) {
