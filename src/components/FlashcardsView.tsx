@@ -121,29 +121,6 @@ export function FlashcardsView({ type, onBack }: FlashcardsViewProps) {
         >
           <ArrowRight className="w-5 h-5" />
         </button>
-        
-        <div className="flex flex-col items-center">
-          <div className={`inline-flex items-center justify-center w-12 h-12 rounded-2xl ${info?.classes?.bgLight} ${info?.classes?.textIcon} mb-2 shadow-sm border ${info?.classes?.borderLight}`}>
-             {info?.icon}
-          </div>
-          <h2 className="font-black text-xl text-slate-800">{info?.title}</h2>
-          <p className="text-sm font-medium text-slate-500">
-            بطاقة {currentIndex + 1} من {cards.length}
-          </p>
-        </div>
-        
-        <div className="w-10 h-10 border-4 border-slate-100 rounded-full flex items-center justify-center relative">
-           <svg className="w-full h-full -rotate-90">
-             <circle cx="50%" cy="50%" r="45%" className="fill-none stroke-slate-100" strokeWidth="10%" />
-             <circle 
-                cx="50%" cy="50%" r="45%" 
-                className={`fill-none ${info?.classes?.stroke} transition-all duration-500 ease-out`} 
-                strokeWidth="10%" 
-                strokeDasharray="283" 
-                strokeDashoffset={283 - ((currentIndex + 1) / cards.length) * 283}
-             />
-           </svg>
-        </div>
       </div>
 
       {/* Flashcard Area */}
