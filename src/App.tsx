@@ -611,11 +611,17 @@ function StudentPortal({ session }: { session: any }) {
       </div>
 
       {view.type === 'dashboard' && (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[400px] h-20 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/50 dark:border-slate-700/50 shadow-[0_8px_30px_rgb(0,0,0,0.08)] z-40 flex items-center justify-around sm:justify-evenly px-2 sm:px-6 rounded-[2rem]">
-          <BottomNavItem icon={<Home size={22} />} label="الرئيسية" active={mainTab === 'home'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('home'); }} />
-          <BottomNavItem icon={<BookOpen size={22} />} label="المواد" active={mainTab === 'subjects'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('subjects'); }} />
-          <BottomNavItem icon={<Trophy size={22} />} label="الصدارة" active={mainTab === 'leaderboard'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('leaderboard'); }} />
-          <BottomNavItem icon={<FileText size={22} />} label="مواضيع" active={mainTab === 'topics'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('topics'); }} />
+        <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[400px] h-20 bg-white/60 dark:bg-slate-900/60 backdrop-blur-[30px] border border-white/60 dark:border-slate-700/50 shadow-[0_8px_32px_rgba(37,99,235,0.04)] z-40 rounded-[2rem] overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-blue-400/[0.02] via-transparent to-blue-400/[0.02] pointer-events-none" />
+          <div className="absolute -top-4 left-0 right-0 h-10 bg-blue-500/[0.02] blur-[12px] pointer-events-none" />
+          <div className="absolute -bottom-4 left-0 right-0 h-10 bg-blue-500/[0.02] blur-[12px] pointer-events-none" />
+          
+          <div className="relative z-10 w-full h-full flex items-center justify-around sm:justify-evenly px-2 sm:px-6">
+            <BottomNavItem icon={<Home size={22} />} label="الرئيسية" active={mainTab === 'home'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('home'); }} />
+            <BottomNavItem icon={<BookOpen size={22} />} label="المواد" active={mainTab === 'subjects'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('subjects'); }} />
+            <BottomNavItem icon={<Trophy size={22} />} label="الصدارة" active={mainTab === 'leaderboard'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('leaderboard'); }} />
+            <BottomNavItem icon={<FileText size={22} />} label="مواضيع" active={mainTab === 'topics'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('topics'); }} />
+          </div>
         </div>
       )}
     </>
