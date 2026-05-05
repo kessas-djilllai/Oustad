@@ -6,9 +6,17 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { user, pass, to, subject, message } = req.body;
+    const { to, subject, message } = req.body;
     
-    if (!user || !pass || !to || !subject || !message) {
+    // Use environment variables for credentials
+    const user = process.env.SMTP_EMAIL;
+    const pass = process.env.SMTP_PASSWORD;
+
+    if (!user || !pass) {
+      return res.status(500).json({ error: "الرجاء إعداد متغيرات البيئة SMTP_EMAIL و SMTP_PASSWORD" });
+    }
+    
+    if (!to || !subject || !message) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 

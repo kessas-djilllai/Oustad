@@ -13,9 +13,15 @@ async function startServer() {
   // Email API Route
   app.post("/api/send-emails", async (req, res) => {
     try {
-      const { user, pass, to, subject, message } = req.body;
+      const { to, subject, message } = req.body;
+      const user = process.env.SMTP_EMAIL;
+      const pass = process.env.SMTP_PASSWORD;
       
-      if (!user || !pass || !to || !subject || !message) {
+      if (!user || !pass) {
+        return res.status(500).json({ error: "الرجاء إعداد متغيرات البيئة SMTP_EMAIL و SMTP_PASSWORD" });
+      }
+
+      if (!to || !subject || !message) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 

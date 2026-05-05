@@ -11,17 +11,10 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
-  const [senderEmail, setSenderEmail] = useState('');
-  const [appPassword, setAppPassword] = useState('');
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     fetchUsers();
-    // Load saved SMTP credentials
-    const savedEmail = localStorage.getItem('smtp_email');
-    const savedPass = localStorage.getItem('smtp_pass');
-    if (savedEmail) setSenderEmail(savedEmail);
-    if (savedPass) setAppPassword(savedPass);
   }, []);
 
   const fetchUsers = async () => {
@@ -71,10 +64,6 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
       triggerAlert('الرجاء إدخال عنوان ومحتوى الرسالة.', 'error');
       return;
     }
-    if (!senderEmail.trim() || !appPassword.trim()) {
-      triggerAlert('الرجاء إدخال إيميل المرسل وكلمة مرور التطبيقات.', 'error');
-      return;
-    }
 
     const selectedEmails = users
       .filter(u => selectedUsers.has(u.id))
@@ -88,15 +77,10 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
 
     setIsSending(true);
     try {
-      localStorage.setItem('smtp_email', senderEmail);
-      localStorage.setItem('smtp_pass', appPassword);
-
       const response = await fetch('/api/send-emails', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user: senderEmail,
-          pass: appPassword,
           to: selectedEmails,
           subject,
           message
@@ -151,31 +135,6 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
              تفاصيل الرسالة
           </h3>
           <div className="space-y-4">
-            <div className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 mb-4">
-              <h4 className="font-bold text-xs text-slate-600 border-b border-slate-100 pb-2">إعدادات بريد الإرسال (Gmail)</h4>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني (Sender Email)</label>
-                <input 
-                  type="email" 
-                  value={senderEmail}
-                  onChange={e => setSenderEmail(e.target.value)}
-                  placeholder="مثال: example@gmail.com"
-                  className="w-full border-slate-200 rounded-lg p-2 bg-slate-50 outline-none focus:border-blue-500 text-sm"
-                  dir="ltr"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">كلمة مرور التطبيقات (App Password)</label>
-                <input 
-                  type="password" 
-                  value={appPassword}
-                  onChange={e => setAppPassword(e.target.value)}
-                  placeholder="كلمة مرور التطبيقات..."
-                  className="w-full border-slate-200 rounded-lg p-2 bg-slate-50 outline-none focus:border-blue-500 text-sm"
-                  dir="ltr"
-                />
-              </div>
-            </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-2">عنوان الرسالة (Subject)</label>
               <input 
@@ -199,7 +158,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
             
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mt-2">
               <p className="text-xs text-blue-800 leading-relaxed font-medium">
-                ملاحظة: سيتم إرسال الرسالة من الخادم تلقائياً عن طريق إعدادات بريد Gmail أعلاه باستخدام "كلمة مرور التطبيقات". سيتم وضع المستقبلين في خانة BCC للخصوصية.
+                ملاحظة: سيتم إرسال الرسالة من الخادم تلقائياً عن طريق إعدادات بريد Gmail الموجودة في الخادم (بيئة .env). سيتم وضع المستقبلين في خانة BCC للخصوصية.
               </p>
             </div>
 
