@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { Mail, Search, Send, RefreshCw, Menu, Check, X, Filter, Users, CheckCircle2, ChevronRight, Inbox, Plus, AlertCircle, Bookmark } from "lucide-react";
+import { Mail, Search, Send, RefreshCw, Menu, Check, X, Filter, Users, CheckCircle2, ChevronRight, Inbox, Plus, AlertCircle, Bookmark, MessageSquare, History } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type: 'success' | 'error') => void }) {
@@ -23,6 +23,10 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   
   const [savedMessages, setSavedMessages] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  
+  const [selectedUserForOptions, setSelectedUserForOptions] = useState<any>(null);
+  const [showUserHistoryModal, setShowUserHistoryModal] = useState(false);
+  const [currentUserHistory, setCurrentUserHistory] = useState<any[]>([]);
 
   useEffect(() => {
     fetchUsers();
@@ -175,6 +179,23 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     next.delete(userObj.id);
                     return next;
                 });
+                
+                // Save to user's personal message log (database)
+                try {
+                    const msgToSave = {
+                        id: Date.now() + Math.random(),
+                        text: message,
+                        date: new Date().toISOString(),
+                        hasButton: includeButton,
+                        buttonText: buttonText,
+                        buttonLink: buttonLink
+                    };
+                    const key = 'user_messages_log_' + userObj.id;
+                    const existingStr = localStorage.getItem(key);
+                    const historyArr = existingStr ? JSON.parse(existingStr) : [];
+                    historyArr.unshift(msgToSave);
+                    localStorage.setItem(key, JSON.stringify(historyArr));
+                } catch(e) {}
             }
             sentCount++;
             
@@ -311,15 +332,11 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                         <div 
                             key={user.id}
                             onClick={() => {
-                                if (!isSent) {
-                                  setSelectedUsers(new Set([user.id]));
-                                  setIsBottomSheetOpen(true);
-                                  setShowHistory(false);
-                                }
+                                setSelectedUserForOptions(user);
                             }}
-                            className={`bg-white rounded-2xl p-3 shadow-sm border flex items-center gap-3 transition-all ${
-                                isSent ? 'opacity-60 grayscale border-slate-100 pointer-events-none' : 
-                                'border-slate-100/80 cursor-pointer hover:border-blue-300 active:scale-95'
+                            className={`bg-white rounded-2xl p-3 shadow-sm border flex items-center gap-3 transition-all cursor-pointer hover:border-blue-300 active:scale-95 ${
+                                isSent ? 'opacity-70 grayscale border-slate-100' : 
+                                'border-slate-100/80'
                             }`}
                         >
                             <div className={`w-11 h-11 rounded-xl shrink-0 flex items-center justify-center font-bold text-lg transition-colors ${
@@ -539,6 +556,149 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                             </button>
                         </div>
                     )}
+                </motion.div>
+            </>
+        )}
+      </AnimatePresence>
+
+      {/* User Options Sheet */}
+      <AnimatePresence>
+        {selectedUserForOptions && !showUserHistoryModal && (
+            <>
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="fixed inset-0 bg-slate-900/60 z-50 backdrop-blur-sm"
+                    onClick={() => setSelectedUserForOptions(null)}
+                />
+                <motion.div
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0 }}
+                    exit={{ y: '100%' }}
+                    transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
+                    className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 flex flex-col p-6 gap-4"
+                    dir="rtl"
+                >
+                    <div className="flex justify-between items-center mb-2">
+                        <h3 className="font-black text-slate-800 text-lg">
+                            خيارات المستخدم
+                        </h3>
+                        <button 
+                            onClick={() => setSelectedUserForOptions(null)}
+                            className="bg-slate-100 p-2 rounded-full text-slate-500 hover:bg-slate-200"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-2xl mb-2">
+                        <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-bold text-xl">
+                            {(selectedUserForOptions.raw_user_meta_data?.full_name || 'ب').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="font-bold text-slate-800 px-1">{selectedUserForOptions.raw_user_meta_data?.full_name || 'بدون اسم'}</span>
+                            <span className="text-sm font-mono text-slate-500 line-clamp-1 px-1">{selectedUserForOptions.email}</span>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={() => {
+                            setSelectedUsers(new Set([selectedUserForOptions.id]));
+                            setSelectedUserForOptions(null);
+                            setIsBottomSheetOpen(true);
+                            setShowHistory(false);
+                        }}
+                        className="w-full flex items-center gap-3 py-4 px-5 rounded-2xl font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                    >
+                        <div className="bg-white p-2 rounded-lg shadow-sm"><Send size={18} className="transform -scale-x-100" /></div>
+                        إرسال رسالة 
+                    </button>
+
+                    <button 
+                        onClick={() => {
+                            const key = 'user_messages_log_' + selectedUserForOptions.id;
+                            const historyData = localStorage.getItem(key);
+                            setCurrentUserHistory(historyData ? JSON.parse(historyData) : []);
+                            setShowUserHistoryModal(true);
+                        }}
+                        className="w-full flex items-center gap-3 py-4 px-5 rounded-2xl font-bold bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors"
+                    >
+                        <div className="bg-white p-2 rounded-lg shadow-sm border border-slate-100 text-slate-500"><History size={18} /></div>
+                        سجل الرسائل المرسلة
+                    </button>
+                </motion.div>
+            </>
+        )}
+      </AnimatePresence>
+
+      {/* User History Modal */}
+      <AnimatePresence>
+        {selectedUserForOptions && showUserHistoryModal && (
+            <>
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    className="fixed inset-0 bg-slate-900/60 z-50 backdrop-blur-sm"
+                    onClick={() => {
+                        setShowUserHistoryModal(false);
+                        setSelectedUserForOptions(null);
+                    }}
+                />
+                <motion.div
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0 }}
+                    exit={{ y: '100%' }}
+                    transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
+                    className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 flex flex-col h-[85vh]"
+                    dir="rtl"
+                >
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl shrink-0">
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={() => setShowUserHistoryModal(false)}
+                                className="bg-white border border-slate-200 p-2 rounded-xl text-slate-500 hover:bg-slate-100"
+                            >
+                                <ChevronRight size={20} />
+                            </button>
+                            <h3 className="font-black text-slate-800 text-[17px]">
+                                سجل رسائل: {selectedUserForOptions.raw_user_meta_data?.full_name?.split(' ')[0] || 'المستخدم'}
+                            </h3>
+                        </div>
+                    </div>
+
+                    <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-4 bg-slate-50">
+                        {currentUserHistory.length === 0 ? (
+                             <div className="text-center py-16">
+                                <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm border border-slate-100">
+                                    <MessageSquare size={26} className="text-slate-300" />
+                                </div>
+                                <h3 className="text-slate-500 font-bold mb-1">لا توجد رسائل سابقة</h3>
+                                <p className="text-sm text-slate-400">لم تقم بإرسال أي رسالة لهذا المستخدم بعد.</p>
+                             </div>
+                        ) : (
+                            currentUserHistory.map((msg, idx) => (
+                                <div key={idx} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm relative">
+                                    <div className="text-[12px] font-bold text-slate-400 mb-2 border-b border-slate-50 pb-2 flex items-center gap-1.5 justify-start" dir="ltr">
+                                        {new Date(msg.date).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })}
+                                    </div>
+                                    <p className="text-slate-700 text-[15px] whitespace-pre-wrap leading-relaxed font-medium">
+                                        {msg.text}
+                                    </p>
+                                    {msg.hasButton && (
+                                        <div className="mt-3 bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex flex-col gap-1">
+                                            <span className="text-[11px] font-bold text-blue-500">الزر المرفق:</span>
+                                            <div className="font-bold text-blue-800 text-[13px]">{msg.buttonText}</div>
+                                            <div className="text-[11px] font-mono text-blue-400 truncate dir-ltr">{msg.buttonLink}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </motion.div>
             </>
         )}
