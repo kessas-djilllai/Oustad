@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { Mail, Search, Send, RefreshCw, Menu, Check, X, Filter, Users, CheckCircle2, ChevronRight, Inbox, Plus, AlertCircle, Bookmark, MessageSquare, History } from "lucide-react";
+import { Mail, Search, Send, RefreshCw, Menu, Check, X, Filter, Users, CheckCircle2, ChevronRight, Inbox, Plus, AlertCircle, Bookmark, MessageSquare, History, Database } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type: 'success' | 'error') => void }) {
@@ -27,6 +27,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   const [selectedUserForOptions, setSelectedUserForOptions] = useState<any>(null);
   const [showUserHistoryModal, setShowUserHistoryModal] = useState(false);
   const [currentUserHistory, setCurrentUserHistory] = useState<any[]>([]);
+  const [showSqlModal, setShowSqlModal] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -45,7 +46,13 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   const fetchTemplates = async () => {
       try {
           const { data, error } = await supabase.from('admin_msg_templates').select('*').order('created_at', { ascending: false });
-          if (!error && data) {
+          if (error) {
+              if (error.message?.includes('does not exist') || error.code === '42P01') {
+                  setShowSqlModal(true);
+              }
+              throw error;
+          }
+          if (data) {
               setSavedMessages(data.map(d => ({
                   id: d.id,
                   message: d.message,
@@ -53,23 +60,22 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                   buttonText: d.button_text,
                   buttonLink: d.button_link
               })));
-              return;
           }
-      } catch (e) {}
-
-      // Fallback
-      const history = localStorage.getItem('admin_msg_history');
-      if (history) {
-          try {
-              setSavedMessages(JSON.parse(history));
-          } catch (e) {}
+      } catch (e) {
+          console.error("DB Error:", e);
       }
   };
 
   const loadUserHistory = async (userId: string) => {
       try {
           const { data, error } = await supabase.from('user_messages').select('*').eq('user_id', userId).order('date', { ascending: false });
-          if (!error && data) {
+          if (error) {
+              if (error.message?.includes('does not exist') || error.code === '42P01') {
+                  setShowSqlModal(true);
+              }
+              throw error;
+          }
+          if (data) {
               setCurrentUserHistory(data.map(d => ({
                   id: d.id,
                   text: d.text,
@@ -78,14 +84,10 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                   buttonText: d.button_text,
                   buttonLink: d.button_link
               })));
-              return;
           }
-      } catch(e) {}
-
-      // Fallback
-      const key = 'user_messages_log_' + userId;
-      const historyData = localStorage.getItem(key);
-      setCurrentUserHistory(historyData ? JSON.parse(historyData) : []);
+      } catch(e) {
+          console.error("DB Error:", e);
+      }
   };
 
   useEffect(() => {
@@ -233,21 +235,13 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     };
                     const { error } = await supabase.from('user_messages').insert(msgToSave);
                     if (error) throw error;
-                } catch(e) {
-                    // Fallback
-                    const fallbackMsg = {
-                        id: Date.now() + Math.random(),
-                        text: message,
-                        date: new Date().toISOString(),
-                        hasButton: includeButton,
-                        buttonText: buttonText,
-                        buttonLink: buttonLink
-                    };
-                    const key = 'user_messages_log_' + userObj.id;
-                    const existingStr = localStorage.getItem(key);
-                    const historyArr = existingStr ? JSON.parse(existingStr) : [];
-                    historyArr.unshift(fallbackMsg);
-                    localStorage.setItem(key, JSON.stringify(historyArr));
+                } catch(e: any) {
+                    console.error("DB Saving Error", e);
+                    if (e?.message?.includes('does not exist') || e?.code === '42P01') {
+                        setShowSqlModal(true);
+                    } else {
+                        triggerAlert('تعذر حفظ الرسالة في السجل، تحقق من الاتصال.', 'error');
+                    }
                 }
             }
             sentCount++;
@@ -540,21 +534,16 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                                                     };
                                                     setSavedMessages([formatted, ...savedMessages]);
                                                 }
-                                            } catch (e) {
-                                                // Fallback
-                                                const fallbackMsg = {
-                                                    id: Date.now().toString(),
-                                                    message,
-                                                    includeButton,
-                                                    buttonText,
-                                                    buttonLink
-                                                };
-                                                const updated = [fallbackMsg, ...savedMessages];
-                                                setSavedMessages(updated);
-                                                localStorage.setItem('admin_msg_history', JSON.stringify(updated));
+                                                triggerAlert('تم حفظ الرسالة كقالب', 'success');
+                                                setShowHistory(true);
+                                            } catch (e: any) {
+                                                console.error("DB Saving Error", e);
+                                                if (e?.message?.includes('does not exist') || e?.code === '42P01') {
+                                                    setShowSqlModal(true);
+                                                } else {
+                                                    triggerAlert('تعذر حفظ القالب، تحقق من قاعدة البيانات.', 'error');
+                                                }
                                             }
-                                            triggerAlert('تم حفظ الرسالة كقالب', 'success');
-                                            setShowHistory(true);
                                         }} className="text-[11px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
                                             + حفظ كقالب
                                         </button>
@@ -800,6 +789,99 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     </div>
                 </motion.div>
             </>
+        )}
+      </AnimatePresence>
+
+      {/* SQL Missing Alert Modal */}
+      <AnimatePresence>
+        {showSqlModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                    onClick={() => setShowSqlModal(false)}
+                />
+                <motion.div
+                    initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                    className="relative bg-white rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+                    dir="rtl"
+                >
+                    <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-red-50">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-red-100 text-red-600 rounded-xl flex items-center justify-center">
+                                <Database size={20} />
+                            </div>
+                            <div>
+                                <h3 className="font-black text-red-900">جداول قاعدة البيانات مفقودة</h3>
+                                <p className="text-sm font-bold text-red-600">يرجى إضافة الجداول في Supabase لتفعيل تخزين الرسائل</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setShowSqlModal(false)}
+                            className="bg-red-100 p-2 rounded-full text-red-500 hover:bg-red-200"
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+                    <div className="p-5 overflow-y-auto">
+                        <p className="text-slate-600 font-medium mb-4 text-[15px] leading-relaxed">
+                            لأنك تقوم باستخدام ميزة (حفظ القوالب وسجل مراسلات المستخدمين)، يجب إنشاء الجداول التالية في لوحة تحكم Supabase الخاصة بك عبر الذهاب لـ <strong>SQL Editor</strong> وتشغيل هذا الكود:
+                        </p>
+                        <div className="relative group">
+                            <button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`CREATE TABLE IF NOT EXISTS admin_msg_templates (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  message TEXT,
+  include_button BOOLEAN DEFAULT false,
+  button_text TEXT,
+  button_link TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+CREATE TABLE IF NOT EXISTS user_messages (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL,
+  text TEXT,
+  has_button BOOLEAN DEFAULT false,
+  button_text TEXT,
+  button_link TEXT,
+  date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);`);
+                                    triggerAlert('تم نسخ الكود بنجاح', 'success');
+                                }}
+                                className="absolute top-3 left-3 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-bold font-sans backdrop-blur-sm transition-all"
+                            >
+                                نسخ الكود
+                            </button>
+                            <pre className="bg-slate-900 text-green-400 p-5 rounded-2xl overflow-x-auto font-mono text-[13px] leading-relaxed" dir="ltr">
+{`CREATE TABLE IF NOT EXISTS admin_msg_templates (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  message TEXT,
+  include_button BOOLEAN DEFAULT false,
+  button_text TEXT,
+  button_link TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);
+
+CREATE TABLE IF NOT EXISTS user_messages (
+  id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  user_id UUID NOT NULL,
+  text TEXT,
+  has_button BOOLEAN DEFAULT false,
+  button_text TEXT,
+  button_link TEXT,
+  date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
+);`}
+                            </pre>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
         )}
       </AnimatePresence>
     </div>
