@@ -39,13 +39,54 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
       }
     }
     
-    const history = localStorage.getItem('admin_msg_history');
-    if (history) {
-        try {
-            setSavedMessages(JSON.parse(history));
-        } catch (e) {}
-    }
+    fetchTemplates();
   }, []);
+
+  const fetchTemplates = async () => {
+      try {
+          const { data, error } = await supabase.from('admin_msg_templates').select('*').order('created_at', { ascending: false });
+          if (!error && data) {
+              setSavedMessages(data.map(d => ({
+                  id: d.id,
+                  message: d.message,
+                  includeButton: d.include_button,
+                  buttonText: d.button_text,
+                  buttonLink: d.button_link
+              })));
+              return;
+          }
+      } catch (e) {}
+
+      // Fallback
+      const history = localStorage.getItem('admin_msg_history');
+      if (history) {
+          try {
+              setSavedMessages(JSON.parse(history));
+          } catch (e) {}
+      }
+  };
+
+  const loadUserHistory = async (userId: string) => {
+      try {
+          const { data, error } = await supabase.from('user_messages').select('*').eq('user_id', userId).order('date', { ascending: false });
+          if (!error && data) {
+              setCurrentUserHistory(data.map(d => ({
+                  id: d.id,
+                  text: d.text,
+                  date: d.date,
+                  hasButton: d.has_button,
+                  buttonText: d.button_text,
+                  buttonLink: d.button_link
+              })));
+              return;
+          }
+      } catch(e) {}
+
+      // Fallback
+      const key = 'user_messages_log_' + userId;
+      const historyData = localStorage.getItem(key);
+      setCurrentUserHistory(historyData ? JSON.parse(historyData) : []);
+  };
 
   useEffect(() => {
     setVisibleCount(50);
@@ -183,6 +224,18 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                 // Save to user's personal message log (database)
                 try {
                     const msgToSave = {
+                        user_id: userObj.id,
+                        text: message,
+                        date: new Date().toISOString(),
+                        has_button: includeButton,
+                        button_text: buttonText,
+                        button_link: buttonLink
+                    };
+                    const { error } = await supabase.from('user_messages').insert(msgToSave);
+                    if (error) throw error;
+                } catch(e) {
+                    // Fallback
+                    const fallbackMsg = {
                         id: Date.now() + Math.random(),
                         text: message,
                         date: new Date().toISOString(),
@@ -193,9 +246,9 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     const key = 'user_messages_log_' + userObj.id;
                     const existingStr = localStorage.getItem(key);
                     const historyArr = existingStr ? JSON.parse(existingStr) : [];
-                    historyArr.unshift(msgToSave);
+                    historyArr.unshift(fallbackMsg);
                     localStorage.setItem(key, JSON.stringify(historyArr));
-                } catch(e) {}
+                }
             }
             sentCount++;
             
@@ -436,8 +489,13 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                                             }} className="flex-1 bg-slate-800 text-white rounded-xl py-2.5 text-sm font-bold hover:bg-slate-700 active:scale-[0.98] transition-all">
                                                 استخدام القالب
                                             </button>
-                                            <button onClick={() => {
+                                            <button onClick={async () => {
                                                 if(window.confirm('هل أنت متأكد من حذف هذا القالب؟')) {
+                                                    try {
+                                                        const { error } = await supabase.from('admin_msg_templates').delete().eq('id', msg.id);
+                                                        if (error) throw error;
+                                                    } catch (e) {}
+
                                                     const updated = savedMessages.filter(m => m.id !== msg.id);
                                                     setSavedMessages(updated);
                                                     localStorage.setItem('admin_msg_history', JSON.stringify(updated));
@@ -461,17 +519,40 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="block text-[13px] font-bold text-slate-700">النص (يدعم المسافات)</label>
                                     {message.trim() && (
-                                        <button onClick={() => {
-                                            const newMsg = {
-                                                id: Date.now().toString(),
-                                                message,
-                                                includeButton,
-                                                buttonText,
-                                                buttonLink
-                                            };
-                                            const updated = [newMsg, ...savedMessages];
-                                            setSavedMessages(updated);
-                                            localStorage.setItem('admin_msg_history', JSON.stringify(updated));
+                                        <button onClick={async () => {
+                                            try {
+                                                const newMsg = {
+                                                    message,
+                                                    include_button: includeButton,
+                                                    button_text: buttonText,
+                                                    button_link: buttonLink
+                                                };
+                                                const { data, error } = await supabase.from('admin_msg_templates').insert(newMsg).select().single();
+                                                if (error) throw error;
+                                                
+                                                if (data) {
+                                                    const formatted = {
+                                                        id: data.id,
+                                                        message: data.message,
+                                                        includeButton: data.include_button,
+                                                        buttonText: data.button_text,
+                                                        buttonLink: data.button_link
+                                                    };
+                                                    setSavedMessages([formatted, ...savedMessages]);
+                                                }
+                                            } catch (e) {
+                                                // Fallback
+                                                const fallbackMsg = {
+                                                    id: Date.now().toString(),
+                                                    message,
+                                                    includeButton,
+                                                    buttonText,
+                                                    buttonLink
+                                                };
+                                                const updated = [fallbackMsg, ...savedMessages];
+                                                setSavedMessages(updated);
+                                                localStorage.setItem('admin_msg_history', JSON.stringify(updated));
+                                            }
                                             triggerAlert('تم حفظ الرسالة كقالب', 'success');
                                             setShowHistory(true);
                                         }} className="text-[11px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
@@ -618,9 +699,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
 
                     <button 
                         onClick={() => {
-                            const key = 'user_messages_log_' + selectedUserForOptions.id;
-                            const historyData = localStorage.getItem(key);
-                            setCurrentUserHistory(historyData ? JSON.parse(historyData) : []);
+                            loadUserHistory(selectedUserForOptions.id);
                             setShowUserHistoryModal(true);
                         }}
                         className="w-full flex items-center gap-3 py-4 px-5 rounded-2xl font-bold bg-slate-50 text-slate-700 hover:bg-slate-100 transition-colors"
@@ -681,9 +760,29 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                              </div>
                         ) : (
                             currentUserHistory.map((msg, idx) => (
-                                <div key={idx} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm relative">
-                                    <div className="text-[12px] font-bold text-slate-400 mb-2 border-b border-slate-50 pb-2 flex items-center gap-1.5 justify-start" dir="ltr">
-                                        {new Date(msg.date).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })}
+                                <div key={idx} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm relative group overflow-hidden">
+                                    <div className="text-[12px] font-bold text-slate-400 mb-2 border-b border-slate-50 pb-2 flex items-center justify-between" dir="rtl">
+                                        <div className="flex gap-2">
+                                            {new Date(msg.date).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })}
+                                        </div>
+                                        <button 
+                                            onClick={async () => {
+                                                if (window.confirm('هل أنت متأكد من حذف هذه الرسالة من السجل؟')) {
+                                                    try {
+                                                        const { error } = await supabase.from('user_messages').delete().eq('id', msg.id);
+                                                        if (error) throw error;
+                                                    } catch (e) {}
+
+                                                    const updated = currentUserHistory.filter(m => m.id !== msg.id);
+                                                    setCurrentUserHistory(updated);
+                                                    const key = 'user_messages_log_' + selectedUserForOptions.id;
+                                                    localStorage.setItem(key, JSON.stringify(updated));
+                                                }
+                                            }}
+                                            className="text-white hover:bg-red-50 hover:text-red-600 transition-colors rounded-lg p-1.5 opacity-0 group-hover:opacity-100 bg-red-400 font-bold flex items-center justify-center shrink-0"
+                                        >
+                                            <X size={14} /> 
+                                        </button>
                                     </div>
                                     <p className="text-slate-700 text-[15px] whitespace-pre-wrap leading-relaxed font-medium">
                                         {msg.text}
