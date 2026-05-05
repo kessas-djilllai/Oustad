@@ -15,6 +15,7 @@ import { getSubjectPrompt } from "./lib/prompts";
 import { preprocessMath } from "./lib/utils";
 import { QuizView } from "./components/QuizView";
 import { SubjectTypeView, SubjectUnitsView, UnitDetailsView, ContentListView, LessonDetailsView, InteractiveExerciseView } from "./components/StudentViews";
+import { VIP } from "./pages/vip";
 import { PdfViewer } from "./components/PdfViewer";
 import { 
   BookOpen,
@@ -136,6 +137,20 @@ function StudentLayout({ session }: { session: any }) {
     return localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
 
+  const [paymentStatus, setPaymentStatus] = useState<'success' | 'failure' | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentParam = params.get('payment');
+    if (paymentParam === 'success') {
+      setPaymentStatus('success');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (paymentParam === 'failure') {
+      setPaymentStatus('failure');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -196,6 +211,54 @@ function StudentLayout({ session }: { session: any }) {
             </button>
           </div>
         </header>
+
+        <AnimatePresence>
+          {paymentStatus === 'success' && (
+            <motion.div
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              className="bg-green-50/90 backdrop-blur border border-green-200 text-green-700 px-4 py-3 rounded-2xl flex items-center justify-between mb-6 shadow-sm"
+              dir="rtl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-green-100 p-2 rounded-full text-green-600">
+                  <CheckCircle size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold">عملية دفع ناجحة!</h3>
+                  <p className="text-sm">تم ترقية حسابك وتفعيل باقة VIP بنجاح.</p>
+                </div>
+              </div>
+              <button onClick={() => setPaymentStatus(null)} className="text-green-500 hover:text-green-700">
+                 <X size={20} />
+              </button>
+            </motion.div>
+          )}
+          
+          {paymentStatus === 'failure' && (
+            <motion.div
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              className="bg-red-50/90 backdrop-blur border border-red-200 text-red-700 px-4 py-3 rounded-2xl flex items-center justify-between mb-6 shadow-sm"
+              dir="rtl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-red-100 p-2 rounded-full text-red-600">
+                  <X size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold">فشلت عملية الدفع</h3>
+                  <p className="text-sm">عذراً، لم نتمكن من اتمام عملية الدفع. يرجى المحاولة مرة أخرى.</p>
+                </div>
+              </div>
+              <button onClick={() => setPaymentStatus(null)} className="text-red-500 hover:text-red-700">
+                 <X size={20} />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <StudentPortal session={session} />
 
@@ -542,7 +605,7 @@ function StudentPortal({ session }: { session: any }) {
         {view.type === 'view_lesson' && <LessonDetailsView subject={currentSubject} unit={currentUnit} lesson={view.lesson} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} />}
         {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} onPay={() => setView({ type: 'payment' })} />}
         {view.type === 'quiz' && <QuizView subjects={subjects} onBack={() => setView({ type: 'dashboard' })} />}
-        {view.type === 'payment' && <PaymentView onBack={() => setView({ type: 'dashboard' })} />}
+        {view.type === 'payment' && <VIP onBack={() => setView({ type: 'dashboard' })} session={session} />}
       </div>
 
       {view.type === 'dashboard' && (
@@ -1015,30 +1078,7 @@ function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subject
   )
 }
 
-function PaymentView({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="max-w-md mx-auto pt-10 pb-20 px-4 animate-in fade-in slide-in-from-bottom-4 duration-500" dir="rtl">
-      <div className="flex items-center mb-8 gap-4">
-        <button onClick={onBack} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-500 hover:bg-slate-50 shadow-sm border border-slate-100 shrink-0">
-          <ChevronRight size={20} />
-        </button>
-        <h2 className="text-2xl font-black text-slate-800">ترقية الحساب</h2>
-      </div>
-
-      <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-100 text-center flex flex-col items-center justify-center min-h-[300px]">
-         <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center text-amber-500 mb-6 mx-auto">
-            <svg xmlns="http://www.w3.org/.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-         </div>
-         <h3 className="text-xl font-bold text-slate-800 mb-4">لا يوجد اي طريقة دفع</h3>
-         <p className="text-slate-500 leading-relaxed max-w-sm mb-8">الصفحة قيد التطوير.</p>
-         
-         <button onClick={onBack} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-4 rounded-2xl transition-colors">
-            العودة
-         </button>
-      </div>
-    </div>
-  );
-}
+// PaymentView removed in favor of VIP component
 
 function LeaderboardView({ session }: { session: any }) {
   const [xp, setXp] = useState(0);
