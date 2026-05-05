@@ -171,6 +171,13 @@ function StudentLayout({ session }: { session: any }) {
           </div>
           <div className="flex gap-2 relative">
             <button 
+              onClick={() => navigate('/admin')}
+              className="w-10 h-10 flex rounded-2xl glass glass-hover justify-center items-center text-slate-600 dark:text-slate-300 transition-all shrink-0"
+              title="لوحة التحكم"
+            >
+              <Shield size={20} />
+            </button>
+            <button 
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="w-10 h-10 flex rounded-2xl glass glass-hover justify-center items-center text-slate-600 dark:text-slate-300 transition-all shrink-0"
               aria-label="Toggle Dark Mode"

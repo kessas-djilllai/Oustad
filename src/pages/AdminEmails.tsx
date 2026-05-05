@@ -28,6 +28,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   const [showUserHistoryModal, setShowUserHistoryModal] = useState(false);
   const [currentUserHistory, setCurrentUserHistory] = useState<any[]>([]);
   const [showSqlModal, setShowSqlModal] = useState(false);
+  const [deleteConfirmInfo, setDeleteConfirmInfo] = useState<{type: 'template' | 'user_message' | 'reset_list', data?: any} | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -95,11 +96,44 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   }, [searchTerm, activeTab]);
 
   const handleReset = () => {
-    if (window.confirm('هل أنت متأكد من رغبتك في تصفير قائمة المستلمين؟ سيتم إعادة الجميع إلى قائمة المراسلة.')) {
+    setDeleteConfirmInfo({ type: 'reset_list' });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmInfo) return;
+    
+    if (deleteConfirmInfo.type === 'reset_list') {
         localStorage.removeItem('sent_emails_history');
         setSentSet(new Set());
         triggerAlert('تم تصفير القائمة بنجاح', 'success');
+    } else if (deleteConfirmInfo.type === 'template') {
+        const msg = deleteConfirmInfo.data;
+        try {
+            const { error } = await supabase.from('admin_msg_templates').delete().eq('id', msg.id);
+            if (error) throw error;
+        } catch (e: any) {
+            console.error("DB Error", e);
+        }
+        const updated = savedMessages.filter((m: any) => m.id !== msg.id);
+        setSavedMessages(updated);
+        localStorage.setItem('admin_msg_history', JSON.stringify(updated));
+        triggerAlert('تم حذف القالب بنجاح', 'success');
+    } else if (deleteConfirmInfo.type === 'user_message') {
+        const msg = deleteConfirmInfo.data;
+        try {
+            const { error } = await supabase.from('user_messages').delete().eq('id', msg.id);
+            if (error) throw error;
+        } catch (e: any) {
+            console.error("DB Error", e);
+        }
+        const updated = currentUserHistory.filter((m: any) => m.id !== msg.id);
+        setCurrentUserHistory(updated);
+        const key = 'user_messages_log_' + selectedUserForOptions?.id;
+        localStorage.setItem(key, JSON.stringify(updated));
+        triggerAlert('تم حذف الرسالة بنجاح', 'success');
     }
+    
+    setDeleteConfirmInfo(null);
   };
 
   const fetchUsers = async () => {
@@ -425,7 +459,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ duration: 0.1 }}
                     className="fixed inset-0 bg-slate-900/60 z-50"
                     onClick={() => !isSending && setIsBottomSheetOpen(false)}
                 />
@@ -433,7 +467,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     initial={{ y: '100%' }}
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
-                    transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
+                    transition={{ type: 'tween', duration: 0.15, ease: 'easeOut' }}
                     className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 flex flex-col h-auto max-h-[85vh]"
                     dir="rtl"
                 >
@@ -488,16 +522,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                                                 استخدام القالب
                                             </button>
                                             <button onClick={async () => {
-                                                if(window.confirm('هل أنت متأكد من حذف هذا القالب؟')) {
-                                                    try {
-                                                        const { error } = await supabase.from('admin_msg_templates').delete().eq('id', msg.id);
-                                                        if (error) throw error;
-                                                    } catch (e) {}
-
-                                                    const updated = savedMessages.filter(m => m.id !== msg.id);
-                                                    setSavedMessages(updated);
-                                                    localStorage.setItem('admin_msg_history', JSON.stringify(updated));
-                                                }
+                                                setDeleteConfirmInfo({ type: 'template', data: msg });
                                             }} className="px-4 bg-red-50 text-red-600 rounded-xl py-2.5 text-sm font-bold hover:bg-red-100 active:scale-[0.98] transition-all">
                                                 حذف
                                             </button>
@@ -643,7 +668,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ duration: 0.1 }}
                     className="fixed inset-0 bg-slate-900/60 z-50 backdrop-blur-sm"
                     onClick={() => setSelectedUserForOptions(null)}
                 />
@@ -651,7 +676,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     initial={{ y: '100%' }}
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
-                    transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
+                    transition={{ type: 'tween', duration: 0.15, ease: 'easeOut' }}
                     className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 flex flex-col p-6 gap-4"
                     dir="rtl"
                 >
@@ -713,7 +738,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ duration: 0.1 }}
                     className="fixed inset-0 bg-slate-900/60 z-50 backdrop-blur-sm"
                     onClick={() => {
                         setShowUserHistoryModal(false);
@@ -724,8 +749,8 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     initial={{ y: '100%' }}
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
-                    transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
-                    className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 flex flex-col h-[85vh]"
+                    transition={{ type: 'tween', duration: 0.15, ease: 'easeOut' }}
+                    className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 flex flex-col h-auto max-h-[85vh]"
                     dir="rtl"
                 >
                     <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl shrink-0">
@@ -759,20 +784,8 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                                             {new Date(msg.date).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })}
                                         </div>
                                         <button 
-                                            onClick={async () => {
-                                                if (window.confirm('هل أنت متأكد من حذف هذه الرسالة من السجل؟')) {
-                                                    try {
-                                                        const { error } = await supabase.from('user_messages').delete().eq('id', msg.id);
-                                                        if (error) throw error;
-                                                    } catch (e) {}
-
-                                                    const updated = currentUserHistory.filter(m => m.id !== msg.id);
-                                                    setCurrentUserHistory(updated);
-                                                    const key = 'user_messages_log_' + selectedUserForOptions.id;
-                                                    localStorage.setItem(key, JSON.stringify(updated));
-                                                }
-                                            }}
-                                            className="text-white hover:bg-red-50 hover:text-red-600 transition-colors rounded-lg p-1.5 opacity-0 group-hover:opacity-100 bg-red-400 font-bold flex items-center justify-center shrink-0"
+                                            onClick={() => setDeleteConfirmInfo({ type: 'user_message', data: msg })}
+                                            className="text-red-500 bg-red-50 hover:bg-red-100 transition-colors rounded-lg p-1.5 font-bold flex items-center justify-center shrink-0"
                                         >
                                             <X size={14} /> 
                                         </button>
@@ -889,6 +902,52 @@ ALTER TABLE admin_msg_templates DISABLE ROW LEVEL SECURITY;
 ALTER TABLE user_messages DISABLE ROW LEVEL SECURITY;`}
                             </pre>
                         </div>
+                    </div>
+                </motion.div>
+            </div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirmInfo && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <motion.div 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                    onClick={() => setDeleteConfirmInfo(null)}
+                />
+                <motion.div
+                    initial={{ scale: 0.95, opacity: 0, y: 10 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.95, opacity: 0, y: 10 }}
+                    className="relative bg-white rounded-3xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col p-6"
+                    dir="rtl"
+                >
+                    <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle size={32} />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-800 text-center mb-2">
+                        {deleteConfirmInfo.type === 'reset_list' ? 'تصفير القائمة' : 'تأكيد الحذف'}
+                    </h3>
+                    <p className="text-slate-500 text-center font-medium text-sm mb-6">
+                        {deleteConfirmInfo.type === 'reset_list' ? 'هل أنت متأكد من رغبتك في تصفير قائمة المستلمين؟ سيتم إعادة الجميع إلى قائمة المراسلة.' : 'هل أنت متأكد من حذف هذا العنصر؟ لا يمكن التراجع عن هذا الـإجراء.'}
+                    </p>
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={handleConfirmDelete}
+                            className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition-colors"
+                        >
+                            تأكيد
+                        </button>
+                        <button 
+                            onClick={() => setDeleteConfirmInfo(null)}
+                            className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors"
+                        >
+                            إلغاء
+                        </button>
                     </div>
                 </motion.div>
             </div>
