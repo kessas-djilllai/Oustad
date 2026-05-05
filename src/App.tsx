@@ -587,7 +587,7 @@ function StudentPortal({ session }: { session: any }) {
 
   return (
     <>
-      <div key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}>
+      <div key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')} className={view.type === 'dashboard' ? 'pb-28' : ''}>
         {view.type === 'dashboard' && mainTab === 'home' && <DashboardHomeView subjects={subjects} bacDate={bacDate} onStartQuiz={() => setView({ type: 'quiz' })} onOpenFlashcards={(type) => setView({ type: 'flashcards', listType: type })} />}
         {view.type === 'dashboard' && mainTab === 'subjects' && <DashboardSubjectsView subjects={subjects} listType={mainTab} onSubjectClick={(s) => setView({ type: 'subject_units', subject: s })} />}
         {view.type === 'dashboard' && mainTab === 'topics' && <TopicsView subjects={subjects} />}
@@ -611,7 +611,7 @@ function StudentPortal({ session }: { session: any }) {
       </div>
 
       {view.type === 'dashboard' && (
-        <div className="fixed bottom-0 left-0 right-0 h-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-800/50 z-40 flex items-center justify-around px-2 sm:px-6 pb-2 text-slate-500 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.05)]">
+        <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[400px] h-20 bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/50 dark:border-slate-700/50 shadow-[0_8px_30px_rgb(0,0,0,0.08)] z-40 flex items-center justify-around sm:justify-evenly px-2 sm:px-6 rounded-[2rem]">
           <BottomNavItem icon={<Home size={22} />} label="الرئيسية" active={mainTab === 'home'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('home'); }} />
           <BottomNavItem icon={<BookOpen size={22} />} label="المواد" active={mainTab === 'subjects'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('subjects'); }} />
           <BottomNavItem icon={<Trophy size={22} />} label="الصدارة" active={mainTab === 'leaderboard'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('leaderboard'); }} />
