@@ -206,226 +206,131 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   const isAllSelected = selectableFiltered.length > 0 && selectableFiltered.every(u => selectedUsers.has(u.id));
 
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-slate-50 font-sans" dir="rtl">
+    <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans" dir="rtl">
       
-      {/* Top Navigation */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
-                        <Mail size={20} />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-bold text-slate-900 tracking-tight">المراسلات</h1>
-                        <p className="text-sm text-slate-500 hidden sm:block">إدارة رسائل المستخدمين والتنبيهات</p>
-                    </div>
+      <div className="px-5 pt-8 pb-4 max-w-lg mx-auto">
+        {/* Page Header */}
+        <div className="flex items-center justify-start gap-4 mb-8">
+            <Menu className="text-slate-800" size={28} />
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">المراسلات للإدارة</h1>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-4 mb-6 leading-tight">
+            {/* Mass Send Button */}
+            <button 
+                onClick={() => {
+                    const remaining = filteredUsers.filter(u => !sentSet.has(u.id));
+                    if (remaining.length === 0) {
+                        triggerAlert('لا يوجد مستخدمين متبقين في هذه القائمة لمراسلتهم.', 'error');
+                        return;
+                    }
+                    setSelectedUsers(new Set(remaining.map(u => u.id)));
+                    setIsBottomSheetOpen(true);
+                }}
+                className="flex-1 bg-blue-500 text-white rounded-3xl p-5 flex items-center justify-between shadow-sm active:scale-[0.98] transition-transform"
+            >
+                <div className="flex flex-col text-right font-bold text-[17px]">
+                    <span>إرسال</span>
+                    <span>للمتبقين ({remainingCount})</span>
                 </div>
-                
-                <div className="flex items-center gap-3">
-                     <button 
-                         onClick={handleReset}
-                         className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-red-600 bg-slate-50 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors border border-slate-200 hover:border-red-100"
-                     >
-                         <RefreshCw size={16} /> تصفير القائمة
-                     </button>
-                    {(selectedUsers.size > 0 || remainingCount > 0) && (
-                        <button 
+                <Send size={24} className="transform -scale-x-100 opacity-90" />
+            </button>
+
+            {/* Reset Button */}
+            <button 
+                onClick={handleReset}
+                className="w-1/3 bg-red-50 text-red-600 rounded-3xl p-5 flex flex-col items-center justify-center gap-2 font-bold text-sm active:scale-[0.98] transition-transform"
+            >
+                <RefreshCw size={22} className="mb-1" />
+                تصفير
+            </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex p-1.5 bg-white border border-slate-200/50 rounded-2xl shadow-sm mb-6 flex-row-reverse relative z-0">
+            <button 
+                onClick={() => setActiveTab('remaining')}
+                className={`flex-1 py-3 px-2 flex items-center justify-center gap-2 font-bold text-sm transition-colors rounded-xl ${activeTab === 'remaining' ? 'bg-white shadow text-slate-800 border border-slate-100' : 'text-slate-500'}`}
+            >
+                المتبقية <span className={`rounded-full px-2 py-0.5 text-xs ${activeTab === 'remaining' ? 'bg-slate-400 text-white' : 'bg-slate-200 text-slate-600'}`}>{remainingCount}</span>
+            </button>
+            <button 
+                onClick={() => setActiveTab('sent')}
+                className={`flex-1 py-3 px-2 flex items-center justify-center gap-2 font-bold text-sm transition-colors rounded-xl ${activeTab === 'sent' ? 'bg-white shadow text-emerald-600 border border-slate-100' : 'text-slate-500'}`}
+            >
+                المستلمة <span className={`rounded-full px-2 py-0.5 text-xs ${activeTab === 'sent' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-600'}`}>{sentSet.size}</span>
+            </button>
+            <button 
+                onClick={() => setActiveTab('all')}
+                className={`flex-1 py-3 px-2 flex items-center justify-center gap-2 font-bold text-sm transition-colors rounded-xl ${activeTab === 'all' ? 'bg-white shadow text-blue-600 border border-slate-100' : 'text-slate-500'}`}
+            >
+                الكل
+            </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative mb-6">
+            <input 
+                type="text" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="بحث بالاسم أو الايميل..." 
+                className="w-full bg-white border border-slate-200/50 rounded-2xl py-4 pr-12 pl-6 text-[15px] font-medium outline-none text-right shadow-sm focus:border-blue-500 transition-colors" 
+            />
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+        </div>
+
+        {/* User Cards */}
+        <div className="space-y-4">
+            {filteredUsers.length === 0 ? (
+                 <div className="text-center py-16 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
+                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                     <Search size={28} className="text-slate-300" />
+                 </div>
+                 <h3 className="text-lg font-bold text-slate-800 mb-1">لا يوجد نتائج</h3>
+               </div>
+            ) : (
+                filteredUsers.map(user => {
+                    const name = user.raw_user_meta_data?.full_name || 'بدون اسم';
+                    const initial = name.charAt(0).toUpperCase();
+                    const isSent = sentSet.has(user.id);
+
+                    return (
+                        <div 
+                            key={user.id}
                             onClick={() => {
-                                if (selectedUsers.size === 0) {
-                                    const remaining = users.filter(u => !sentSet.has(u.id));
-                                    setSelectedUsers(new Set(remaining.map(u => u.id)));
+                                if (!isSent) {
+                                  setSelectedUsers(new Set([user.id]));
+                                  setIsBottomSheetOpen(true);
                                 }
-                                setIsBottomSheetOpen(true);
                             }}
-                            className="flex items-center gap-2 px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition-all"
-                        >
-                            <Send size={16} className="transform -scale-x-100" />
-                            {selectedUsers.size > 0 ? `رسالة جديدة (${selectedUsers.size})` : 'مراسلة الجميع'}
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-slate-500">إجمالي المستخدمين</h3>
-                    <Users size={20} className="text-blue-500 opacity-80" />
-                </div>
-                <p className="text-3xl font-bold text-slate-900">{users.length}</p>
-            </div>
-            
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-slate-500">تم الإرسال</h3>
-                    <CheckCircle2 size={20} className="text-emerald-500 opacity-80" />
-                </div>
-                <p className="text-3xl font-bold text-slate-900">{sentSet.size}</p>
-            </div>
-            
-            <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-slate-500">في الانتظار</h3>
-                    <Inbox size={20} className="text-amber-500 opacity-80" />
-                </div>
-                <p className="text-3xl font-bold text-slate-900">{remainingCount}</p>
-            </div>
-        </div>
-
-        {/* Content Section */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-            
-            {/* Toolbar */}
-            <div className="border-b border-slate-200 p-4 sm:p-5 flex flex-col sm:flex-row gap-4 justify-between bg-slate-50/50">
-                
-                {/* Search */}
-                <div className="relative max-w-sm w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <input 
-                        type="text" 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="ابحث بالاسم أو الإيميل..." 
-                        className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-shadow"
-                    />
-                </div>
-                
-                {/* Segmented Control */}
-                <div className="flex p-0.5 bg-slate-100 border border-slate-200 rounded-lg sm:w-auto w-full">
-                    {[
-                        { id: 'remaining', label: 'في الانتظار', count: remainingCount },
-                        { id: 'sent', label: 'المستلمة', count: sentSet.size },
-                        { id: 'all', label: 'الكل', count: users.length }
-                    ].map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex-1 sm:flex-none flex justify-center items-center gap-2 px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                                activeTab === tab.id 
-                                ? 'bg-white text-slate-900 shadow-sm border border-slate-200/50' 
-                                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                            className={`bg-white rounded-[1.75rem] p-5 shadow-sm border flex justify-between items-center transition-all ${
+                                isSent ? 'opacity-60 grayscale border-slate-100 pointer-events-none' : 
+                                'border-slate-100/80 cursor-pointer hover:border-blue-300 active:scale-95'
                             }`}
                         >
-                            {tab.label}
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                activeTab === tab.id 
-                                ? 'bg-slate-100 text-slate-600' 
-                                : 'bg-slate-200/50 text-slate-500'
-                            }`}>
-                                {tab.count}
-                            </span>
-                        </button>
-                    ))}
-                </div>
-            </div>
+                            <div className="flex flex-col text-right pr-4 overflow-hidden order-1 flex-1">
+                                <span className="font-bold text-slate-800 text-[17px] mb-1 truncate leading-tight">{name}</span>
+                                <span className="font-mono text-[14px] text-slate-500 truncate">{user.email}</span>
+                            </div>
 
-            {/* List Header */}
-            {filteredUsers.length > 0 && activeTab !== 'sent' && (
-                <div className="grid grid-cols-[auto_1fr_auto] gap-4 items-center bg-slate-50 border-b border-slate-200 px-5 py-3 text-sm font-medium text-slate-500">
-                    <div 
-                        className={`w-5 h-5 rounded border flex items-center justify-center cursor-pointer transition-colors ${
-                            isAllSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white hover:border-blue-400'
-                        }`}
-                        onClick={toggleAll}
-                    >
-                        {isAllSelected && <Check size={14} strokeWidth={3} />}
-                    </div>
-                    <div>المستخدم ({filteredUsers.length})</div>
-                    <div className="text-left w-24">الحالة</div>
-                </div>
-            )}
-
-            {/* List Body */}
-            <div className="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
-                {filteredUsers.length === 0 ? (
-                    <div className="p-12 text-center flex flex-col items-center">
-                        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
-                            <Search size={24} />
-                        </div>
-                        <h3 className="text-base font-semibold text-slate-900 mb-1">لا توجد نتائج</h3>
-                        <p className="text-sm text-slate-500">جرب تعديل كلمات البحث أو تغيير التصنيف.</p>
-                    </div>
-                ) : (
-                    filteredUsers.map(user => {
-                        const name = user.raw_user_meta_data?.full_name || 'بدون اسم';
-                        const initial = name.charAt(0).toUpperCase();
-                        const isSelected = selectedUsers.has(user.id);
-                        const isSent = sentSet.has(user.id);
-
-                        return (
-                            <div 
-                                key={user.id}
-                                onClick={() => !isSent && toggleUserSelection(user.id)}
-                                className={`grid grid-cols-[auto_1fr_auto] gap-4 items-center px-5 py-3 transition-colors ${
-                                    isSent ? 'bg-slate-50/50 opacity-75' : 
-                                    isSelected ? 'bg-blue-50/40 hover:bg-blue-50/60 cursor-pointer' : 
-                                    'hover:bg-slate-50 cursor-pointer'
-                                }`}
-                            >
-                                <div className="pt-1 self-start">
-                                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
-                                        isSent ? 'bg-slate-200 border-slate-200 text-slate-400 cursor-not-allowed' :
-                                        isSelected ? 'bg-blue-600 border-blue-600 text-white' : 
-                                        'border-slate-300 bg-white'
-                                    }`}>
-                                        {(isSelected || isSent) && <Check size={14} strokeWidth={isSent ? 2 : 3} />}
-                                    </div>
-                                </div>
-                                
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border ${
-                                        isSent ? 'bg-slate-100 border-slate-200 text-slate-500' :
-                                        'bg-blue-100 border-blue-200 text-blue-700'
-                                    }`}>
-                                        {initial}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="font-semibold text-sm text-slate-900 truncate pr-1">{name}</p>
-                                        <p className="text-xs text-slate-500 truncate mt-0.5">{user.email}</p>
-                                    </div>
-                                </div>
-                                
-                                <div className="text-left">
-                                    {isSent ? (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                                            مُرسل
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-600">
-                                            انتظار
-                                        </span>
-                                    )}
+                            <div className="relative shrink-0 order-2 pl-4 border-r border-slate-100 flex items-center">
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl transition-colors ${
+                                    isSent ? 'bg-slate-200 text-slate-500' : 
+                                    'bg-blue-50 text-blue-600'
+                                }`}>
+                                    {initial}
                                 </div>
                             </div>
-                        )
-                    })
-                )}
-            </div>
-            
-            {/* List Footer */}
-            {selectedUsers.size > 0 && (
-                <div className="bg-blue-50 border-t border-blue-100 p-4 flex items-center justify-between slide-up transition-all duration-300">
-                    <span className="text-sm font-medium text-blue-800">
-                        تم تحديد ({selectedUsers.size}) مستخدم
-                    </span>
-                    <button 
-                        onClick={() => setSelectedUsers(new Set())}
-                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                    >
-                        إلغاء التحديد
-                    </button>
-                </div>
+                        </div>
+                    )
+                })
             )}
         </div>
       </div>
 
-      {/* Modern Composer Drawer */}
+      {/* Modern Composer Drawer (Bottom Sheet on Mobile) */}
       <AnimatePresence>
         {isBottomSheetOpen && (
             <>
@@ -437,58 +342,52 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     onClick={() => !isSending && setIsBottomSheetOpen(false)}
                 />
                 <motion.div
-                    initial={{ x: '100%' }}
-                    animate={{ x: 0 }}
-                    exit={{ x: '100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 250 }}
-                    className="fixed top-0 right-0 bottom-0 w-full sm:w-[480px] bg-white shadow-2xl z-50 flex flex-col"
+                    initial={{ y: '100%' }}
+                    animate={{ y: 0 }}
+                    exit={{ y: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-2xl z-50 overflow-hidden flex flex-col h-[85vh] max-h-[800px]"
                     dir="rtl"
                 >
-                    <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shadow-sm relative z-10">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                                <Mail size={16} />
-                            </div>
-                            <h3 className="font-bold text-slate-900">رسالة جديدة</h3>
-                        </div>
+                    <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                        <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg">
+                           رسالة جديدة
+                        </h3>
                         <button 
                             onClick={() => !isSending && setIsBottomSheetOpen(false)} 
-                            className="text-slate-400 hover:text-slate-800 transition-colors p-2 rounded-full hover:bg-slate-100"
+                            className="text-slate-400 hover:text-slate-800 transition-colors p-2 rounded-full hover:bg-slate-200"
                             disabled={isSending}
                         >
                            <X size={20} />
                         </button>
                     </div>
                     
-                    <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6 bg-slate-50/30">
+                    <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6 bg-white">
                         
-                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-3 text-sm text-blue-800 shrink-0">
+                        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex gap-3 text-sm text-blue-800 shrink-0">
                             <AlertCircle size={20} className="text-blue-600 shrink-0 mt-0.5" />
                             <p>سيتم إرسال هذه الرسالة إلى <strong>{selectedUsers.size}</strong> مستخدم. يرجى المراجعة بعناية قبل الإرسال.</p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">محتوى الرسالة</label>
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">النص (يدعم المسافات)</label>
                             <textarea 
                                 value={message}
                                 onChange={e => setMessage(e.target.value)}
-                                rows={10}
+                                rows={8}
                                 placeholder="اكتب رسالتك تفصيلياً هنا..."
-                                className="w-full border border-slate-200 rounded-xl p-4 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm resize-none transition-all shadow-sm flex-1"
+                                className="w-full border border-slate-200 rounded-2xl p-4 bg-slate-50 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-[15px] resize-none transition-all"
                             ></textarea>
                         </div>
                         
-                        <div className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-sm shrink-0">
+                        <div className="border border-slate-200 rounded-2xl bg-slate-50/50 overflow-hidden p-5 shrink-0">
                             <div 
-                                className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 select-none"
+                                className="flex items-center justify-between cursor-pointer select-none"
                                 onClick={() => setIncludeButton(!includeButton)}
                             >
-                                <div className="flex items-center gap-3">
-                                    <Plus size={18} className={`text-slate-400 transition-transform ${includeButton ? 'rotate-45' : ''}`} />
-                                    <span className="font-semibold text-sm text-slate-700">إضافة زر إجراء (CTA)</span>
-                                </div>
-                                <div className={`w-10 h-6 rounded-full transition-colors relative flex items-center ${includeButton ? 'bg-blue-500' : 'bg-slate-200'}`}>
-                                    <div className={`w-4 h-4 bg-white rounded-full mx-1 absolute transition-all shadow-sm ${includeButton ? 'left-5' : 'left-0'}`}></div>
+                                <span className="font-bold text-[15px] text-slate-700">تضمين زر (رابط) في الأسفل</span>
+                                <div className={`w-12 h-7 rounded-full transition-colors relative flex items-center ${includeButton ? 'bg-blue-500' : 'bg-slate-300'}`}>
+                                    <div className={`w-5 h-5 bg-white rounded-full mx-1 absolute transition-all shadow-sm ${includeButton ? 'left-5' : 'left-0'}`}></div>
                                 </div>
                             </div>
 
@@ -500,25 +399,25 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                                         exit={{ opacity: 0, height: 0 }}
                                         className="overflow-hidden"
                                     >
-                                        <div className="p-4 pt-0 border-t border-slate-100 flex flex-col gap-4 mt-2">
+                                        <div className="grid grid-cols-1 gap-4 mt-4 pt-4 border-t border-slate-200">
                                             <div>
-                                                <label className="block text-xs font-semibold text-slate-600 mb-1.5">النص على الزر</label>
+                                                <label className="block text-xs font-bold text-slate-600 mb-2">النص على الزر</label>
                                                 <input 
                                                     type="text" 
                                                     value={buttonText}
                                                     onChange={e => setButtonText(e.target.value)}
                                                     placeholder="مثال: تسجيل الدخول"
-                                                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all"
+                                                    className="w-full border border-slate-200 rounded-xl px-3.5 py-3 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-semibold text-slate-600 mb-1.5">الرابط الموجه</label>
+                                                <label className="block text-xs font-bold text-slate-600 mb-2">الرابط الوجهة</label>
                                                 <input 
                                                     type="url" 
                                                     value={buttonLink}
                                                     onChange={e => setButtonLink(e.target.value)}
                                                     placeholder="https://..."
-                                                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all font-mono text-left"
+                                                    className="w-full border border-slate-200 rounded-xl px-3.5 py-3 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm font-mono text-left"
                                                     dir="ltr"
                                                 />
                                             </div>
@@ -530,36 +429,26 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
 
                         {isSending && sendingStatus && (
                             <div className="bg-blue-50 border border-blue-100 text-blue-800 p-4 rounded-xl text-sm font-medium text-center flex flex-col items-center gap-3 shrink-0">
-                                <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
                                 {sendingStatus}
                             </div>
                         )}
                     </div>
 
-                    <div className="p-4 border-t border-slate-100 bg-white">
+                    <div className="p-5 border-t border-slate-100 bg-white drop-shadow-2xl">
                         <button 
                             onClick={handleSendEmail}
                             disabled={selectedUsers.size === 0 || isSending}
-                            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                            className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-black bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-[17px] shadow-lg shadow-blue-500/20"
                         >
-                            <Send size={18} className="transform -scale-x-100" /> 
-                            {isSending ? 'جاري التنفيذ...' : 'إرسال الآن'}
+                            <Send size={20} className="transform -scale-x-100" /> 
+                            {isSending ? 'جاري التنفيذ...' : `تأكيد وإرسال لـ ${selectedUsers.size}`}
                         </button>
                     </div>
                 </motion.div>
             </>
         )}
       </AnimatePresence>
-
-      <style>{`
-        .slide-up {
-            animation: slideUp 0.3s ease-out;
-        }
-        @keyframes slideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }
