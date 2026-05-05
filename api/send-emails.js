@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { to, subject, message } = req.body;
+    const { to, subject, message, htmlMessage } = req.body;
     
     // Use environment variables for credentials
     const user = process.env.SMTP_EMAIL;
@@ -34,6 +34,10 @@ export default async function handler(req, res) {
       subject: subject,
       text: message
     };
+    
+    if (htmlMessage) {
+        mailOptions.html = htmlMessage;
+    }
 
     const info = await transporter.sendMail(mailOptions);
     res.status(200).json({ success: true, info });

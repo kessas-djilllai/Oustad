@@ -13,7 +13,7 @@ async function startServer() {
   // Email API Route
   app.post("/api/send-emails", async (req, res) => {
     try {
-      const { to, subject, message } = req.body;
+      const { to, subject, message, htmlMessage } = req.body;
       const user = process.env.SMTP_EMAIL;
       const pass = process.env.SMTP_PASSWORD;
       
@@ -33,12 +33,16 @@ async function startServer() {
         }
       });
 
-      const mailOptions = {
+      const mailOptions: any = {
         from: `"بكالوريا" <${user}>`,
         to: to,
         subject: subject,
         text: message
       };
+      
+      if (htmlMessage) {
+        mailOptions.html = htmlMessage;
+      }
 
       const info = await transporter.sendMail(mailOptions);
       res.json({ success: true, info });
