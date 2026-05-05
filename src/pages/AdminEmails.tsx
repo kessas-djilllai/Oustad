@@ -305,23 +305,21 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                                   setIsBottomSheetOpen(true);
                                 }
                             }}
-                            className={`bg-white rounded-[1.75rem] p-5 shadow-sm border flex justify-between items-center transition-all ${
+                            className={`bg-white rounded-2xl p-3 shadow-sm border flex items-center gap-3 transition-all ${
                                 isSent ? 'opacity-60 grayscale border-slate-100 pointer-events-none' : 
                                 'border-slate-100/80 cursor-pointer hover:border-blue-300 active:scale-95'
                             }`}
                         >
-                            <div className="flex flex-col text-right pr-4 overflow-hidden order-1 flex-1">
-                                <span className="font-bold text-slate-800 text-[17px] mb-1 truncate leading-tight">{name}</span>
-                                <span className="font-mono text-[14px] text-slate-500 truncate">{user.email}</span>
+                            <div className={`w-11 h-11 rounded-xl shrink-0 flex items-center justify-center font-bold text-lg transition-colors ${
+                                isSent ? 'bg-slate-200 text-slate-500' : 
+                                'bg-blue-50 text-blue-600'
+                            }`}>
+                                {initial}
                             </div>
 
-                            <div className="relative shrink-0 order-2 pl-4 border-r border-slate-100 flex items-center">
-                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-2xl transition-colors ${
-                                    isSent ? 'bg-slate-200 text-slate-500' : 
-                                    'bg-blue-50 text-blue-600'
-                                }`}>
-                                    {initial}
-                                </div>
+                            <div className="flex flex-col text-right overflow-hidden flex-1">
+                                <span className="font-bold text-slate-800 text-[15px] truncate">{name}</span>
+                                <span className="font-mono text-[13px] text-slate-500 truncate mt-0.5">{user.email}</span>
                             </div>
                         </div>
                     )
@@ -346,7 +344,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
                     transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-2xl z-50 overflow-hidden flex flex-col h-[85vh] max-h-[800px]"
+                    className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]"
                     dir="rtl"
                 >
                     <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
@@ -362,9 +360,9 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                         </button>
                     </div>
                     
-                    <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6 bg-white">
+                    <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-5 bg-white">
                         
-                        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-4 flex gap-3 text-sm text-blue-800 shrink-0">
+                        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex gap-3 text-sm text-blue-800 shrink-0">
                             <AlertCircle size={20} className="text-blue-600 shrink-0 mt-0.5" />
                             <p>سيتم إرسال هذه الرسالة إلى <strong>{selectedUsers.size}</strong> مستخدم. يرجى المراجعة بعناية قبل الإرسال.</p>
                         </div>
@@ -374,7 +372,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                             <textarea 
                                 value={message}
                                 onChange={e => setMessage(e.target.value)}
-                                rows={8}
+                                rows={5}
                                 placeholder="اكتب رسالتك تفصيلياً هنا..."
                                 className="w-full border border-slate-200 rounded-2xl p-4 bg-slate-50 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-[15px] resize-none transition-all"
                             ></textarea>
