@@ -11,9 +11,17 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
+  const [senderEmail, setSenderEmail] = useState('');
+  const [appPassword, setAppPassword] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     fetchUsers();
+    // Load saved SMTP credentials
+    const savedEmail = localStorage.getItem('smtp_email');
+    const savedPass = localStorage.getItem('smtp_pass');
+    if (savedEmail) setSenderEmail(savedEmail);
+    if (savedPass) setAppPassword(savedPass);
   }, []);
 
   const fetchUsers = async () => {
@@ -54,13 +62,17 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
     }
   };
 
-  const handleSendEmail = () => {
+  const handleSendEmail = async () => {
     if (selectedUsers.size === 0) {
       triggerAlert('الرجاء تحديد مستخدم واحد على الأقل.', 'error');
       return;
     }
     if (!subject.trim() || !message.trim()) {
       triggerAlert('الرجاء إدخال عنوان ومحتوى الرسالة.', 'error');
+      return;
+    }
+    if (!senderEmail.trim() || !appPassword.trim()) {
+      triggerAlert('الرجاء إدخال إيميل المرسل وكلمة مرور التطبيقات.', 'error');
       return;
     }
 
@@ -74,18 +86,35 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
         return;
     }
 
-    // Use bcc to hide emails from other recipients
-    const bccList = selectedEmails.join(',');
-    const mailtoLink = `mailto:?bcc=${encodeURIComponent(bccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
-    
-    // Create a temporary link element and click it (to handle large URIs properly)
-    window.location.href = mailtoLink;
-    
-    // Clear form
-    setSubject('');
-    setMessage('');
-    setSelectedUsers(new Set());
-    triggerAlert('تم فتح تطبيق البريد الخاص بك لإرسال الرسالة.', 'success');
+    setIsSending(true);
+    try {
+      localStorage.setItem('smtp_email', senderEmail);
+      localStorage.setItem('smtp_pass', appPassword);
+
+      const response = await fetch('/api/send-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user: senderEmail,
+          pass: appPassword,
+          to: selectedEmails,
+          subject,
+          message
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'فشل إرسال الرسالة');
+
+      setSubject('');
+      setMessage('');
+      setSelectedUsers(new Set());
+      triggerAlert('تم إرسال الرسالة بنجاح!', 'success');
+    } catch (err: any) {
+      triggerAlert('خطأ في الإرسال: ' + err.message, 'error');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   if (loading) {
@@ -116,6 +145,31 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
              تفاصيل الرسالة
           </h3>
           <div className="space-y-4">
+            <div className="bg-white border border-slate-200 p-4 rounded-xl space-y-3 mb-4">
+              <h4 className="font-bold text-xs text-slate-600 border-b border-slate-100 pb-2">إعدادات بريد الإرسال (Gmail)</h4>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">البريد الإلكتروني (Sender Email)</label>
+                <input 
+                  type="email" 
+                  value={senderEmail}
+                  onChange={e => setSenderEmail(e.target.value)}
+                  placeholder="مثال: example@gmail.com"
+                  className="w-full border-slate-200 rounded-lg p-2 bg-slate-50 outline-none focus:border-blue-500 text-sm"
+                  dir="ltr"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">كلمة مرور التطبيقات (App Password)</label>
+                <input 
+                  type="password" 
+                  value={appPassword}
+                  onChange={e => setAppPassword(e.target.value)}
+                  placeholder="كلمة مرور التطبيقات..."
+                  className="w-full border-slate-200 rounded-lg p-2 bg-slate-50 outline-none focus:border-blue-500 text-sm"
+                  dir="ltr"
+                />
+              </div>
+            </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-2">عنوان الرسالة (Subject)</label>
               <input 
@@ -139,16 +193,20 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
             
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 mt-2">
               <p className="text-xs text-blue-800 leading-relaxed font-medium">
-                ملاحظة: سيتم فتح تطبيق البريد الخاص بك (مثل Gmail أو Outlook) لإرسال الرسالة فعلياً. سيتم وضع إيميلات المستقبلين في الـ BCC للحفاظ على خصوصيتهم.
+                ملاحظة: سيتم إرسال الرسالة من الخادم تلقائياً عن طريق إعدادات بريد Gmail أعلاه باستخدام "كلمة مرور التطبيقات". سيتم وضع المستقبلين في خانة BCC للخصوصية.
               </p>
             </div>
 
             <button 
               onClick={handleSendEmail}
-              disabled={selectedUsers.size === 0}
+              disabled={selectedUsers.size === 0 || isSending}
               className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 mt-4"
             >
-              <Send size={18} /> إرسال إلى {selectedUsers.size} مستخدمين
+              {isSending ? (
+                <>جاري الإرسال...</>
+              ) : (
+                <><Send size={18} /> إرسال إلى {selectedUsers.size} مستخدمين</>
+              )}
             </button>
           </div>
         </div>
