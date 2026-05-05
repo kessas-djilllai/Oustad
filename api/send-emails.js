@@ -30,7 +30,7 @@ export default async function handler(req, res) {
 
     const mailOptions = {
       from: `"بكالوريا" <${user}>`,
-      bcc: Array.isArray(to) ? to.join(',') : to,
+      to: to,
       subject: subject,
       text: message
     };

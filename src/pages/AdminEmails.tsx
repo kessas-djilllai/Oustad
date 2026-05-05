@@ -11,6 +11,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [sendingStatus, setSendingStatus] = useState('');
 
   useEffect(() => {
     fetchUsers();
@@ -75,31 +76,51 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
     }
 
     setIsSending(true);
-    try {
-      const response = await fetch('/api/send-emails', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: selectedEmails,
-          subject: 'رسالة من إدارة منصة بكالوريا',
-          message
-        })
-      });
+    setSendingStatus('بدأ الإرسال...');
+    let sentCount = 0;
 
-      let data;
-      try {
-        data = await response.json();
-      } catch (err) {
-        throw new Error('تعذر قراءة الاستجابة من الخادم. تأكد من رفع مجلد api إلى Vercel.');
+    try {
+      for (let i = 0; i < selectedEmails.length; i += 60) {
+        const batch = selectedEmails.slice(i, i + 60);
+
+        for (let j = 0; j < batch.length; j++) {
+            const email = batch[j];
+            setSendingStatus(`جاري الإرسال إلى ${email}... (${sentCount + 1}/${selectedEmails.length})`);
+            
+            const response = await fetch('/api/send-emails', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: email,
+                subject: 'رسالة من إدارة منصة بكالوريا',
+                message
+              })
+            });
+
+            if (!response.ok) {
+                console.error(`فشل الإرسال إلى ${email}`);
+            }
+            sentCount++;
+            
+            // Wait slightly between each email
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        if (i + 60 < selectedEmails.length) {
+            for (let s = 60; s > 0; s--) {
+                setSendingStatus(`إيقاف مؤقت! تم إرسال ${sentCount} رسالة. ننتظر ${s} ثانية قبل الدفعة التالية لتجنب الحظر...`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
       }
-      
-      if (!response.ok) throw new Error(data?.error || 'فشل إرسال الرسالة');
 
       setMessage('');
       setSelectedUsers(new Set());
-      triggerAlert('تم إرسال الرسالة بنجاح!', 'success');
+      setSendingStatus('');
+      triggerAlert('تم إرسال جميع الرسائل بنجاح!', 'success');
     } catch (err: any) {
       triggerAlert('خطأ في الإرسال: ' + err.message, 'error');
+      setSendingStatus('');
     } finally {
       setIsSending(false);
     }
@@ -161,6 +182,12 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                 <><Send size={18} /> إرسال إلى {selectedUsers.size} مستخدمين</>
               )}
             </button>
+
+            {isSending && sendingStatus && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl mt-3 text-xs font-bold text-center leading-relaxed">
+                    {sendingStatus}
+                </div>
+            )}
           </div>
         </div>
 
