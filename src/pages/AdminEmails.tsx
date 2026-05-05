@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { Mail, Search, Send, RefreshCw, Menu, Check, X, Filter, Users, CheckCircle2, ChevronRight, Inbox, Plus, AlertCircle } from "lucide-react";
+import { Mail, Search, Send, RefreshCw, Menu, Check, X, Filter, Users, CheckCircle2, ChevronRight, Inbox, Plus, AlertCircle, Bookmark } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type: 'success' | 'error') => void }) {
@@ -20,6 +20,9 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   const [buttonLink, setButtonLink] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendingStatus, setSendingStatus] = useState('');
+  
+  const [savedMessages, setSavedMessages] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -30,6 +33,13 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
       } catch (e) {
         console.error("Failed to parse saved sent list", e);
       }
+    }
+    
+    const history = localStorage.getItem('admin_msg_history');
+    if (history) {
+        try {
+            setSavedMessages(JSON.parse(history));
+        } catch (e) {}
     }
   }, []);
 
@@ -226,6 +236,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     }
                     setSelectedUsers(new Set(remaining.map(u => u.id)));
                     setIsBottomSheetOpen(true);
+                    setShowHistory(false);
                 }}
                 className="flex-1 bg-blue-500 text-white rounded-2xl p-4 flex items-center justify-between shadow-sm active:scale-[0.98] transition-transform"
             >
@@ -303,6 +314,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                                 if (!isSent) {
                                   setSelectedUsers(new Set([user.id]));
                                   setIsBottomSheetOpen(true);
+                                  setShowHistory(false);
                                 }
                             }}
                             className={`bg-white rounded-2xl p-3 shadow-sm border flex items-center gap-3 transition-all ${
@@ -358,9 +370,18 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     dir="rtl"
                 >
                     <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl shrink-0">
-                        <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg">
-                           رسالة جديدة
-                        </h3>
+                        <div className="flex items-center gap-3">
+                            <h3 className="font-black text-slate-800 flex items-center gap-2 text-[17px]">
+                                {showHistory ? 'القوالب المحفوظة' : 'رسالة جديدة'}
+                            </h3>
+                            <button 
+                                onClick={() => setShowHistory(!showHistory)}
+                                className="text-[12px] font-bold bg-slate-200/70 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-300 transition-colors flex items-center gap-1.5"
+                            >
+                                <Bookmark size={14} />
+                                {showHistory ? 'رجوع للرسالة' : 'سجل القوالب'}
+                            </button>
+                        </div>
                         <button 
                             onClick={() => !isSending && setIsBottomSheetOpen(false)} 
                             className="text-slate-400 hover:text-slate-800 transition-colors p-2 rounded-full hover:bg-slate-200"
@@ -370,89 +391,154 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                         </button>
                     </div>
                     
-                    <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-4 bg-white">
-                        
-                        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex gap-2 text-[13px] text-blue-800 shrink-0">
-                            <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
-                            <p>إرسال إلى <strong>{selectedUsers.size}</strong> مستخدم. راجع الرسالة قبل الإرسال.</p>
-                        </div>
-
-                        <div>
-                            <label className="block text-[13px] font-bold text-slate-700 mb-1.5">النص (يدعم المسافات)</label>
-                            <textarea 
-                                value={message}
-                                onChange={e => setMessage(e.target.value)}
-                                rows={4}
-                                placeholder="اكتب رسالتك تفصيلياً هنا..."
-                                className="w-full border border-slate-200 rounded-xl p-3 bg-slate-50 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-[14px] resize-none transition-all"
-                            ></textarea>
-                        </div>
-                        
-                        <div className="border border-slate-200 rounded-xl bg-slate-50/50 overflow-hidden p-4 shrink-0">
-                            <div 
-                                className="flex items-center justify-between cursor-pointer select-none"
-                                onClick={() => setIncludeButton(!includeButton)}
-                            >
-                                <span className="font-bold text-[14px] text-slate-700">تضمين زر (رابط)</span>
-                                <div className={`w-11 h-6 rounded-full transition-colors relative flex items-center ${includeButton ? 'bg-blue-500' : 'bg-slate-300'}`}>
-                                    <div className={`w-4 h-4 bg-white rounded-full mx-1 absolute transition-all shadow-sm ${includeButton ? 'left-5' : 'left-0'}`}></div>
+                    {showHistory ? (
+                        <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-3 bg-slate-50">
+                            {savedMessages.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <div className="w-16 h-16 bg-slate-200/50 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <Bookmark size={24} className="text-slate-400" />
+                                    </div>
+                                    <p className="text-slate-500 text-[15px] font-bold">لا توجد رسائل محفوظة حالياً</p>
                                 </div>
-                            </div>
-
-                            <AnimatePresence>
-                                {includeButton && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, height: 0 }}
-                                        animate={{ opacity: 1, height: 'auto' }}
-                                        exit={{ opacity: 0, height: 0 }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="grid grid-cols-1 gap-3 mt-3 pt-3 border-t border-slate-200">
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-600 mb-1.5">النص</label>
-                                                <input 
-                                                    type="text" 
-                                                    value={buttonText}
-                                                    onChange={e => setButtonText(e.target.value)}
-                                                    placeholder="مثال: تسجيل الدخول"
-                                                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm"
-                                                />
+                            ) : (
+                                savedMessages.map(msg => (
+                                    <div key={msg.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col gap-3">
+                                        <p className="text-[14px] font-medium text-slate-700 whitespace-pre-wrap leading-relaxed max-h-[10rem] overflow-y-auto">{msg.message}</p>
+                                        {msg.includeButton && (
+                                            <div className="bg-blue-50 text-blue-700 text-xs px-2 py-1.5 rounded-lg inline-block self-start font-bold border border-blue-100">
+                                                زر إضافي: {msg.buttonText || 'بدون نص'}
                                             </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-600 mb-1.5">الرابط الوجهة</label>
-                                                <input 
-                                                    type="url" 
-                                                    value={buttonLink}
-                                                    onChange={e => setButtonLink(e.target.value)}
-                                                    placeholder="https://..."
-                                                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm font-mono text-left"
-                                                    dir="ltr"
-                                                />
-                                            </div>
+                                        )}
+                                        <div className="flex gap-2 mt-1 border-t border-slate-100 pt-3">
+                                            <button onClick={() => {
+                                                setMessage(msg.message);
+                                                setIncludeButton(msg.includeButton);
+                                                setButtonText(msg.buttonText || '');
+                                                setButtonLink(msg.buttonLink || '');
+                                                setShowHistory(false);
+                                            }} className="flex-1 bg-slate-800 text-white rounded-xl py-2.5 text-sm font-bold hover:bg-slate-700 active:scale-[0.98] transition-all">
+                                                استخدام القالب
+                                            </button>
+                                            <button onClick={() => {
+                                                if(window.confirm('هل أنت متأكد من حذف هذا القالب؟')) {
+                                                    const updated = savedMessages.filter(m => m.id !== msg.id);
+                                                    setSavedMessages(updated);
+                                                    localStorage.setItem('admin_msg_history', JSON.stringify(updated));
+                                                }
+                                            }} className="px-4 bg-red-50 text-red-600 rounded-xl py-2.5 text-sm font-bold hover:bg-red-100 active:scale-[0.98] transition-all">
+                                                حذف
+                                            </button>
                                         </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
+                                    </div>
+                                ))
+                            )}
                         </div>
-
-                        {isSending && sendingStatus && (
-                            <div className="bg-blue-50 border border-blue-100 text-blue-800 p-4 rounded-xl text-sm font-medium text-center flex flex-col items-center gap-3 shrink-0">
-                                <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                                {sendingStatus}
+                    ) : (
+                        <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-4 bg-white">
+                            <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex gap-2 text-[13px] text-blue-800 shrink-0">
+                                <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                                <p>إرسال إلى <strong>{selectedUsers.size}</strong> مستخدم. راجع الرسالة قبل الإرسال.</p>
                             </div>
-                        )}
-                    </div>
 
-                    <div className="p-4 border-t border-slate-100 bg-white drop-shadow-2xl shrink-0">
-                        <button 
-                            onClick={handleSendEmail}
-                            disabled={selectedUsers.size === 0 || isSending}
-                            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl font-black bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-[16px] shadow-lg shadow-blue-500/20"
-                        >
-                            <Send size={20} className="transform -scale-x-100" /> 
-                            {isSending ? 'جاري التنفيذ...' : `تأكيد وإرسال لـ ${selectedUsers.size}`}
-                        </button>
-                    </div>
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="block text-[13px] font-bold text-slate-700">النص (يدعم المسافات)</label>
+                                    {message.trim() && (
+                                        <button onClick={() => {
+                                            const newMsg = {
+                                                id: Date.now().toString(),
+                                                message,
+                                                includeButton,
+                                                buttonText,
+                                                buttonLink
+                                            };
+                                            const updated = [newMsg, ...savedMessages];
+                                            setSavedMessages(updated);
+                                            localStorage.setItem('admin_msg_history', JSON.stringify(updated));
+                                            triggerAlert('تم حفظ الرسالة كقالب', 'success');
+                                            setShowHistory(true);
+                                        }} className="text-[11px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors">
+                                            + حفظ كقالب
+                                        </button>
+                                    )}
+                                </div>
+                                <textarea 
+                                    value={message}
+                                    onChange={e => setMessage(e.target.value)}
+                                    rows={4}
+                                    placeholder="اكتب رسالتك تفصيلياً هنا..."
+                                    className="w-full border border-slate-200 rounded-xl p-3 bg-slate-50 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-[14px] resize-none transition-all font-medium leading-relaxed"
+                                ></textarea>
+                            </div>
+                            
+                            <div className="border border-slate-200 rounded-xl bg-slate-50/50 overflow-hidden p-4 shrink-0">
+                                <div 
+                                    className="flex items-center justify-between cursor-pointer select-none"
+                                    onClick={() => setIncludeButton(!includeButton)}
+                                >
+                                    <span className="font-bold text-[14px] text-slate-700">تضمين زر (رابط)</span>
+                                    <div className={`w-11 h-6 rounded-full transition-colors relative flex items-center ${includeButton ? 'bg-blue-500' : 'bg-slate-300'}`}>
+                                        <div className={`w-4 h-4 bg-white rounded-full mx-1 absolute transition-all shadow-sm ${includeButton ? 'left-5' : 'left-0'}`}></div>
+                                    </div>
+                                </div>
+
+                                <AnimatePresence>
+                                    {includeButton && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            className="overflow-hidden"
+                                        >
+                                            <div className="grid grid-cols-1 gap-3 mt-3 pt-3 border-t border-slate-200">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-600 mb-1.5">النص</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={buttonText}
+                                                        onChange={e => setButtonText(e.target.value)}
+                                                        placeholder="مثال: تسجيل الدخول"
+                                                        className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-slate-600 mb-1.5">الرابط الوجهة</label>
+                                                    <input 
+                                                        type="url" 
+                                                        value={buttonLink}
+                                                        onChange={e => setButtonLink(e.target.value)}
+                                                        placeholder="https://..."
+                                                        className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm font-mono text-left"
+                                                        dir="ltr"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            {isSending && sendingStatus && (
+                                <div className="bg-blue-50 border border-blue-100 text-blue-800 p-4 rounded-xl text-sm font-medium text-center flex flex-col items-center gap-3 shrink-0">
+                                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                    {sendingStatus}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {!showHistory && (
+                        <div className="p-4 border-t border-slate-100 bg-white drop-shadow-2xl shrink-0">
+                            <button 
+                                onClick={handleSendEmail}
+                                disabled={selectedUsers.size === 0 || isSending}
+                                className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl font-black bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-[16px] shadow-lg shadow-blue-500/20"
+                            >
+                                <Send size={20} className="transform -scale-x-100" /> 
+                                {isSending ? 'جاري التنفيذ...' : `تأكيد وإرسال لـ ${selectedUsers.size}`}
+                            </button>
+                        </div>
+                    )}
                 </motion.div>
             </>
         )}
