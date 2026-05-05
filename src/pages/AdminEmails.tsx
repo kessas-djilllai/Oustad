@@ -11,6 +11,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   const [activeTab, setActiveTab] = useState<'all' | 'sent' | 'remaining'>('remaining');
   const [sentSet, setSentSet] = useState<Set<string>>(new Set());
   
+  const [visibleCount, setVisibleCount] = useState(50);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   
   const [message, setMessage] = useState('');
@@ -31,6 +32,10 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
       }
     }
   }, []);
+
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [searchTerm, activeTab]);
 
   const handleReset = () => {
     if (window.confirm('هل أنت متأكد من رغبتك في تصفير قائمة المستلمين؟ سيتم إعادة الجميع إلى قائمة المراسلة.')) {
@@ -291,7 +296,8 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                  <h3 className="text-lg font-bold text-slate-800 mb-1">لا يوجد نتائج</h3>
                </div>
             ) : (
-                filteredUsers.map(user => {
+                <>
+                {filteredUsers.slice(0, visibleCount).map(user => {
                     const name = user.raw_user_meta_data?.full_name || 'بدون اسم';
                     const initial = name.charAt(0).toUpperCase();
                     const isSent = sentSet.has(user.id);
@@ -323,7 +329,16 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                             </div>
                         </div>
                     )
-                })
+                })}
+                {visibleCount < filteredUsers.length && (
+                    <button
+                        onClick={() => setVisibleCount(prev => prev + 50)}
+                        className="w-full py-4 mt-2 text-sm font-bold text-slate-500 hover:text-slate-800 bg-white rounded-2xl border border-slate-100 shadow-sm transition-colors active:scale-95"
+                    >
+                        عرض المزيد ...
+                    </button>
+                )}
+                </>
             )}
         </div>
       </div>
@@ -343,11 +358,11 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     initial={{ y: '100%' }}
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
-                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                    className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]"
+                    transition={{ type: 'tween', duration: 0.25, ease: 'easeOut' }}
+                    className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 flex flex-col h-auto max-h-[85vh]"
                     dir="rtl"
                 >
-                    <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-3xl shrink-0">
                         <h3 className="font-black text-slate-800 flex items-center gap-2 text-lg">
                            رسالة جديدة
                         </h3>
@@ -360,32 +375,32 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                         </button>
                     </div>
                     
-                    <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-5 bg-white">
+                    <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-4 bg-white">
                         
-                        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex gap-3 text-sm text-blue-800 shrink-0">
-                            <AlertCircle size={20} className="text-blue-600 shrink-0 mt-0.5" />
-                            <p>سيتم إرسال هذه الرسالة إلى <strong>{selectedUsers.size}</strong> مستخدم. يرجى المراجعة بعناية قبل الإرسال.</p>
+                        <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 flex gap-2 text-[13px] text-blue-800 shrink-0">
+                            <AlertCircle size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                            <p>إرسال إلى <strong>{selectedUsers.size}</strong> مستخدم. راجع الرسالة قبل الإرسال.</p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">النص (يدعم المسافات)</label>
+                            <label className="block text-[13px] font-bold text-slate-700 mb-1.5">النص (يدعم المسافات)</label>
                             <textarea 
                                 value={message}
                                 onChange={e => setMessage(e.target.value)}
-                                rows={5}
+                                rows={4}
                                 placeholder="اكتب رسالتك تفصيلياً هنا..."
-                                className="w-full border border-slate-200 rounded-2xl p-4 bg-slate-50 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-[15px] resize-none transition-all"
+                                className="w-full border border-slate-200 rounded-xl p-3 bg-slate-50 outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-[14px] resize-none transition-all"
                             ></textarea>
                         </div>
                         
-                        <div className="border border-slate-200 rounded-2xl bg-slate-50/50 overflow-hidden p-5 shrink-0">
+                        <div className="border border-slate-200 rounded-xl bg-slate-50/50 overflow-hidden p-4 shrink-0">
                             <div 
                                 className="flex items-center justify-between cursor-pointer select-none"
                                 onClick={() => setIncludeButton(!includeButton)}
                             >
-                                <span className="font-bold text-[15px] text-slate-700">تضمين زر (رابط) في الأسفل</span>
-                                <div className={`w-12 h-7 rounded-full transition-colors relative flex items-center ${includeButton ? 'bg-blue-500' : 'bg-slate-300'}`}>
-                                    <div className={`w-5 h-5 bg-white rounded-full mx-1 absolute transition-all shadow-sm ${includeButton ? 'left-5' : 'left-0'}`}></div>
+                                <span className="font-bold text-[14px] text-slate-700">تضمين زر (رابط)</span>
+                                <div className={`w-11 h-6 rounded-full transition-colors relative flex items-center ${includeButton ? 'bg-blue-500' : 'bg-slate-300'}`}>
+                                    <div className={`w-4 h-4 bg-white rounded-full mx-1 absolute transition-all shadow-sm ${includeButton ? 'left-5' : 'left-0'}`}></div>
                                 </div>
                             </div>
 
@@ -397,25 +412,25 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                                         exit={{ opacity: 0, height: 0 }}
                                         className="overflow-hidden"
                                     >
-                                        <div className="grid grid-cols-1 gap-4 mt-4 pt-4 border-t border-slate-200">
+                                        <div className="grid grid-cols-1 gap-3 mt-3 pt-3 border-t border-slate-200">
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-600 mb-2">النص على الزر</label>
+                                                <label className="block text-xs font-bold text-slate-600 mb-1.5">النص</label>
                                                 <input 
                                                     type="text" 
                                                     value={buttonText}
                                                     onChange={e => setButtonText(e.target.value)}
                                                     placeholder="مثال: تسجيل الدخول"
-                                                    className="w-full border border-slate-200 rounded-xl px-3.5 py-3 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm"
+                                                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-xs font-bold text-slate-600 mb-2">الرابط الوجهة</label>
+                                                <label className="block text-xs font-bold text-slate-600 mb-1.5">الرابط الوجهة</label>
                                                 <input 
                                                     type="url" 
                                                     value={buttonLink}
                                                     onChange={e => setButtonLink(e.target.value)}
                                                     placeholder="https://..."
-                                                    className="w-full border border-slate-200 rounded-xl px-3.5 py-3 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm font-mono text-left"
+                                                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-sm transition-all shadow-sm font-mono text-left"
                                                     dir="ltr"
                                                 />
                                             </div>
@@ -433,11 +448,11 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                         )}
                     </div>
 
-                    <div className="p-5 border-t border-slate-100 bg-white drop-shadow-2xl">
+                    <div className="p-4 border-t border-slate-100 bg-white drop-shadow-2xl shrink-0">
                         <button 
                             onClick={handleSendEmail}
                             disabled={selectedUsers.size === 0 || isSending}
-                            className="w-full flex items-center justify-center gap-3 py-4 px-6 rounded-2xl font-black bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-[17px] shadow-lg shadow-blue-500/20"
+                            className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl font-black bg-blue-500 text-white hover:bg-blue-600 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed text-[16px] shadow-lg shadow-blue-500/20"
                         >
                             <Send size={20} className="transform -scale-x-100" /> 
                             {isSending ? 'جاري التنفيذ...' : `تأكيد وإرسال لـ ${selectedUsers.size}`}
