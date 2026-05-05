@@ -239,8 +239,12 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     console.error("DB Saving Error", e);
                     if (e?.message?.includes('does not exist') || e?.code === '42P01') {
                         setShowSqlModal(true);
+                    } else if (e?.message?.includes('violates row-level security policy') || e?.code === '42501') {
+                        // Could be RLS or permissions error
+                        triggerAlert('خطأ في الصلاحيات. يرجى تفعيل RLS بنجاح أو تعطيله للجداول.', 'error');
+                        setShowSqlModal(true); // Re-using modal to show SQL
                     } else {
-                        triggerAlert('تعذر حفظ الرسالة في السجل، تحقق من الاتصال.', 'error');
+                        triggerAlert(`تعذر حفظ الرسالة، الخطأ: ${e?.message || JSON.stringify(e)}`, 'error');
                     }
                 }
             }
@@ -851,7 +855,10 @@ CREATE TABLE IF NOT EXISTS user_messages (
   button_text TEXT,
   button_link TEXT,
   date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);`);
+);
+
+ALTER TABLE admin_msg_templates DISABLE ROW LEVEL SECURITY;
+ALTER TABLE user_messages DISABLE ROW LEVEL SECURITY;`);
                                     triggerAlert('تم نسخ الكود بنجاح', 'success');
                                 }}
                                 className="absolute top-3 left-3 bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-bold font-sans backdrop-blur-sm transition-all"
@@ -876,7 +883,10 @@ CREATE TABLE IF NOT EXISTS user_messages (
   button_text TEXT,
   button_link TEXT,
   date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now())
-);`}
+);
+
+ALTER TABLE admin_msg_templates DISABLE ROW LEVEL SECURITY;
+ALTER TABLE user_messages DISABLE ROW LEVEL SECURITY;`}
                             </pre>
                         </div>
                     </div>
