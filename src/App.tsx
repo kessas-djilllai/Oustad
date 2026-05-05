@@ -858,7 +858,7 @@ function SettingsView() {
   )
 }
 
-function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }: { subjects: any[], bacDate?: string | null, onStartQuiz: () => void, onOpenFlashcards: (type: 'dates' | 'terms' | 'characters') => void }) {
+function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }: { subjects: any[], bacDate?: string | null, onStartQuiz: () => void, onOpenFlashcards: (type: 'dates_history' | 'terms_history' | 'terms_geography' | 'characters') => void }) {
   const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>(() => {
     return (localStorage.getItem('dashboard_active_tab') as 'lessons' | 'exercises') || 'lessons';
   });
@@ -1036,17 +1036,17 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
           <div className="flex gap-3 md:gap-5 overflow-x-auto pb-4 -mx-4 px-4 sm:-mx-1 sm:px-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             
             <button 
-              onClick={() => onOpenFlashcards('dates')} 
+              onClick={() => onOpenFlashcards('dates_history')} 
               className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-purple-50/50 group hover:shadow-lg transition-all overflow-hidden border border-purple-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-purple-400/20 rounded-full blur-2xl group-hover:bg-purple-400/30 transition-all pointer-events-none" />
               <div className="relative z-10 flex-1">
                 <div className="inline-flex items-center gap-1 text-[10px] md:text-xs text-purple-600 font-bold bg-purple-100 px-2 py-1 rounded-lg mb-2">
                   <Calendar size={12} />
-                  مراجعة سريعة
+                  تاريخ
                 </div>
                 <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">تواريخ التاريخ</h4>
-                <p className="text-xs md:text-sm text-slate-500 max-w-md">مرجع لجميع التواريخ والأحداث الهامة في مادة التاريخ.</p>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">مرجع لجميع تواريخ التاريخ.</p>
               </div>
               <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-purple-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-purple-100">
                 <Calendar className="w-6 h-6 md:w-8 md:h-8" />
@@ -1054,19 +1054,37 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
             </button>
 
             <button 
-              onClick={() => onOpenFlashcards('terms')} 
+              onClick={() => onOpenFlashcards('terms_history')} 
               className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-emerald-50/50 group hover:shadow-lg transition-all overflow-hidden border border-emerald-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-emerald-400/20 rounded-full blur-2xl group-hover:bg-emerald-400/30 transition-all pointer-events-none" />
               <div className="relative z-10 flex-1">
                 <div className="inline-flex items-center gap-1 text-[10px] md:text-xs text-emerald-600 font-bold bg-emerald-100 px-2 py-1 rounded-lg mb-2">
                   <BookOpen size={12} />
-                  مراجعة سريعة
+                  تاريخ
                 </div>
-                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">مصطلحات التاريخ والجغرافيا</h4>
-                <p className="text-xs md:text-sm text-slate-500 max-w-md">قاموس لجميع المصطلحات والمفاهيم المقررة في المنهج.</p>
+                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">مصطلحات التاريخ</h4>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">قاموس المصطلحات المقررة بالتاريخ.</p>
               </div>
               <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-emerald-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-emerald-100">
+                <BookOpen className="w-6 h-6 md:w-8 md:h-8" />
+              </div>
+            </button>
+
+            <button 
+              onClick={() => onOpenFlashcards('terms_geography')} 
+              className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-teal-50/50 group hover:shadow-lg transition-all overflow-hidden border border-teal-100/50 text-right min-h-[120px] md:min-h-[140px]"
+            >
+              <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-teal-400/20 rounded-full blur-2xl group-hover:bg-teal-400/30 transition-all pointer-events-none" />
+              <div className="relative z-10 flex-1">
+                <div className="inline-flex items-center gap-1 text-[10px] md:text-xs text-teal-600 font-bold bg-teal-100 px-2 py-1 rounded-lg mb-2">
+                  <BookOpen size={12} />
+                  جغرافيا
+                </div>
+                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">مصطلحات الجغرافيا</h4>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">قاموس المصطلحات المقررة بالجغرافيا.</p>
+              </div>
+              <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-teal-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-teal-100">
                 <BookOpen className="w-6 h-6 md:w-8 md:h-8" />
               </div>
             </button>

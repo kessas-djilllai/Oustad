@@ -4,6 +4,7 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { GoogleGenAI, Type } from "@google/genai";
 import { getSubjectPrompt } from '../lib/prompts';
+import { AdminFlashcards } from '../components/AdminFlashcards';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -2407,6 +2408,8 @@ export function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [view, setView] = useState('dashboard');
   const [isContentMenuOpen, setIsContentMenuOpen] = useState(false);
+  const [isBacMenuOpen, setIsBacMenuOpen] = useState(false);
+  const [isUsersMenuOpen, setIsUsersMenuOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const navigate = useNavigate();
 
@@ -2460,12 +2463,6 @@ export function AdminLayout() {
                <BookOpen size={18} /> لوحة الإحصائيات
             </button>
             <button 
-              onClick={() => { setView('analyze_pdf'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'analyze_pdf' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
-            >
-               <FileText size={18} /> تحليل ملف PDF
-            </button>
-            <button 
               onClick={() => setIsContentMenuOpen(!isContentMenuOpen)}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all font-bold text-sm ${['manage_subjects', 'manage_units', 'add_lesson', 'add_exercise'].includes(view) && !isContentMenuOpen ? 'bg-slate-100 text-slate-800 shadow-sm' : 'text-slate-600 hover:bg-white/60'}`}
             >
@@ -2510,11 +2507,38 @@ export function AdminLayout() {
                )}
             </AnimatePresence>
             <button 
-              onClick={() => { setView('manage_bac'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_bac' ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+              onClick={() => setIsBacMenuOpen(!isBacMenuOpen)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all font-bold text-sm ${['manage_bac', 'analyze_pdf'].includes(view) && !isBacMenuOpen ? 'bg-slate-100 text-slate-800 shadow-sm' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <FileText size={18} /> إدارة مواضيع البكالوريا
+               <div className="flex flex-row items-center gap-3">
+                 <FileText size={18} /> إدارة مواضيع البكالوريا
+               </div>
+               <ChevronRight size={16} className={`transition-transform duration-200 ${isBacMenuOpen ? 'rotate-90 text-indigo-600' : 'text-slate-400'}`} />
             </button>
+            <AnimatePresence>
+               {isBacMenuOpen && (
+                 <motion.div
+                   initial={{ height: 0, opacity: 0 }}
+                   animate={{ height: 'auto', opacity: 1 }}
+                   exit={{ height: 0, opacity: 0 }}
+                   className="overflow-hidden flex flex-col gap-1 pr-4 pl-2 border-r-2 border-slate-200 mr-2"
+                 >
+                   <button 
+                     onClick={() => { setView('manage_bac'); closeSidebar(); }}
+                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all font-bold text-sm ${view === 'manage_bac' ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20' : 'text-slate-600 hover:bg-slate-100'}`}
+                   >
+                     <FileText size={16} /> مواضيع البكالوريا
+                   </button>
+                   <button 
+                     onClick={() => { setView('analyze_pdf'); closeSidebar(); }}
+                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all font-bold text-sm ${view === 'analyze_pdf' ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-slate-100'}`}
+                   >
+                     <FileText size={16} /> تحليل ملف PDF
+                   </button>
+                 </motion.div>
+               )}
+            </AnimatePresence>
+
             <button 
               onClick={() => { setView('manage_cookies'); closeSidebar(); }}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'manage_cookies' ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20' : 'text-slate-600 hover:bg-white/60'}`}
@@ -2522,17 +2546,44 @@ export function AdminLayout() {
                <FileText size={18} /> إدارة كوكيز المواد
             </button>
             <button 
-              onClick={() => { setView('users'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'users' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+              onClick={() => { setView('flashcards'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'flashcards' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <Users size={18} /> إدارة المستخدمين
+               <BookOpen size={18} /> إدارة المراجعة السريعة
             </button>
+            
             <button 
-              onClick={() => { setView('emails'); closeSidebar(); }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'emails' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+              onClick={() => setIsUsersMenuOpen(!isUsersMenuOpen)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all font-bold text-sm ${['users', 'emails'].includes(view) && !isUsersMenuOpen ? 'bg-slate-100 text-slate-800 shadow-sm' : 'text-slate-600 hover:bg-white/60'}`}
             >
-               <Mail size={18} /> مراسلة المستخدمين
+               <div className="flex flex-row items-center gap-3">
+                 <Users size={18} /> إدارة المستخدمين
+               </div>
+               <ChevronRight size={16} className={`transition-transform duration-200 ${isUsersMenuOpen ? 'rotate-90 text-indigo-600' : 'text-slate-400'}`} />
             </button>
+            <AnimatePresence>
+               {isUsersMenuOpen && (
+                 <motion.div
+                   initial={{ height: 0, opacity: 0 }}
+                   animate={{ height: 'auto', opacity: 1 }}
+                   exit={{ height: 0, opacity: 0 }}
+                   className="overflow-hidden flex flex-col gap-1 pr-4 pl-2 border-r-2 border-slate-200 mr-2"
+                 >
+                   <button 
+                     onClick={() => { setView('users'); closeSidebar(); }}
+                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all font-bold text-sm ${view === 'users' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-slate-600 hover:bg-slate-100'}`}
+                   >
+                     <Users size={16} /> قائمة المستخدمين
+                   </button>
+                   <button 
+                     onClick={() => { setView('emails'); closeSidebar(); }}
+                     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all font-bold text-sm ${view === 'emails' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-slate-100'}`}
+                   >
+                     <Mail size={16} /> مراسلة المستخدمين
+                   </button>
+                 </motion.div>
+               )}
+            </AnimatePresence>
           </nav>
           
           <div className="pt-4 border-t border-slate-200/50 space-y-2 mt-auto">
@@ -2600,6 +2651,7 @@ export function AdminLayout() {
              {view === 'manage_units' && <AdminAddUnit onBack={() => setView('dashboard')} />}
              {view === 'manage_bac' && <AdminManageBac onBack={() => setView('dashboard')} />}
              {view === 'manage_cookies' && <AdminAddCookies onBack={() => setView('dashboard')} />}
+             {view === 'flashcards' && <AdminFlashcards onBack={() => setView('dashboard')} triggerAlert={triggerAlert} />}
              {view === 'settings' && <AdminSettings onBack={() => setView('dashboard')} />}
              {view === 'bac_date' && <AdminBacDate onBack={() => setView('dashboard')} />}
              {view === 'users' && <AdminUsers />}
