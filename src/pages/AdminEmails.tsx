@@ -103,8 +103,14 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
         })
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'فشل إرسال الرسالة');
+      let data;
+      try {
+        data = await response.json();
+      } catch (err) {
+        throw new Error('تعذر قراءة الاستجابة من الخادم. تأكد من رفع مجلد api إلى Vercel.');
+      }
+      
+      if (!response.ok) throw new Error(data?.error || 'فشل إرسال الرسالة');
 
       setSubject('');
       setMessage('');
