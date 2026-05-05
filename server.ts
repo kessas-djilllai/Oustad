@@ -34,7 +34,7 @@ async function startServer() {
       });
 
       const mailOptions = {
-        from: user,
+        from: `"بكالوريا" <${user}>`,
         bcc: Array.isArray(to) ? to.join(',') : to,
         subject: subject,
         text: message

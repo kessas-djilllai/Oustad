@@ -9,7 +9,6 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
   
-  const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
 
@@ -60,8 +59,8 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
       triggerAlert('الرجاء تحديد مستخدم واحد على الأقل.', 'error');
       return;
     }
-    if (!subject.trim() || !message.trim()) {
-      triggerAlert('الرجاء إدخال عنوان ومحتوى الرسالة.', 'error');
+    if (!message.trim()) {
+      triggerAlert('الرجاء إدخال محتوى الرسالة.', 'error');
       return;
     }
 
@@ -82,7 +81,7 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: selectedEmails,
-          subject,
+          subject: 'رسالة من إدارة منصة بكالوريا',
           message
         })
       });
@@ -96,7 +95,6 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
       
       if (!response.ok) throw new Error(data?.error || 'فشل إرسال الرسالة');
 
-      setSubject('');
       setMessage('');
       setSelectedUsers(new Set());
       triggerAlert('تم إرسال الرسالة بنجاح!', 'success');
@@ -135,16 +133,6 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
              تفاصيل الرسالة
           </h3>
           <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2">عنوان الرسالة (Subject)</label>
-              <input 
-                type="text" 
-                value={subject}
-                onChange={e => setSubject(e.target.value)}
-                placeholder="عنوان الرسالة..."
-                className="w-full border-slate-200 rounded-xl p-3 bg-white outline-none focus:border-blue-500 text-sm"
-              />
-            </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-2">محتوى الرسالة (Body)</label>
               <textarea 
