@@ -1029,6 +1029,55 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz }: { subjects: any[]
           </div>
         </div>
 
+        <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 fill-mode-both" dir="rtl">
+          <h3 className="font-bold text-lg md:text-xl text-slate-800 mb-4 px-1">استكشف المراجعة السريعة</h3>
+          <div className="flex gap-4 overflow-x-auto pb-4 px-1 -mx-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+            
+            <button 
+              onClick={() => {}} 
+              className="min-w-[220px] md:min-w-[260px] snap-center shrink-0 relative glass rounded-3xl p-5 flex flex-col items-start gap-4 bg-gradient-to-br from-white to-purple-50/50 group hover:shadow-md transition-all overflow-hidden border border-purple-100/50 text-right"
+            >
+              <div className="absolute -left-10 -bottom-10 w-24 h-24 bg-purple-400/20 rounded-full blur-2xl group-hover:bg-purple-400/30 transition-all pointer-events-none" />
+              <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0 mb-2 relative z-10">
+                <Calendar size={24} />
+              </div>
+              <div className="relative z-10 w-full">
+                <h4 className="font-black text-slate-800 text-base md:text-lg mb-1 leading-tight">تواريخ التاريخ</h4>
+                <p className="text-xs md:text-sm text-slate-500 line-clamp-2">مرجع سريع لجميع التواريخ والأحداث الهامة في مادة التاريخ.</p>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => {}} 
+              className="min-w-[220px] md:min-w-[260px] snap-center shrink-0 relative glass rounded-3xl p-5 flex flex-col items-start gap-4 bg-gradient-to-br from-white to-emerald-50/50 group hover:shadow-md transition-all overflow-hidden border border-emerald-100/50 text-right"
+            >
+              <div className="absolute -left-10 -bottom-10 w-24 h-24 bg-emerald-400/20 rounded-full blur-2xl group-hover:bg-emerald-400/30 transition-all pointer-events-none" />
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mb-2 relative z-10">
+                <BookOpen size={24} />
+              </div>
+              <div className="relative z-10 w-full">
+                <h4 className="font-black text-slate-800 text-base md:text-lg mb-1 leading-tight">مصطلحات التاريخ والجغرافيا</h4>
+                <p className="text-xs md:text-sm text-slate-500 line-clamp-2">قاموس شامل لجميع المصطلحات والمفاهيم المقررة في المنهج.</p>
+              </div>
+            </button>
+
+            <button 
+              onClick={() => {}} 
+              className="min-w-[220px] md:min-w-[260px] snap-center shrink-0 relative glass rounded-3xl p-5 flex flex-col items-start gap-4 bg-gradient-to-br from-white to-rose-50/50 group hover:shadow-md transition-all overflow-hidden border border-rose-100/50 text-right"
+            >
+              <div className="absolute -left-10 -bottom-10 w-24 h-24 bg-rose-400/20 rounded-full blur-2xl group-hover:bg-rose-400/30 transition-all pointer-events-none" />
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mb-2 relative z-10">
+                <Users size={24} />
+              </div>
+              <div className="relative z-10 w-full">
+                <h4 className="font-black text-slate-800 text-base md:text-lg mb-1 leading-tight">شخصيات التاريخ</h4>
+                <p className="text-xs md:text-sm text-slate-500 line-clamp-2">تعريف مفصل بأبرز الشخصيات التاريخية ودورها في الأحداث.</p>
+              </div>
+            </button>
+
+          </div>
+        </div>
+
       </div>
     </div>
   )
