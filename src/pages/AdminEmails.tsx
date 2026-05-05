@@ -213,15 +213,9 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans" dir="rtl">
       
-      <div className="px-5 pt-8 pb-4 max-w-lg mx-auto">
-        {/* Page Header */}
-        <div className="flex items-center justify-start gap-4 mb-8">
-            <Menu className="text-slate-800" size={28} />
-            <h1 className="text-2xl font-black text-slate-800 tracking-tight">المراسلات للإدارة</h1>
-        </div>
-
+      <div className="px-5 pt-6 pb-4 max-w-lg mx-auto">
         {/* Action Buttons */}
-        <div className="flex gap-4 mb-6 leading-tight">
+        <div className="flex gap-3 mb-5 leading-tight">
             {/* Mass Send Button */}
             <button 
                 onClick={() => {
@@ -233,21 +227,21 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     setSelectedUsers(new Set(remaining.map(u => u.id)));
                     setIsBottomSheetOpen(true);
                 }}
-                className="flex-1 bg-blue-500 text-white rounded-3xl p-5 flex items-center justify-between shadow-sm active:scale-[0.98] transition-transform"
+                className="flex-1 bg-blue-500 text-white rounded-2xl p-4 flex items-center justify-between shadow-sm active:scale-[0.98] transition-transform"
             >
-                <div className="flex flex-col text-right font-bold text-[17px]">
-                    <span>إرسال</span>
-                    <span>للمتبقين ({remainingCount})</span>
+                <div className="flex flex-col text-right font-bold text-[15px]">
+                    <span>إرسال للكل</span>
+                    <span className="text-blue-100 text-[13px] font-medium">({remainingCount} متبقي)</span>
                 </div>
-                <Send size={24} className="transform -scale-x-100 opacity-90" />
+                <Send size={22} className="transform -scale-x-100 opacity-90" />
             </button>
 
             {/* Reset Button */}
             <button 
                 onClick={handleReset}
-                className="w-1/3 bg-red-50 text-red-600 rounded-3xl p-5 flex flex-col items-center justify-center gap-2 font-bold text-sm active:scale-[0.98] transition-transform"
+                className="w-[100px] bg-red-50 text-red-600 rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 font-bold text-sm active:scale-[0.98] transition-transform"
             >
-                <RefreshCw size={22} className="mb-1" />
+                <RefreshCw size={20} />
                 تصفير
             </button>
         </div>
@@ -351,14 +345,15 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-slate-900/40 z-50 backdrop-blur-sm"
+                    transition={{ duration: 0.15 }}
+                    className="fixed inset-0 bg-slate-900/60 z-50"
                     onClick={() => !isSending && setIsBottomSheetOpen(false)}
                 />
                 <motion.div
                     initial={{ y: '100%' }}
                     animate={{ y: 0 }}
                     exit={{ y: '100%' }}
-                    transition={{ type: 'tween', duration: 0.25, ease: 'easeOut' }}
+                    transition={{ type: 'tween', duration: 0.2, ease: 'easeOut' }}
                     className="fixed bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 flex flex-col h-auto max-h-[85vh]"
                     dir="rtl"
                 >
