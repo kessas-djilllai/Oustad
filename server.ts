@@ -62,8 +62,10 @@ async function startServer() {
   // Chargily Checkout API Route
   app.post("/api/create-checkout", async (req, res) => {
     try {
+      console.log("[DEBUG] /api/create-checkout body:", req.body);
       const { amount, success_url, failure_url, user_id } = req.body;
       const chargilyKey = process.env.CHARGILY_SECRET_KEY;
+      console.log("[DEBUG] /api/create-checkout chargilyKey exists:", !!chargilyKey);
       
       if (!chargilyKey) {
         return res.status(500).json({ error: "الرجاء إعداد متغير البيئة CHARGILY_SECRET_KEY" });
