@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
-import { UserIcon, Mail, CheckSquare, Square, Search, Send } from "lucide-react";
+import { UserIcon, Mail, CheckSquare, Square, Search, Send, RefreshCw, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type: 'success' | 'error') => void }) {
@@ -22,7 +22,23 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
 
   useEffect(() => {
     fetchUsers();
+    const saved = localStorage.getItem('sent_emails_history');
+    if (saved) {
+      try {
+        setSentSet(new Set(JSON.parse(saved)));
+      } catch (e) {
+        console.error("Failed to parse saved sent list", e);
+      }
+    }
   }, []);
+
+  const handleReset = () => {
+    if (window.confirm('هل أنت متأكد من رغبتك في تصفير قائمة المستلمين؟ سيتم إعادة الجميع إلى قائمة المتبقية.')) {
+        localStorage.removeItem('sent_emails_history');
+        setSentSet(new Set());
+        triggerAlert('تم تصفير قائمة المستلمين بنجاح', 'success');
+    }
+  };
 
   const fetchUsers = async () => {
     if (!supabase) return;
@@ -136,7 +152,11 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
             if (!response.ok) {
                 console.error(`فشل الإرسال إلى ${userObj.email}`);
             } else {
-                setSentSet(prev => new Set(prev).add(userObj.id));
+                setSentSet(prev => {
+                    const next = new Set(prev).add(userObj.id);
+                    localStorage.setItem('sent_emails_history', JSON.stringify(Array.from(next)));
+                    return next;
+                });
                 setSelectedUsers(prev => {
                     const next = new Set(prev);
                     next.delete(userObj.id);
@@ -181,116 +201,105 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
   }
 
   return (
-    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-slate-100 flex flex-col h-[calc(100vh-8rem)]">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 shrink-0">
-        <div>
-          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <Mail className="text-blue-500" /> إرسال رسائل للمستخدمين
-          </h2>
-          <p className="text-slate-500 text-sm mt-1">
-            حدد المستخدمين، واكتب رسالتك لترسل عبر البريد.
-          </p>
-        </div>
-        <button 
-          onClick={() => setIsBottomSheetOpen(true)}
-          className="bg-blue-600 shadow border border-blue-500 text-white px-5 py-3 rounded-xl font-bold hover:bg-blue-700 transition flex items-center gap-2"
-        >
-          <Send size={18} /> بدء صياغة الرسالة
-        </button>
+    <div className="bg-slate-50/50 rounded-3xl min-h-[calc(100vh-8rem)]">
+      {/* Header */}
+      <div className="p-6 flex flex-row-reverse items-center justify-between mb-2">
+        <Menu size={28} className="text-slate-800 cursor-pointer" />
+        <h1 className="text-2xl font-black text-slate-800">المراسلات والإشعارات</h1>
       </div>
-
-      <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-2 mb-4 shrink-0">
-        <button 
-            onClick={() => setActiveTab('all')}
-            className={`px-4 py-2 font-bold text-sm rounded-lg transition-colors ${activeTab === 'all' ? 'bg-blue-50 text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}
-        >الجميع</button>
-        <button 
-            onClick={() => setActiveTab('sent')}
-            className={`px-4 py-2 font-bold text-sm rounded-lg transition-colors flex gap-2 items-center ${activeTab === 'sent' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-500 hover:bg-slate-50'}`}
-        >تم الإرسال بنجاح <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-xs">{sentSet.size}</span></button>
-        <button 
-            onClick={() => setActiveTab('remaining')}
-            className={`px-4 py-2 font-bold text-sm rounded-lg transition-colors flex gap-2 items-center ${activeTab === 'remaining' ? 'bg-amber-50 text-amber-600' : 'text-slate-500 hover:bg-slate-50'}`}
-        >المتبقية <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-xs">{users.length - sentSet.size}</span></button>
-      </div>
-
-      <div className="flex flex-col flex-1 min-h-0 relative">
-        <div className="flex gap-2 mb-4 shrink-0">
-            <div className="relative flex-1 max-w-sm">
-            <input 
-              type="text" 
-              placeholder="ابحث بالاسم أو البريد الإلكتروني..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full border border-slate-200 p-3 pr-10 rounded-xl outline-none focus:border-blue-500 bg-slate-50 text-sm"
-            />
-            <Search className="absolute right-3 top-3.5 text-slate-400" size={18} />
-          </div>
-        </div>
-
-        <div className="mb-4 shrink-0">
+      
+      <div className="px-6 max-w-3xl mx-auto space-y-6 pb-20">
+        
+        {/* Actions Row */}
+        <div className="flex gap-4 flex-row-reverse">
+          {(() => {
+              const remaining = filteredUsers.filter(u => !sentSet.has(u.id));
+              return (
+                <button 
+                  onClick={() => {
+                      if (remaining.length === 0) {
+                          triggerAlert('لا يوجد مستخدمين متبقين في هذه القائمة.', 'error');
+                          return;
+                      }
+                      setSelectedUsers(new Set(remaining.map(u => u.id)));
+                      setIsBottomSheetOpen(true);
+                  }}
+                  className="flex-1 bg-blue-500 text-white px-5 py-4 rounded-2xl font-bold hover:bg-blue-600 transition flex items-center justify-center gap-3 text-lg shadow-sm"
+                >
+                   <Send size={20} className="transform -scale-x-100" /> إرسال للمتبقين ({remaining.length})
+                </button>
+              );
+          })()}
+          
           <button 
-            onClick={toggleAll} 
-            className="flex items-center gap-2 text-sm font-bold text-slate-700 hover:text-blue-600 transition-colors"
+            onClick={handleReset}
+            className="flex items-center justify-center gap-2 px-5 py-4 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition whitespace-nowrap"
           >
-            {(() => {
-                const selectableUsers = filteredUsers.filter(u => !sentSet.has(u.id));
-                const allSelected = selectableUsers.length > 0 && selectableUsers.every(u => selectedUsers.has(u.id));
-                return allSelected ? (
-                  <><CheckSquare size={18} className="text-blue-500" /> إلغاء تحديد الكل</>
-                ) : (
-                  <><Square size={18} /> تحديد الكل</>
-                );
-            })()}
+            <RefreshCw size={20} /> تصفير
           </button>
         </div>
 
-        {filteredUsers.length === 0 ? (
-          <div className="text-center p-8 bg-slate-50 rounded-2xl border border-slate-100 mt-4">
-            <p className="text-slate-500 font-medium">لا يوجد مستخدمين لعرضهم</p>
-          </div>
-        ) : (
-          <div className="overflow-auto border border-slate-200 rounded-2xl flex-1 bg-white">
-            <table className="w-full text-right border-separate border-spacing-0">
-              <thead className="sticky top-0 bg-slate-50 z-10 shadow-sm">
-                <tr className="text-slate-500 text-sm">
-                  <th className="font-bold py-3 px-4 whitespace-nowrap border-b border-slate-200">الاسم والتخصص</th>
-                  <th className="font-bold py-3 px-4 whitespace-nowrap border-b border-slate-200">البريد الإلكتروني</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map((user) => {
-                  const isSelected = selectedUsers.has(user.id);
-                  const isSent = sentSet.has(user.id);
-                  return (
-                    <tr 
-                      key={user.id} 
-                      onClick={() => toggleUserSelection(user.id)}
-                      className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-slate-50'} ${isSent ? 'opacity-50 grayscale pointer-events-none' : ''}`}
-                    >
-                    <td className="py-3 px-4 border-b border-slate-100 flex items-center gap-3">
-                      <div className={`text-slate-400 ${isSent ? 'text-emerald-500' : ''}`}>
-                        {isSent ? <CheckSquare size={18} className="text-emerald-500" /> : isSelected ? <CheckSquare size={18} className="text-blue-500" /> : <Square size={18} />}
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-800 text-sm">
-                          {user.raw_user_meta_data?.full_name || 'بدون اسم'}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {user.raw_user_meta_data?.specialization || 'غير محدد'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-sm font-mono text-slate-600 border-b border-slate-100">
-                      {user.email}
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* Tabs */}
+        <div className="flex bg-white rounded-2xl p-1.5 shadow-sm border border-slate-100 gap-1 flex-row-reverse">
+           <button 
+             onClick={() => setActiveTab('all')}
+             className={`flex-1 py-3 text-sm font-bold rounded-xl transition ${activeTab === 'all' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:bg-slate-50'}`}
+           >
+             الكل
+           </button>
+           <button 
+             onClick={() => setActiveTab('sent')}
+             className={`flex-1 py-3 text-sm font-bold rounded-xl transition flex items-center justify-center gap-2 flex-row-reverse ${activeTab === 'sent' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}
+           >
+             المستلمة <span className="bg-emerald-500 text-white px-2 py-0.5 rounded-full text-xs font-bold shrink-0">{sentSet.size}</span>
+           </button>
+           <button 
+             onClick={() => setActiveTab('remaining')}
+             className={`flex-1 py-3 text-sm font-bold rounded-xl transition flex items-center justify-center gap-2 flex-row-reverse ${activeTab === 'remaining' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:bg-slate-50'}`}
+           >
+             المتبقية <span className="bg-slate-400 text-white px-2 py-0.5 rounded-full text-xs font-bold shrink-0">{users.length - sentSet.size}</span>
+           </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <input 
+            type="text" 
+            placeholder="بحث بالاسم أو الإيميل..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full border border-slate-200 p-4 pr-12 rounded-2xl outline-none focus:border-blue-500 bg-white text-[15px] shadow-sm text-right"
+          />
+          <Search className="absolute right-4 top-4 text-slate-400" size={20} />
+        </div>
+
+        {/* Users List */}
+        <div className="space-y-4">
+           {filteredUsers.length === 0 ? (
+             <div className="text-center p-12 bg-white rounded-3xl border border-slate-100">
+               <p className="text-slate-400 font-bold">لا يوجد مستخدمين لعرضهم</p>
+             </div>
+           ) : (
+             filteredUsers.map(user => {
+                 const name = user.raw_user_meta_data?.full_name || 'بدون اسم';
+                 const initial = name.charAt(0).toUpperCase();
+
+                 return (
+                     <div key={user.id} className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between gap-4">
+                         
+                         <div className="flex flex-col flex-1 items-end text-right overflow-hidden">
+                             <span className="font-bold text-slate-800 text-[15px] truncate w-full">{name}</span>
+                             <span className="text-sm text-slate-500 font-mono truncate w-full mt-1">{user.email}</span>
+                         </div>
+                         
+                         <div className="w-14 h-14 shrink-0 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-bold text-2xl">
+                             {initial}
+                         </div>
+                     </div>
+                 )
+             })
+           )}
+        </div>
       </div>
 
       {/* Bottom Sheet for Compose Email */}
