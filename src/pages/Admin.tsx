@@ -37,10 +37,12 @@ import {
   Trash2,
   Sparkles,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Mail
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import AdminUsers from "./users";
+import { AdminEmails } from "./AdminEmails";
 import { PdfBacAnalis } from "./PdfBacAnalis";
 
 export type AlertEventPayload = { message: string, type?: 'success' | 'error' | 'info' };
@@ -2525,6 +2527,12 @@ export function AdminLayout() {
             >
                <Users size={18} /> إدارة المستخدمين
             </button>
+            <button 
+              onClick={() => { setView('emails'); closeSidebar(); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold text-sm ${view === 'emails' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-slate-600 hover:bg-white/60'}`}
+            >
+               <Mail size={18} /> مراسلة المستخدمين
+            </button>
           </nav>
           
           <div className="pt-4 border-t border-slate-200/50 space-y-2 mt-auto">
@@ -2595,6 +2603,7 @@ export function AdminLayout() {
              {view === 'settings' && <AdminSettings onBack={() => setView('dashboard')} />}
              {view === 'bac_date' && <AdminBacDate onBack={() => setView('dashboard')} />}
              {view === 'users' && <AdminUsers />}
+             {view === 'emails' && <AdminEmails triggerAlert={triggerAlert} />}
           </div>
         )}
 
