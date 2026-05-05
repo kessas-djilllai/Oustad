@@ -16,6 +16,7 @@ import { preprocessMath } from "./lib/utils";
 import { QuizView } from "./components/QuizView";
 import { SubjectTypeView, SubjectUnitsView, UnitDetailsView, ContentListView, LessonDetailsView, InteractiveExerciseView } from "./components/StudentViews";
 import { VIP } from "./pages/vip";
+import { FlashcardsView } from './components/FlashcardsView';
 import { PdfViewer } from "./components/PdfViewer";
 import { 
   BookOpen,
@@ -587,7 +588,7 @@ function StudentPortal({ session }: { session: any }) {
   return (
     <>
       <div key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')}>
-        {view.type === 'dashboard' && mainTab === 'home' && <DashboardHomeView subjects={subjects} bacDate={bacDate} onStartQuiz={() => setView({ type: 'quiz' })} />}
+        {view.type === 'dashboard' && mainTab === 'home' && <DashboardHomeView subjects={subjects} bacDate={bacDate} onStartQuiz={() => setView({ type: 'quiz' })} onOpenFlashcards={(type) => setView({ type: 'flashcards', listType: type })} />}
         {view.type === 'dashboard' && mainTab === 'subjects' && <DashboardSubjectsView subjects={subjects} listType={mainTab} onSubjectClick={(s) => setView({ type: 'subject_units', subject: s })} />}
         {view.type === 'dashboard' && mainTab === 'topics' && <TopicsView subjects={subjects} />}
         {view.type === 'dashboard' && mainTab === 'leaderboard' && <LeaderboardView session={session} />}
@@ -606,6 +607,7 @@ function StudentPortal({ session }: { session: any }) {
         {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} onPay={() => setView({ type: 'payment' })} />}
         {view.type === 'quiz' && <QuizView subjects={subjects} onBack={() => setView({ type: 'dashboard' })} />}
         {view.type === 'payment' && <VIP onBack={() => setView({ type: 'dashboard' })} session={session} />}
+        {view.type === 'flashcards' && view.listType && <FlashcardsView type={view.listType as any} onBack={() => setView({ type: 'dashboard' })} />}
       </div>
 
       {view.type === 'dashboard' && (
@@ -856,7 +858,7 @@ function SettingsView() {
   )
 }
 
-function DashboardHomeView({ subjects, bacDate, onStartQuiz }: { subjects: any[], bacDate?: string | null, onStartQuiz: () => void }) {
+function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }: { subjects: any[], bacDate?: string | null, onStartQuiz: () => void, onOpenFlashcards: (type: 'dates' | 'terms' | 'characters') => void }) {
   const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>(() => {
     return (localStorage.getItem('dashboard_active_tab') as 'lessons' | 'exercises') || 'lessons';
   });
@@ -1034,7 +1036,7 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz }: { subjects: any[]
           <div className="flex gap-3 md:gap-5 overflow-x-auto pb-4 -mx-4 px-4 sm:-mx-1 sm:px-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             
             <button 
-              onClick={() => {}} 
+              onClick={() => onOpenFlashcards('dates')} 
               className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-purple-50/50 group hover:shadow-lg transition-all overflow-hidden border border-purple-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-purple-400/20 rounded-full blur-2xl group-hover:bg-purple-400/30 transition-all pointer-events-none" />
@@ -1052,7 +1054,7 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz }: { subjects: any[]
             </button>
 
             <button 
-              onClick={() => {}} 
+              onClick={() => onOpenFlashcards('terms')} 
               className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-emerald-50/50 group hover:shadow-lg transition-all overflow-hidden border border-emerald-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-emerald-400/20 rounded-full blur-2xl group-hover:bg-emerald-400/30 transition-all pointer-events-none" />
@@ -1070,7 +1072,7 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz }: { subjects: any[]
             </button>
 
             <button 
-              onClick={() => {}} 
+              onClick={() => onOpenFlashcards('characters')} 
               className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-rose-50/50 group hover:shadow-lg transition-all overflow-hidden border border-rose-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-rose-400/20 rounded-full blur-2xl group-hover:bg-rose-400/30 transition-all pointer-events-none" />
