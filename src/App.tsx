@@ -1235,9 +1235,9 @@ function LeaderboardView({ session }: { session: any }) {
       <div className="max-w-xl mx-auto px-4 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
         
         {/* Header */}
-        <div className="flex items-center justify-center mb-8">
-           <div className="flex items-center gap-3">
-             <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">لوحة المتصدرين</h1>
+        <div className="flex items-center justify-start mb-12">
+           <div className="flex items-center gap-2">
+             <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">لوحة المتصدرين</h1>
            </div>
         </div>
 
