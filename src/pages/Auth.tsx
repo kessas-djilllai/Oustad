@@ -64,15 +64,80 @@ export function AuthPage() {
               subject: 'تسجيل مستخدم جديد في منصة بكالوريا 🎉',
               message: `تم تسجيل عضو جديد:\nالاسم: ${name}\nالبريد: ${email}\nالتخصص: ${specialization}`,
               htmlMessage: `
-                <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Arial, sans-serif; text-align: right; line-height: 1.6; color: #1e293b; background-color: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
-                    <h2 style="color: #2563eb; margin-top: 0;">مستخدم جديد انضم للمنصة! 🎉</h2>
-                    <div style="background-color: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-                      <p style="margin: 8px 0; font-size: 16px;"><strong>👤 الاسم:</strong> ${name}</p>
-                      <p style="margin: 8px 0; font-size: 16px;"><strong>📧 البريد الإلكتروني:</strong> ${email}</p>
-                      <p style="margin: 8px 0; font-size: 16px;"><strong>📚 التخصص:</strong> ${specialization}</p>
-                    </div>
-                    <p style="margin-top: 15px; font-size: 14px; color: #64748b;">هذه رسالة تلقائية من النظام.</p>
-                </div>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل جديد</title>
+</head>
+<body style="margin: 0; padding: 20px; background-color: #f4f7f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; direction: rtl;">
+    <div style="max-width: 400px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+        <div style="background-color: #00b894; padding: 20px; text-align: center; color: #fff;">
+            <h2 style="margin: 0; font-size: 20px; font-weight: bold;">تسجيل جديد 🔥</h2>
+        </div>
+        <div style="padding: 25px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="width: 100%; border-collapse: separate; border-spacing: 0;">
+                <tr>
+                    <td width="70" valign="middle" style="padding: 15px 0; border-bottom: 1px dashed #eee; color: #2d3436; font-weight: bold; font-size: 14px; white-space: nowrap;">
+                        الاسم :
+                    </td>
+                    <td align="right" valign="middle" style="padding: 15px 10px 15px 0; border-bottom: 1px dashed #eee;">
+                        <span style="color: #2d3436; font-weight: bold; font-size: 16px; direction: ltr; display: inline-block;">
+                            \${name || 'بدون اسم'}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="70" valign="middle" style="padding: 15px 0; border-bottom: 1px dashed #eee; color: #2d3436; font-weight: bold; font-size: 14px; white-space: nowrap;">
+                        البريد :
+                    </td>
+                    <td align="right" valign="middle" style="padding: 15px 10px 15px 0; border-bottom: 1px dashed #eee;">
+                        <span style="color: #0984e3; font-weight: bold; font-size: 15px; direction: ltr; display: inline-block; white-space: nowrap; text-decoration: none;">
+                            \${email || 'غير متوفر'}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="70" valign="middle" style="padding: 15px 0; border-bottom: 1px dashed #eee; color: #2d3436; font-weight: bold; font-size: 14px; white-space: nowrap;">
+                        التخصص :
+                    </td>
+                    <td align="right" valign="middle" style="padding: 15px 10px 15px 0; border-bottom: 1px dashed #eee;">
+                        <span style="color: #e17055; font-weight: bold; font-size: 14px; display: inline-block;">
+                            \${specialization || 'غير محدد'}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="70" valign="middle" style="padding: 15px 0; border-bottom: 1px dashed #eee; color: #2d3436; font-weight: bold; font-size: 14px; white-space: nowrap;">
+                        الجهاز :
+                    </td>
+                    <td align="right" valign="middle" style="padding: 15px 10px 15px 0; border-bottom: 1px dashed #eee;">
+                        <span style="color: #6c5ce7; font-weight: bold; font-size: 15px; direction: ltr; display: inline-block;">
+                            منصة ويب
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="70" valign="middle" style="padding-top: 15px; color: #2d3436; font-weight: bold; font-size: 14px; white-space: nowrap;">
+                        IP :
+                    </td>
+                    <td align="right" valign="middle" style="padding-top: 15px; padding-right: 10px;">
+                        <div style="background-color: #f1f2f6; color: #2d3436; padding: 10px 15px; border-radius: 6px; font-family: monospace; font-size: 14px; display: inline-block; direction: ltr;">
+                            غير متوفر
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+        <div style="background-color: #f9f9f9; padding: 15px; text-align: center; border-top: 1px solid #f0f0f0;">
+            <p style="margin: 0; color: #b2bec3; font-size: 12px;">
+                وقت التسجيل: <span dir="ltr">\${new Date().toLocaleString('ar-DZ')}</span>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
               `
             })
           }).catch(console.error);
