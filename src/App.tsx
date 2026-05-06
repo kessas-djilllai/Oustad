@@ -102,7 +102,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-blue-50/30 to-white flex items-center justify-center">
          <div className="flex gap-2">
            <div className="w-3 h-3 rounded-full bg-blue-600 animate-bounce"></div>
            <div className="w-3 h-3 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -169,9 +169,10 @@ function StudentLayout({ session }: { session: any }) {
   return (
     <div className="min-h-screen pb-20 md:pb-6 relative flex justify-center">
       {/* Background Gradient & Blobs */}
-      <div className="fixed inset-0 z-0 bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-[#0b0f19] dark:to-slate-900 pointer-events-none" />
-      <div className="fixed top-0 left-0 w-[60vw] h-[60vh] rounded-full bg-blue-300/20 dark:bg-blue-600/10 blur-[120px] pointer-events-none z-0 -translate-x-1/2 -translate-y-1/2" />
-      <div className="fixed bottom-0 right-0 w-[60vw] h-[60vh] rounded-full bg-indigo-300/20 dark:bg-indigo-600/10 blur-[120px] pointer-events-none z-0 translate-x-1/3 translate-y-1/3" />
+      <div className="fixed inset-0 z-0 bg-gradient-to-b from-blue-50/20 via-purple-50/10 to-sky-50/20 dark:from-slate-900 dark:via-[#0b0f19] dark:to-slate-900 pointer-events-none" />
+      <div className="fixed top-20 left-0 right-0 h-[60vh] bg-blue-300/[0.02] dark:bg-blue-600/[0.02] blur-[120px] pointer-events-none z-0" />
+      <div className="fixed top-1/3 left-0 right-0 h-[50vh] bg-purple-300/[0.02] dark:bg-purple-600/[0.02] blur-[120px] pointer-events-none z-0" />
+      <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-sky-300/[0.02] dark:bg-sky-600/[0.02] blur-[120px] pointer-events-none z-0" />
       
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10 relative">
         
@@ -611,10 +612,7 @@ function StudentPortal({ session }: { session: any }) {
       </div>
 
       {view.type === 'dashboard' && (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[400px] h-20 bg-white/60 dark:bg-slate-900/60 backdrop-blur-[30px] border border-white/60 dark:border-slate-700/50 shadow-[0_8px_32px_rgba(37,99,235,0.04)] z-40 rounded-[2rem] overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-blue-400/[0.02] via-transparent to-blue-400/[0.02] pointer-events-none" />
-          <div className="absolute -top-4 left-0 right-0 h-10 bg-blue-500/[0.02] blur-[12px] pointer-events-none" />
-          <div className="absolute -bottom-4 left-0 right-0 h-10 bg-blue-500/[0.02] blur-[12px] pointer-events-none" />
+        <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[400px] h-20 bg-white/10 dark:bg-slate-900/10 backdrop-blur-md border border-white/20 dark:border-slate-700/30 shadow-lg z-40 rounded-[2rem] overflow-hidden">
           
           <div className="relative z-10 w-full h-full flex items-center justify-around sm:justify-evenly px-2 sm:px-6">
             <BottomNavItem icon={<Home size={22} />} label="الرئيسية" active={mainTab === 'home'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('home'); }} />
