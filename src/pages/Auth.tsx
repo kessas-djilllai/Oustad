@@ -53,6 +53,32 @@ export function AuthPage() {
           }
         });
         if (signUpError) throw signUpError;
+
+        // إرسال بريد إلكتروني للإدمن لاشعاره بالمستخدم الجديد
+        try {
+          fetch('/api/send-emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: '0696666164dj@gmail.com',
+              subject: 'تسجيل مستخدم جديد في منصة بكالوريا 🎉',
+              message: `تم تسجيل عضو جديد:\nالاسم: ${name}\nالبريد: ${email}\nالتخصص: ${specialization}`,
+              htmlMessage: `
+                <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Arial, sans-serif; text-align: right; line-height: 1.6; color: #1e293b; background-color: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                    <h2 style="color: #2563eb; margin-top: 0;">مستخدم جديد انضم للمنصة! 🎉</h2>
+                    <div style="background-color: #ffffff; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                      <p style="margin: 8px 0; font-size: 16px;"><strong>👤 الاسم:</strong> ${name}</p>
+                      <p style="margin: 8px 0; font-size: 16px;"><strong>📧 البريد الإلكتروني:</strong> ${email}</p>
+                      <p style="margin: 8px 0; font-size: 16px;"><strong>📚 التخصص:</strong> ${specialization}</p>
+                    </div>
+                    <p style="margin-top: 15px; font-size: 14px; color: #64748b;">هذه رسالة تلقائية من النظام.</p>
+                </div>
+              `
+            })
+          }).catch(console.error);
+        } catch(e) {
+          console.error(e);
+        }
       }
       
       // on success, redirect
