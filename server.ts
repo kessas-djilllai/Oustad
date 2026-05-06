@@ -235,13 +235,15 @@ async function startServer() {
         return res.status(200).json({ status: "paid" });
       }
 
-      if (userCheckout.status === "pending") {
-        return res
-          .status(200)
-          .json({ status: "pending", url: userCheckout.checkout_url });
+      if (userCheckout.status === 'pending') {
+         return res.status(200).json({ status: 'pending', url: userCheckout.checkout_url });
       }
 
-      return res.status(200).json({ status: "none" });
+      if (userCheckout.status === 'failed' || userCheckout.status === 'canceled') {
+         return res.status(200).json({ status: 'failed' });
+      }
+
+      return res.status(200).json({ status: 'none' });
     } catch (err: any) {
       console.error("Error checking payment:", err);
       res.status(500).json({ error: err.message });

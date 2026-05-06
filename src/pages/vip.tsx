@@ -7,8 +7,9 @@ import {
   Star,
   Zap,
   CheckCircle,
+  X,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "../lib/supabase";
 
 import { loadUserProgress } from "../lib/progress";
@@ -27,6 +28,14 @@ export function VIP({
     url?: string;
   } | null>(null);
   const [isChecking, setIsChecking] = useState(true);
+  const [showFailureToast, setShowFailureToast] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") === "failure") {
+      setShowFailureToast(true);
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -46,6 +55,9 @@ export function VIP({
           }
           if (mounted) {
             setPaymentStatus(data);
+            if (data.status === "failed" && !showFailureToast) {
+               setShowFailureToast(true);
+            }
           }
         }
       } catch (err) {
@@ -60,7 +72,7 @@ export function VIP({
     return () => {
       mounted = false;
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, showFailureToast]);
 
   const handlePayment = async () => {
     setIsLoading(true);
@@ -211,10 +223,34 @@ export function VIP({
             </div>
           )}
 
+          <AnimatePresence>
+            {showFailureToast && (
+               <motion.div 
+                 initial={{ y: -20, opacity: 0 }}
+                 animate={{ y: 0, opacity: 1 }}
+                 exit={{ y: -20, opacity: 0 }}
+                 className="bg-red-500/90 backdrop-blur-md text-white px-4 py-3 rounded-2xl flex items-center justify-between mb-6 shadow-sm border border-red-400"
+               >
+                 <div className="flex items-center gap-3">
+                   <div className="bg-red-600/50 p-2 rounded-full">
+                     <X size={16} />
+                   </div>
+                   <div className="flex flex-col">
+                     <span className="font-bold text-sm">فشلت عملية الدفع</span>
+                     <span className="text-xs text-red-100">يرجى المحاولة مرة أخرى أو الاتصال بالدعم.</span>
+                   </div>
+                 </div>
+                 <button onClick={() => setShowFailureToast(false)} className="text-white/80 hover:text-white shrink-0 p-1">
+                   <X size={20} />
+                 </button>
+               </motion.div>
+            )}
+          </AnimatePresence>
+
           {isChecking ? (
-            <div className="w-full bg-white/50 text-amber-600 font-bold py-4 rounded-2xl flex items-center justify-center gap-2">
+            <div className="w-full bg-white/30 text-amber-100 font-medium py-4 rounded-2xl flex items-center justify-center gap-3 text-lg">
               <svg
-                className="animate-spin h-5 w-5 text-amber-600"
+                className="animate-spin h-5 w-5 text-amber-100"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -236,13 +272,13 @@ export function VIP({
               جاري التحقق من حالة الدفع...
             </div>
           ) : paymentStatus?.status === "paid" ? (
-            <div className="w-full bg-green-50 text-green-700 font-bold py-4 rounded-2xl flex flex-col items-center justify-center gap-2 shadow-inner border border-green-200">
-              <CheckCircle size={32} />
-              <span className="text-lg">أنت مشترك في باقة VIP بنجاح!</span>
-              <span className="text-xs font-normal">
-                تم تأكيد الدفع وتفعيل حسابك.
-              </span>
-            </div>
+            <button
+              disabled
+              className="w-full bg-white text-amber-600 font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-3 text-lg opacity-90 cursor-default"
+            >
+              <CheckCircle size={24} />
+              <span>مشترك</span>
+            </button>
           ) : paymentStatus?.status === "pending" && paymentStatus?.url ? (
             <div className="w-full flex items-center justify-between bg-white px-4 py-3 rounded-2xl shadow-lg border border-amber-200 gap-2 overflow-hidden relative">
               <div className="absolute top-0 right-0 w-8 h-8 bg-amber-100 rounded-bl-full flex items-start justify-end pr-2 pt-1 font-bold text-[10px] text-amber-600">
