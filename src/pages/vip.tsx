@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ChevronRight,
   Crown,
@@ -6,9 +6,12 @@ import {
   ShieldCheck,
   Star,
   Zap,
+  CheckCircle,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { supabase } from "../lib/supabase";
+
+import { loadUserProgress } from "../lib/progress";
 
 export function VIP({
   onBack,
@@ -19,6 +22,45 @@ export function VIP({
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<{
+    status: string;
+    url?: string;
+  } | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkStatus = async () => {
+      if (!session?.user?.id) {
+        setIsChecking(false);
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/check-payment?user_id=${session.user.id}`,
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === "paid") {
+            await loadUserProgress();
+          }
+          if (mounted) {
+            setPaymentStatus(data);
+          }
+        }
+      } catch (err) {
+        console.error("Error checking payment status:", err);
+      } finally {
+        if (mounted) {
+          setIsChecking(false);
+        }
+      }
+    };
+    checkStatus();
+    return () => {
+      mounted = false;
+    };
+  }, [session?.user?.id]);
 
   const handlePayment = async () => {
     setIsLoading(true);
@@ -169,14 +211,10 @@ export function VIP({
             </div>
           )}
 
-          <button
-            onClick={handlePayment}
-            disabled={isLoading}
-            className="w-full bg-white text-amber-600 font-black py-4 rounded-2xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-3 disabled:opacity-75 disabled:hover:scale-100 text-lg"
-          >
-            {isLoading ? (
+          {isChecking ? (
+            <div className="w-full bg-white/50 text-amber-600 font-bold py-4 rounded-2xl flex items-center justify-center gap-2">
               <svg
-                className="animate-spin -ml-1 mr-3 h-5 w-5 text-amber-600"
+                className="animate-spin h-5 w-5 text-amber-600"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -195,13 +233,71 @@ export function VIP({
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-            ) : (
-              <CreditCard size={24} />
-            )}
-            <span>
-              {isLoading ? "جاري التحويل..." : "ادفع عبر Chargily Pay"}
-            </span>
-          </button>
+              جاري التحقق من حالة الدفع...
+            </div>
+          ) : paymentStatus?.status === "paid" ? (
+            <div className="w-full bg-green-50 text-green-700 font-bold py-4 rounded-2xl flex flex-col items-center justify-center gap-2 shadow-inner border border-green-200">
+              <CheckCircle size={32} />
+              <span className="text-lg">أنت مشترك في باقة VIP بنجاح!</span>
+              <span className="text-xs font-normal">
+                تم تأكيد الدفع وتفعيل حسابك.
+              </span>
+            </div>
+          ) : paymentStatus?.status === "pending" && paymentStatus?.url ? (
+            <div className="w-full flex items-center justify-between bg-white px-4 py-3 rounded-2xl shadow-lg border border-amber-200 gap-2 overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-8 h-8 bg-amber-100 rounded-bl-full flex items-start justify-end pr-2 pt-1 font-bold text-[10px] text-amber-600">
+                !
+              </div>
+              <div className="flex flex-col pr-4">
+                <span className="font-bold text-slate-800 text-sm">
+                  لديك عملية دفع معلقة
+                </span>
+                <span className="text-slate-500 text-xs">
+                  يرجى إكمال الدفع أو المحاولة مجددا الاستمرار.
+                </span>
+              </div>
+              <a
+                href={paymentStatus.url}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-bold shadow-md shadow-amber-500/20 shrink-0"
+              >
+                إكمال الدفع
+              </a>
+            </div>
+          ) : (
+            <button
+              onClick={handlePayment}
+              disabled={isLoading}
+              className="w-full bg-white text-amber-600 font-black py-4 rounded-2xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-3 disabled:opacity-75 disabled:hover:scale-100 text-lg"
+            >
+              {isLoading ? (
+                <svg
+                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-amber-600"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+              ) : (
+                <CreditCard size={24} />
+              )}
+              <span>
+                {isLoading ? "جاري التحويل..." : "ادفع عبر Chargily Pay"}
+              </span>
+            </button>
+          )}
 
           <p className="text-center text-amber-100 text-xs font-medium mt-4 flex items-center justify-center gap-1">
             <ShieldCheck size={14} />

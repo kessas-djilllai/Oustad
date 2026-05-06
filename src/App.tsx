@@ -194,6 +194,7 @@ function StudentLayout({ session }: { session: any }) {
     const paymentParam = params.get("payment");
     if (paymentParam === "success") {
       setPaymentStatus("success");
+      loadUserProgress(); // Ensure local status is updated to VIP
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (paymentParam === "failure") {
       setPaymentStatus("failure");
