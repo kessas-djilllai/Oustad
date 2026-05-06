@@ -141,11 +141,26 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
     if (!supabase) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('users_view').select('id, email, raw_user_meta_data').order('created_at', { ascending: false });
+      const adminPass = sessionStorage.getItem("admin_pass") || "";
+      const { data: usersData, error } = await supabase.rpc("get_admin_users", {
+        admin_pass: adminPass,
+      });
       if (error) throw error;
-      setUsers(data || []);
+      
+      const sortedUsersData = usersData
+        ? usersData.sort(
+            (a: any, b: any) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime(),
+          )
+        : [];
+      setUsers(sortedUsersData);
     } catch (err: any) {
-      triggerAlert('خطأ في جلب البيانات: ' + err.message, 'error');
+      if (err?.message?.includes('does not exist') || err?.code === '42P01' || err?.code === '42883' || err?.message?.includes('Could not find the function')) {
+        setShowSqlModal(true);
+      } else {
+        triggerAlert('خطأ في جلب البيانات: ' + err.message, 'error');
+      }
     } finally {
       setLoading(false);
     }
