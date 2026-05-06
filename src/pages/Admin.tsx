@@ -2414,9 +2414,13 @@ export function AdminLayout() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!sessionStorage.getItem('isAdmin')) {
+      navigate('/admin/login');
+      return;
+    }
     const timer = setTimeout(() => setLoading(false), 500);
     return () => clearTimeout(timer);
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     const handleRefresh = () => setRefreshKey(prev => prev + 1);
@@ -2708,6 +2712,8 @@ export function AdminLogin() {
           console.error("Supabase Login Error:", error);
         }
       } else if (data) {
+        sessionStorage.setItem('isAdmin', 'true');
+        sessionStorage.setItem('admin_pass', hashedPassword);
         navigate('/admin');
       } else {
         triggerAlert('اسم المستخدم أو كلمة المرور غير صحيحة.', 'error');

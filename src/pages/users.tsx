@@ -78,17 +78,21 @@ export default function AdminUsers() {
     setLoading(true);
     setSetupRequired(false);
     try {
-      // Fetch users
-      const { data: usersData, error: usersError } = await supabase.from('users_view').select('*').order('created_at', { ascending: false });
+      // Fetch users using secure RPC function
+      const adminPass = sessionStorage.getItem('admin_pass') || '';
+      const { data: usersData, error: usersError } = await supabase.rpc('get_admin_users', { admin_pass: adminPass });
       
       if (usersError) {
-        if (usersError.code === '42P01' || usersError.code === 'PGRST204' || usersError.message.includes('Could not find the table')) {
+        if (usersError.code === '42883' || usersError.message.includes('Could not find the function')) {
           setSetupRequired(true);
           return;
         } else {
           throw usersError;
         }
       }
+
+      // Sort users
+      const sortedUsersData = usersData ? usersData.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : [];
 
       // Fetch all xp progress
       const { data: xpData, error: xpError } = await supabase
@@ -106,7 +110,7 @@ export default function AdminUsers() {
          });
       }
 
-      setUsers(usersData || []);
+      setUsers(sortedUsersData || []);
       setUserXpMap(xpMap);
     } catch (err: any) {
       console.error(err);
@@ -225,15 +229,24 @@ export default function AdminUsers() {
           لعرض وإدارة المستخدمين، يجب تشغيل أكواد SQL التالية في لوحة تحكم Supabase (SQL Editor):
         </div>
         <div className="bg-slate-900 text-slate-100 p-4 rounded-xl text-left font-mono text-xs overflow-x-auto whitespace-pre-wrap leading-relaxed" dir="ltr">
-{`-- 1. إنشاء عرض (View) لجلب المستخدمين (آمن للعرض فقط للـ Admin)
-create or replace view public.users_view as
-select id, email, created_at, raw_user_meta_data
-from auth.users;
+{`-- هام جداً: لحل مشكلة 'auth_users_exposed'، قم بحذف الـ View القديم إذا كان موجوداً:
+DROP VIEW IF EXISTS public.users_view;
 
--- 2. إعطاء صلاحيات قراءة للمسؤول (أو للجميع حيث يتم حمايته في التطبيق)
-grant select on public.users_view to anon, authenticated;
+-- 1. إنشاء دالة آمنة لجلب المستخدمين (تتطلب المطابقة مع كلمة السر الخاصة بالأدمن المشفرة)
+create or replace function public.get_admin_users(admin_pass text)
+returns table(id uuid, email varchar, created_at timestamptz, raw_user_meta_data jsonb) as $$
+begin
+  if not exists (select 1 from public.admin_credentials where password = admin_pass limit 1) then
+     raise exception 'Unauthorized';
+  end if;
+  return query select u.id, u.email::varchar, u.created_at, u.raw_user_meta_data from auth.users u;
+end;
+$$ language plpgsql security definer;
 
--- 3. إنشاء وظيفة (Function) لحذف المستخدم وصلاحيات الـ API لها
+-- 2. إعطاء صلاحيات تنفيذ الدالة للمستخدمين
+grant execute on function public.get_admin_users(text) to anon, authenticated;
+
+-- 3. إنشاء دالة أو وظيفة لحذف المستخدم وصلاحيات الـ API لها
 create or replace function public.delete_user_by_id(user_id uuid)
 returns void as $$
 begin
@@ -244,7 +257,7 @@ $$ language plpgsql security definer;
 -- 4. إعطاء صلاحية تنفيذ الوظيفة للـ API
 grant execute on function public.delete_user_by_id(uuid) to anon, authenticated;
 
--- 5. إنشاء وظيفة (Function) لتغيير اسم المستخدم والتخصص
+-- 5. إنشاء دالة أو وظيفة لتغيير اسم المستخدم والتخصص
 create or replace function public.update_user_meta_by_id(user_id uuid, new_name text, new_spec text)
 returns void as $$
 begin
