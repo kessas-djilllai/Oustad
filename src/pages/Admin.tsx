@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import AdminUsers from "./users";
-import { AdminEmails } from "./AdminEmails";
+import { AdminEmails } from "../AdminEmails";
 import { PdfBacAnalis } from "./PdfBacAnalis";
 
 export type AlertEventPayload = { message: string, type?: 'success' | 'error' | 'info' };

@@ -12,7 +12,7 @@ export default defineConfig(({mode}) => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['Bacaloria.png'],
+        includeAssets: ['bacaloria.png'],
         manifest: {
           name: 'Bacaloria',
           short_name: 'Bacaloria',
@@ -22,19 +22,19 @@ export default defineConfig(({mode}) => {
           display: 'standalone',
           icons: [
             {
-              src: 'Bacaloria.png',
+              src: 'bacaloria.png',
               sizes: '192x192',
-              type: 'image/svg+xml'
+              type: 'image/png'
             },
             {
-              src: 'Bacaloria.png',
+              src: 'bacaloria.png',
               sizes: '512x512',
-              type: 'image/svg+xml'
+              type: 'image/png'
             },
             {
-              src: 'Bacaloria.png',
+              src: 'bacaloria.png',
               sizes: '512x512',
-              type: 'image/svg+xml',
+              type: 'image/png',
               purpose: 'any maskable'
             }
           ]

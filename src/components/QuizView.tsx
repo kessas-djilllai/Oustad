@@ -8,7 +8,7 @@ import rehypeKatex from "rehype-katex";
 import rehypeRaw from "rehype-raw";
 import "katex/dist/katex.min.css";
 import { supabase } from "../lib/supabase";
-import { preprocessMath } from "../lib/utils";
+import { preprocessMath } from "../utils";
 import { getProgressSync, saveProgress, addXP } from "../lib/progress";
 
 export function QuizView({ subjects, onBack }: { subjects: any[], onBack: () => void }) {

@@ -8,7 +8,7 @@ import rehypeRaw from 'rehype-raw';
 import { ChevronRight, ChevronLeft, PlayCircle, ClipboardList, FileText, CheckCircle, RefreshCw, X } from 'lucide-react';
 import { getProgressSync, saveProgress, addXP } from '../lib/progress';
 import { getSubjectPrompt } from '../lib/prompts';
-import { preprocessMath } from '../lib/utils';
+import { preprocessMath } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { supabase } from '../lib/supabase';
 
