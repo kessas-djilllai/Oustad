@@ -3,6 +3,17 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { initGlobalButtonProgress } from './lib/buttonProgress.ts';
+import { registerSW } from 'virtual:pwa-register';
+
+// Register the PWA service worker
+const updateSW = registerSW({
+  onNeedRefresh() {
+    // We could prompt the user to refresh here
+  },
+  onOfflineReady() {
+    console.log('App ready to work offline');
+  },
+})
 
 // Prevent "Failed to fetch" errors from triggering the Vite error overlay
 window.addEventListener('unhandledrejection', (event) => {
