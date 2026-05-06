@@ -14,8 +14,8 @@ export default defineConfig(({mode}) => {
         registerType: 'autoUpdate',
         includeAssets: ['pwa-icon.svg'],
         manifest: {
-          name: 'منصة بكالوريا',
-          short_name: 'بكالوريا',
+          name: 'Bacaloria',
+          short_name: 'Bacaloria',
           description: 'تطبيق شامل لمراجعة البكالوريا',
           theme_color: '#f8fafc',
           background_color: '#f8fafc',
