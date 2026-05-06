@@ -18,6 +18,11 @@ export default async function handler(req, res) {
       ? "https://pay.chargily.net/test/api/v2"
       : "https://pay.chargily.net/api/v2";
 
+    const currentHost = req.headers.host;
+    const protocol = req.headers["x-forwarded-proto"] || "http";
+    const appUrl = `${protocol}://${currentHost}`;
+    const webhook_endpoint = `${appUrl}/api/chargily-webhook`;
+
     if (!amount || !success_url || !failure_url) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -33,6 +38,7 @@ export default async function handler(req, res) {
         currency: "dzd",
         success_url: success_url,
         failure_url: failure_url,
+        webhook_endpoint: webhook_endpoint,
         metadata: [{ user_id: user_id || "" }],
       }),
     });
