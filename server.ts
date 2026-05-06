@@ -71,11 +71,14 @@ async function startServer() {
         return res.status(500).json({ error: "الرجاء إعداد متغير البيئة CHARGILY_SECRET_KEY" });
       }
 
+      const isTestKey = chargilyKey.startsWith('test_');
+      const baseUrl = isTestKey ? "https://pay.chargily.net/test/api/v2" : "https://pay.chargily.net/api/v2";
+
       if (!amount || !success_url || !failure_url) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      const response = await fetch("https://pay.chargily.net/test/api/v2/checkouts", {
+      const response = await fetch(`${baseUrl}/checkouts`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
