@@ -120,7 +120,7 @@ CREATE POLICY "Allow public insert/update to admin_settings" ON admin_settings F
 
 
 -- 7. Create User Progress Table
-CREATE TABLE user_progress (
+CREATE TABLE IF NOT EXISTS user_progress (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   item_id TEXT NOT NULL,
@@ -131,10 +131,16 @@ CREATE TABLE user_progress (
 );
 
 ALTER TABLE user_progress ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow public read access to user_progress" ON user_progress FOR SELECT USING (true);
-CREATE POLICY "Allow public insert to user_progress" ON user_progress FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update to user_progress" ON user_progress FOR UPDATE USING (true);
-CREATE POLICY "Allow public delete to user_progress" ON user_progress FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Allow public read access to user_progress" ON user_progress;
+DROP POLICY IF EXISTS "Allow public insert to user_progress" ON user_progress;
+DROP POLICY IF EXISTS "Allow public update to user_progress" ON user_progress;
+DROP POLICY IF EXISTS "Allow public delete to user_progress" ON user_progress;
+
+CREATE POLICY "Allow users to read their own progress" ON user_progress FOR SELECT USING (auth.uid() = user_id);
+-- prevent users from modifying system records (e.g. is_vip)
+CREATE POLICY "Allow users to insert gamification" ON user_progress FOR INSERT WITH CHECK (auth.uid() = user_id AND item_type != 'system');
+CREATE POLICY "Allow users to update gamification" ON user_progress FOR UPDATE USING (auth.uid() = user_id AND item_type != 'system');
+CREATE POLICY "Allow users to delete gamification" ON user_progress FOR DELETE USING (auth.uid() = user_id AND item_type != 'system');
 
 -- 8. Create Secure Leaderboard RPC
 -- This safely joins auth.users to get only the full_name without exposing emails or private data

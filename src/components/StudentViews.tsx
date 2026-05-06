@@ -745,7 +745,6 @@ export function InteractiveExerciseView({
 
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey });
       const prompt = getSubjectPrompt(
         subject?.name || "",
         unit?.name || "",
@@ -755,31 +754,40 @@ export function InteractiveExerciseView({
         prompt +
         "\n\nملاحظة مهمة: يرجى توليد تمرين مشابه للتمرين السابق من حيث الفكرة، لكن بمعطيات جديدة أو أرقام مختلفة تماماً. **بالنسبة للرياضيات**: يجب استخدام علامات `$$ ... $$` للمعادلات المفصولة و`$ ... $` للمعادلات ضمن السطر. لا تنس أبداً وضع سياق الـ LaTeX بشكل سليم واضافة علامة `\\` قبل أي دالة مثل `\\begin{cases}`, `\\frac`, `\\lim`, `\\sqrt` الخ.";
 
-      const response = await ai.models.generateContent({
-        model: aiModel,
-        contents: newPrompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              exam: {
-                type: Type.STRING,
-                description:
-                  "نص موضوع الامتحان بتنسيق Markdown. لا تضع الحل هنا.",
+      const responseRes = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: newPrompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                exam: {
+                  type: "STRING",
+                  description: "نص موضوع الامتحان بتنسيق Markdown. لا تضع الحل هنا."
+                },
+                solution: {
+                  type: "STRING",
+                  description: "نص التصحيح النموذجي للامتحان بتنسيق Markdown"
+                }
               },
-              solution: {
-                type: Type.STRING,
-                description: "نص التصحيح النموذجي للامتحان بتنسيق Markdown",
-              },
-            },
-            required: ["exam", "solution"],
-          },
-        },
+              required: ["exam", "solution"]
+            }
+          }
+        })
       });
 
-      if (response.text) {
-        const jsonStr = response.text.trim();
+      if (!responseRes.ok) {
+         const d = await responseRes.json();
+         throw new Error(d.error || "خطأ في الاتصال بالخادم");
+      }
+      
+      const { text } = await responseRes.json();
+
+      if (text) {
+        const jsonStr = text.trim();
         const parsedData = JSON.parse(jsonStr);
         setCurrentExercise(parsedData);
         setShowAnswers(false);

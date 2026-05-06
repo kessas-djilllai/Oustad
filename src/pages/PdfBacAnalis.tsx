@@ -132,8 +132,6 @@ export function PdfBacAnalis({ onBack: customOnBack }: { onBack?: () => void }) 
       }
       
       const pdfBase64Data = await getBase64(fileToAnalyze);
-      
-      const ai = new GoogleGenAI({ apiKey: settingsData.api_key });
 
       const subjectsList = dbSubjects.map(s => `- ${s.name}`).join('\n');
       
@@ -149,31 +147,33 @@ ${subjectsList}`;
 
       setAnalyzingStep("جاري تصنيف الملفات حسب المادة والتخصص بالذكاء الاصطناعي...");
 
-      const response = await ai.models.generateContent({
-        model: actualModel,
-        contents: [
-            {
-              role: 'user',
-              parts: [
-                { text: prompt },
-                { inlineData: { data: pdfBase64Data, mimeType: 'application/pdf' } }
-              ],
+      const responseRes = await fetch("/api/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: prompt,
+          base64Image: pdfBase64Data,
+          mimeType: "application/pdf",
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: "OBJECT",
+              properties: {
+                bac_year: { type: "STRING" },
+                subject_names: { type: "ARRAY", items: { type: "STRING" } }
+              },
+              required: ["bac_year", "subject_names"]
             }
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              bac_year: { type: Type.STRING },
-              subject_names: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: ["bac_year", "subject_names"]
           }
-        }
+        })
       });
 
-      const textResponse = response.text || '';
+      if (!responseRes.ok) {
+         const d = await responseRes.json();
+         throw new Error(d.error || "خطأ في الاتصال بالخادم");
+      }
+      
+      const { text: textResponse } = await responseRes.json();
       const cleanedJson = textResponse.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
       const parsed = JSON.parse(cleanedJson);
       

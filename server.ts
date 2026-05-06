@@ -198,7 +198,7 @@ async function startServer() {
 
       if (userCheckout.status === "paid") {
         const supabaseUrl = process.env.VITE_SUPABASE_URL;
-        const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
         if (supabaseUrl && supabaseKey) {
           const fetchUrl = `${supabaseUrl}/rest/v1/user_progress`;
           try {
@@ -253,14 +253,30 @@ async function startServer() {
   // Webhook for Chargily
   app.post(
     "/api/chargily-webhook",
-    express.json({ type: "application/json" }),
+    express.raw({ type: "application/json" }),
     async (req, res) => {
       try {
         const signature = req.get("signature") || req.headers["signature"];
-        const secret = process.env.CHARGILY_SECRET_KEY; // Using SECRET_KEY as webhook verification might use it, or we bypass strictly if IP/host is known, but let's check payload.
-        // Usually signature is crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-        // For simplicity in this env we will process the payload directly if parsing succeeds.
-        const payload = req.body;
+        const secret = process.env.CHARGILY_SECRET_KEY;
+        const crypto = await import("crypto");
+
+        if (!secret) {
+          console.error("Webhook called but CHARGILY_SECRET_KEY is missing");
+          return res.status(500).send("Webhook configuration error");
+        }
+
+        const rawBody = req.body;
+        const computedSignature = crypto
+          .createHmac("sha256", secret)
+          .update(rawBody)
+          .digest("hex");
+
+        if (signature !== computedSignature) {
+          console.error("Invalid Webhook Signature Signature:", signature, "Computed:", computedSignature);
+          return res.status(403).send("Invalid signature");
+        }
+
+        const payload = JSON.parse(rawBody.toString());
 
         if (
           payload &&
@@ -279,7 +295,7 @@ async function startServer() {
 
           if (userId) {
             const supabaseUrl = process.env.VITE_SUPABASE_URL;
-            const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+            const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
             if (supabaseUrl && supabaseKey) {
               // Update user_progress VIP status via REST directly
               const fetchUrl = `${supabaseUrl}/rest/v1/user_progress`;
@@ -336,6 +352,73 @@ async function startServer() {
       }
     },
   );
+
+  // Gemini API Proxy
+  app.post("/api/gemini", async (req, res) => {
+    try {
+      const { prompt, base64Image, mimeType, config } = req.body;
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const serviceRoleKey =
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !serviceRoleKey) {
+        return res.status(500).json({ error: "Supabase config missing in server" });
+      }
+
+      // Fetch API key from admin_settings
+      const settingsRes = await fetch(
+        `${supabaseUrl}/rest/v1/admin_settings?select=api_key,ai_model&limit=1`,
+        {
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+          },
+        }
+      );
+      
+      if (!settingsRes.ok) {
+        return res.status(500).json({ error: "Failed to fetch settings" });
+      }
+
+      const settingsData = await settingsRes.json();
+      const apiKey = settingsData[0]?.api_key;
+      let aiModel = settingsData[0]?.ai_model || "gemini-3-flash-preview";
+      if (aiModel === "gemini-2.5-flash") aiModel = "gemini-3-flash-preview";
+
+      if (!apiKey) {
+         return res.status(500).json({ error: "Gemini API key not configured by admin." });
+      }
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({ apiKey });
+
+      const contents: any[] = [];
+      const parts: any[] = [];
+      parts.push({ text: prompt });
+      if (base64Image && mimeType) {
+         parts.push({ inlineData: { data: base64Image, mimeType } });
+      }
+      contents.push({ role: "user", parts });
+
+      const requestOptions: any = {
+        model: aiModel,
+        contents,
+      };
+      
+      if (config) {
+        // Just directly pass config if provided, e.g. responseSchema
+        requestOptions.config = config;
+      }
+
+      const response = await ai.models.generateContent(requestOptions);
+
+      res.json({ text: response.text });
+    } catch (err: any) {
+      console.error("Error calling Gemini API:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
