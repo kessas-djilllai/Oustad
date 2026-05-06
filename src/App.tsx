@@ -169,10 +169,10 @@ function StudentLayout({ session }: { session: any }) {
   return (
     <div className="min-h-screen pb-20 md:pb-6 relative flex justify-center">
       {/* Background Gradient & Blobs */}
-      <div className="fixed inset-0 z-0 bg-gradient-to-b from-blue-50/20 via-purple-50/10 to-sky-50/20 dark:from-slate-900 dark:via-[#0b0f19] dark:to-slate-900 pointer-events-none" />
-      <div className="fixed top-20 left-0 right-0 h-[60vh] bg-blue-300/[0.02] dark:bg-blue-600/[0.02] blur-[120px] pointer-events-none z-0" />
-      <div className="fixed top-1/3 left-0 right-0 h-[50vh] bg-purple-300/[0.02] dark:bg-purple-600/[0.02] blur-[120px] pointer-events-none z-0" />
-      <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-sky-300/[0.02] dark:bg-sky-600/[0.02] blur-[120px] pointer-events-none z-0" />
+      <div className="fixed inset-0 z-0 bg-gradient-to-b from-blue-50/10 via-purple-50/5 to-sky-50/10 dark:from-slate-900 dark:via-[#0b0f19] dark:to-slate-900 pointer-events-none" />
+      <div className="fixed top-20 left-0 right-0 h-[60vh] bg-blue-300/[0.01] dark:bg-blue-600/[0.01] blur-[120px] pointer-events-none z-0" />
+      <div className="fixed top-1/3 left-0 right-0 h-[50vh] bg-purple-300/[0.01] dark:bg-purple-600/[0.01] blur-[120px] pointer-events-none z-0" />
+      <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-sky-300/[0.01] dark:bg-sky-600/[0.01] blur-[120px] pointer-events-none z-0" />
       
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10 relative">
         
