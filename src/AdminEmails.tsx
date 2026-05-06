@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 import { Mail, Search, Send, RefreshCw, Menu, Check, X, Filter, Users, CheckCircle2, ChevronRight, Inbox, Plus, AlertCircle, Bookmark, MessageSquare, History, Database } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { message_template } from "./lib/message_template";
 
 export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type: 'success' | 'error') => void }) {
   const [users, setUsers] = useState<any[]>([]);
@@ -218,19 +219,12 @@ export function AdminEmails({ triggerAlert }: { triggerAlert: (msg: string, type
             const userObj = batch[j];
             setSendingStatus(`الدفعة (${Math.floor(i/60)+1}) - جاري الإرسال إلى ${userObj.email}... (${sentCount + 1}/${selectedUsersList.length})`);
             
-            let htmlMessage = `<div dir="rtl" style="font-family: Arial, sans-serif; text-align: right; line-height: 1.6; color: #1e293b;">`;
-            htmlMessage += `<p style="white-space: pre-wrap; font-size: 16px;">${message.replace(/\n/g, '<br/>')}</p>`;
-            
-            if (includeButton && buttonText && buttonLink) {
-                htmlMessage += `
-                <div style="margin-top: 30px; text-align: right;">
-                    <a href="${buttonLink}" style="display: inline-block; padding: 14px 28px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                        ${buttonText}
-                    </a>
-                </div>
-                `;
-            }
-            htmlMessage += `</div>`;
+            const htmlMessage = message_template({
+              userName: userObj.name || '',
+              messageText: message,
+              buttonText: includeButton ? buttonText : undefined,
+              buttonLink: includeButton ? buttonLink : undefined
+            });
             
             const response = await fetch('/api/send-emails', {
               method: 'POST',
