@@ -12,7 +12,7 @@ import { AuthPage } from "./pages/Auth";
 import { loadUserProgress, getProgressSync, saveProgress, checkDailyLogin, getXP, getStreak, addXP, getLeaderboard } from "./lib/progress";
 import { GoogleGenAI, Type } from "@google/genai";
 import { getSubjectPrompt } from "./lib/prompts";
-import { preprocessMath } from "./lib/utils";
+import { preprocessMath } from "./utils";
 import { QuizView } from "./components/QuizView";
 import { SubjectTypeView, SubjectUnitsView, UnitDetailsView, ContentListView, LessonDetailsView, InteractiveExerciseView } from "./components/StudentViews";
 import { VIP } from "./pages/vip";

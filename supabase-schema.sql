@@ -135,3 +135,27 @@ CREATE POLICY "Allow public read access to user_progress" ON user_progress FOR S
 CREATE POLICY "Allow public insert to user_progress" ON user_progress FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update to user_progress" ON user_progress FOR UPDATE USING (true);
 CREATE POLICY "Allow public delete to user_progress" ON user_progress FOR DELETE USING (true);
+
+-- 8. Create Secure Leaderboard RPC
+-- This safely joins auth.users to get only the full_name without exposing emails or private data
+CREATE OR REPLACE FUNCTION get_public_leaderboard()
+RETURNS TABLE (
+  user_id UUID,
+  progress_value INTEGER,
+  full_name TEXT
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    p.user_id, 
+    p.progress_value, 
+    (u.raw_user_meta_data->>'full_name')::TEXT as full_name
+  FROM user_progress p
+  JOIN auth.users u ON p.user_id = u.id
+  WHERE p.item_type = 'gamification' AND p.item_id = 'xp'
+  ORDER BY p.progress_value DESC
+  LIMIT 100;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION get_public_leaderboard() TO anon, authenticated;
