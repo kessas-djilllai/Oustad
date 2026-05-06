@@ -4,27 +4,50 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
-import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useNavigate,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
 import { supabase } from "./lib/supabase";
 import { AdminLayout, AdminLogin } from "./pages/Admin";
 import { PdfBacAnalis } from "./pages/PdfBacAnalis";
 import { AuthPage } from "./pages/Auth";
-import { loadUserProgress, getProgressSync, saveProgress, checkDailyLogin, getXP, getStreak, addXP, getLeaderboard } from "./lib/progress";
+import {
+  loadUserProgress,
+  getProgressSync,
+  saveProgress,
+  checkDailyLogin,
+  getXP,
+  getStreak,
+  addXP,
+  getLeaderboard,
+} from "./lib/progress";
 import { GoogleGenAI, Type } from "@google/genai";
 import { getSubjectPrompt } from "./lib/prompts";
 import { preprocessMath } from "./utils";
 import { QuizView } from "./components/QuizView";
-import { SubjectTypeView, SubjectUnitsView, UnitDetailsView, ContentListView, LessonDetailsView, InteractiveExerciseView } from "./components/StudentViews";
+import {
+  SubjectTypeView,
+  SubjectUnitsView,
+  UnitDetailsView,
+  ContentListView,
+  LessonDetailsView,
+  InteractiveExerciseView,
+} from "./components/StudentViews";
 import { VIP } from "./pages/vip";
-import { FlashcardsView } from './components/FlashcardsView';
+import { FlashcardsView } from "./components/FlashcardsView";
 import { PdfViewer } from "./components/PdfViewer";
-import { 
+import {
   BookOpen,
-  Target, 
-  Calendar, 
-  Search, 
-  MessageCircle, 
-  Bell, 
+  Target,
+  Calendar,
+  Search,
+  MessageCircle,
+  Bell,
   Menu,
   ChevronLeft,
   ChevronRight,
@@ -66,32 +89,37 @@ import {
   Dumbbell,
   Shield,
   Activity,
-  Heart
+  Heart,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+
+import { NotFound } from "./pages/NotFound";
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase?.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error("Session error:", error.message);
-      }
-      setSession(session);
-      setLoading(false);
-    }).catch(err => {
-      console.error(err);
-      setLoading(false);
-    });
+    supabase?.auth
+      .getSession()
+      .then(({ data: { session }, error }) => {
+        if (error) {
+          console.error("Session error:", error.message);
+        }
+        setSession(session);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
 
     const {
       data: { subscription },
     } = supabase?.auth.onAuthStateChange((_event, session) => {
-      if (_event === 'SIGNED_OUT') {
+      if (_event === "SIGNED_OUT") {
         const expiresDays = 365;
-        document.cookie = `sb-${(import.meta as any).env.VITE_SUPABASE_URL?.split('//')[1]?.split('.')[0]}-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = `sb-${(import.meta as any).env.VITE_SUPABASE_URL?.split("//")[1]?.split(".")[0]}-auth-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       }
       setSession(session);
       setLoading(false);
@@ -103,11 +131,17 @@ export default function App() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50/30 to-white flex items-center justify-center">
-         <div className="flex gap-2">
-           <div className="w-3 h-3 rounded-full bg-blue-600 animate-bounce"></div>
-           <div className="w-3 h-3 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-           <div className="w-3 h-3 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-         </div>
+        <div className="flex gap-2">
+          <div className="w-3 h-3 rounded-full bg-blue-600 animate-bounce"></div>
+          <div
+            className="w-3 h-3 rounded-full bg-blue-600 animate-bounce"
+            style={{ animationDelay: "0.1s" }}
+          ></div>
+          <div
+            className="w-3 h-3 rounded-full bg-blue-600 animate-bounce"
+            style={{ animationDelay: "0.2s" }}
+          ></div>
+        </div>
       </div>
     );
   }
@@ -116,14 +150,23 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
-        <Route path="/" element={session ? <StudentLayout session={session} /> : <Navigate to="/auth" replace />} />
+        <Route
+          path="/"
+          element={
+            session ? (
+              <StudentLayout session={session} />
+            ) : (
+              <Navigate to="/auth" replace />
+            )
+          }
+        />
         <Route path="/admin/*" element={<AdminLayout />} />
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );
 }
-
 
 // ==========================================
 // 1. Student Portal
@@ -132,33 +175,39 @@ export default function App() {
 function StudentLayout({ session }: { session: any }) {
   const navigate = useNavigate();
 
-  const userName = session?.user?.user_metadata?.full_name || 'الطالب';
+  const userName = session?.user?.user_metadata?.full_name || "الطالب";
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    return localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    return (
+      localStorage.getItem("theme") === "dark" ||
+      (!("theme" in localStorage) &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches)
+    );
   });
 
-  const [paymentStatus, setPaymentStatus] = useState<'success' | 'failure' | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<
+    "success" | "failure" | null
+  >(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const paymentParam = params.get('payment');
-    if (paymentParam === 'success') {
-      setPaymentStatus('success');
+    const paymentParam = params.get("payment");
+    if (paymentParam === "success") {
+      setPaymentStatus("success");
       window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (paymentParam === 'failure') {
-      setPaymentStatus('failure');
+    } else if (paymentParam === "failure") {
+      setPaymentStatus("failure");
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
   useEffect(() => {
     if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
     } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
     }
   }, [isDarkMode]);
 
@@ -173,21 +222,24 @@ function StudentLayout({ session }: { session: any }) {
       <div className="fixed top-20 left-0 right-0 h-[60vh] bg-blue-300/[0.01] dark:bg-blue-600/[0.01] blur-[120px] pointer-events-none z-0" />
       <div className="fixed top-1/3 left-0 right-0 h-[50vh] bg-purple-300/[0.01] dark:bg-purple-600/[0.01] blur-[120px] pointer-events-none z-0" />
       <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-sky-300/[0.01] dark:bg-sky-600/[0.01] blur-[120px] pointer-events-none z-0" />
-      
+
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 z-10 relative">
-        
         <header className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shrink-0">
               {userName.substring(0, 1)}
             </div>
             <div>
-              <h1 className="font-bold text-xl leading-tight line-clamp-1">منصة بكالوريا</h1>
-              <p className="text-xs text-slate-500 font-medium line-clamp-1">مرحباً، {userName} 👋</p>
+              <h1 className="font-bold text-xl leading-tight line-clamp-1">
+                منصة بكالوريا
+              </h1>
+              <p className="text-xs text-slate-500 font-medium line-clamp-1">
+                مرحباً، {userName} 👋
+              </p>
             </div>
           </div>
           <div className="flex gap-2 relative">
-            <button 
+            <button
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="w-10 h-10 flex rounded-2xl glass glass-hover justify-center items-center text-slate-600 dark:text-slate-300 transition-all shrink-0"
               aria-label="Toggle Dark Mode"
@@ -197,7 +249,7 @@ function StudentLayout({ session }: { session: any }) {
             <button className="w-10 h-10 hidden sm:flex rounded-2xl glass glass-hover justify-center items-center text-slate-600 dark:text-slate-300 transition-all shrink-0">
               <Bell size={20} />
             </button>
-            <button 
+            <button
               onClick={handleLogout}
               className="w-10 h-10 rounded-2xl glass glass-hover flex items-center justify-center text-red-500 dark:text-red-400 transition-all shrink-0"
               title="تسجيل الخروج"
@@ -208,7 +260,7 @@ function StudentLayout({ session }: { session: any }) {
         </header>
 
         <AnimatePresence>
-          {paymentStatus === 'success' && (
+          {paymentStatus === "success" && (
             <motion.div
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -222,16 +274,21 @@ function StudentLayout({ session }: { session: any }) {
                 </div>
                 <div>
                   <h3 className="font-bold">عملية دفع ناجحة!</h3>
-                  <p className="text-sm">تم ترقية حسابك وتفعيل باقة VIP بنجاح.</p>
+                  <p className="text-sm">
+                    تم ترقية حسابك وتفعيل باقة VIP بنجاح.
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setPaymentStatus(null)} className="text-green-500 hover:text-green-700">
-                 <X size={20} />
+              <button
+                onClick={() => setPaymentStatus(null)}
+                className="text-green-500 hover:text-green-700"
+              >
+                <X size={20} />
               </button>
             </motion.div>
           )}
-          
-          {paymentStatus === 'failure' && (
+
+          {paymentStatus === "failure" && (
             <motion.div
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -245,18 +302,23 @@ function StudentLayout({ session }: { session: any }) {
                 </div>
                 <div>
                   <h3 className="font-bold">فشلت عملية الدفع</h3>
-                  <p className="text-sm">عذراً، لم نتمكن من اتمام عملية الدفع. يرجى المحاولة مرة أخرى.</p>
+                  <p className="text-sm">
+                    عذراً، لم نتمكن من اتمام عملية الدفع. يرجى المحاولة مرة
+                    أخرى.
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setPaymentStatus(null)} className="text-red-500 hover:text-red-700">
-                 <X size={20} />
+              <button
+                onClick={() => setPaymentStatus(null)}
+                className="text-red-500 hover:text-red-700"
+              >
+                <X size={20} />
               </button>
             </motion.div>
           )}
         </AnimatePresence>
 
         <StudentPortal session={session} />
-
       </div>
     </div>
   );
@@ -264,40 +326,110 @@ function StudentLayout({ session }: { session: any }) {
 
 const SUBJECTS_DATA = [
   {
-    id: 'math', name: 'الرياضيات', progress: 80, color: 'text-blue-500', bg: 'bg-blue-100', icon: Calculator,
-    barColor: 'bg-blue-500',
+    id: "math",
+    name: "الرياضيات",
+    progress: 80,
+    color: "text-blue-500",
+    bg: "bg-blue-100",
+    icon: Calculator,
+    barColor: "bg-blue-500",
     units: [
-      { id: 'u1', name: 'الدوال العددية', lessons: [{id: 'l1', title: 'الاستمرارية'}, {id: 'l2', title: 'الاشتقاقية'}], exercises: [{id: 'e1', title: 'تمرين 1: الاستمرارية'}, {id: 'e2', title: 'تمرين 2: الاشتقاقية'}] },
-      { id: 'u2', name: 'الدوال الأسية', lessons: [{id: 'l3', title: 'تعريف وخواص'}, {id: 'l4', title: 'دراسة الدالة الأسية'}], exercises: [{id: 'e3', title: 'تمرين 1: خواص الدالة الأسية'}, {id: 'e4', title: 'تمرين 2: دراسة شاملة'}] }
-    ]
+      {
+        id: "u1",
+        name: "الدوال العددية",
+        lessons: [
+          { id: "l1", title: "الاستمرارية" },
+          { id: "l2", title: "الاشتقاقية" },
+        ],
+        exercises: [
+          { id: "e1", title: "تمرين 1: الاستمرارية" },
+          { id: "e2", title: "تمرين 2: الاشتقاقية" },
+        ],
+      },
+      {
+        id: "u2",
+        name: "الدوال الأسية",
+        lessons: [
+          { id: "l3", title: "تعريف وخواص" },
+          { id: "l4", title: "دراسة الدالة الأسية" },
+        ],
+        exercises: [
+          { id: "e3", title: "تمرين 1: خواص الدالة الأسية" },
+          { id: "e4", title: "تمرين 2: دراسة شاملة" },
+        ],
+      },
+    ],
   },
   {
-    id: 'physics', name: 'الفيزياء', progress: 65, color: 'text-indigo-500', bg: 'bg-indigo-100', icon: FlaskConical,
-    barColor: 'bg-indigo-500',
+    id: "physics",
+    name: "الفيزياء",
+    progress: 65,
+    color: "text-indigo-500",
+    bg: "bg-indigo-100",
+    icon: FlaskConical,
+    barColor: "bg-indigo-500",
     units: [
-      { id: 'u1', name: 'المتابعة الزمنية للتحول الكيميائي', lessons: [{id: 'l1', title: 'طرق المتابعة الزمنية'}, {id: 'l2', title: 'سرعة التفاعل'}], exercises: [{id: 'e1', title: 'تمرين: المتابعة عن طريق المعايرة'}, {id: 'e2', title: 'تمرين: حساب سرعة التفاعل'}] },
-    ]
+      {
+        id: "u1",
+        name: "المتابعة الزمنية للتحول الكيميائي",
+        lessons: [
+          { id: "l1", title: "طرق المتابعة الزمنية" },
+          { id: "l2", title: "سرعة التفاعل" },
+        ],
+        exercises: [
+          { id: "e1", title: "تمرين: المتابعة عن طريق المعايرة" },
+          { id: "e2", title: "تمرين: حساب سرعة التفاعل" },
+        ],
+      },
+    ],
   },
   {
-    id: 'science', name: 'العلوم الطبيعية', progress: 40, color: 'text-emerald-500', bg: 'bg-emerald-100', icon: Globe,
-    barColor: 'bg-emerald-500',
+    id: "science",
+    name: "العلوم الطبيعية",
+    progress: 40,
+    color: "text-emerald-500",
+    bg: "bg-emerald-100",
+    icon: Globe,
+    barColor: "bg-emerald-500",
     units: [
-      { id: 'u1', name: 'تركيب البروتين', lessons: [{id: 'l1', title: 'مقر تركيب البروتين'}, {id: 'l2', title: 'الاستنساخ والترجمة'}], exercises: [{id: 'e1', title: 'تمرين الاستنساخ'}, {id: 'e2', title: 'تمرين الترجمة'}] }
-    ]
-  }
+      {
+        id: "u1",
+        name: "تركيب البروتين",
+        lessons: [
+          { id: "l1", title: "مقر تركيب البروتين" },
+          { id: "l2", title: "الاستنساخ والترجمة" },
+        ],
+        exercises: [
+          { id: "e1", title: "تمرين الاستنساخ" },
+          { id: "e2", title: "تمرين الترجمة" },
+        ],
+      },
+    ],
+  },
 ];
 
 function StudentPortal({ session }: { session: any }) {
   const [subjects, setSubjects] = useState<any[]>(SUBJECTS_DATA);
-  const [mainTab, setMainTab] = useState<'home' | 'subjects' | 'topics' | 'settings' | 'leaderboard'>('home');
-  
-  const [view, setViewState] = useState<{ type: string, subject?: any, unit?: any, listType?: 'lessons' | 'exercises', exercise?: any, lesson?: any }>(() => {
-    const saved = localStorage.getItem('portal_view');
+  const [mainTab, setMainTab] = useState<
+    "home" | "subjects" | "topics" | "settings" | "leaderboard"
+  >("home");
+
+  const [view, setViewState] = useState<{
+    type: string;
+    subject?: any;
+    unit?: any;
+    listType?: "lessons" | "exercises";
+    exercise?: any;
+    lesson?: any;
+  }>(() => {
+    const saved = localStorage.getItem("portal_view");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (parsed.subject) {
-          const foundSubject = SUBJECTS_DATA.find(s => s.id === parsed.subject.id);
+          const foundSubject = SUBJECTS_DATA.find(
+            (s) => s.id === parsed.subject.id,
+          );
           if (foundSubject) parsed.subject.icon = foundSubject.icon;
           else parsed.subject.icon = BookOpen;
         }
@@ -306,36 +438,36 @@ function StudentPortal({ session }: { session: any }) {
         console.error("Failed to parse saved view", e);
       }
     }
-    return { type: 'dashboard' };
+    return { type: "dashboard" };
   });
 
   const setView = (newView: any) => {
     setViewState(newView);
     const viewToSave = { ...newView };
     if (viewToSave.subject) {
-      viewToSave.subject = { ...viewToSave.subject, icon: undefined }; 
+      viewToSave.subject = { ...viewToSave.subject, icon: undefined };
     }
-    localStorage.setItem('portal_view', JSON.stringify(viewToSave));
+    localStorage.setItem("portal_view", JSON.stringify(viewToSave));
   };
 
-  
   const [dbLoading, setDbLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [bacDate, setBacDate] = useState<string | null>(null);
 
   useEffect(() => {
     const handleProgressUpdate = () => {
-      setRefreshTrigger(prev => prev + 1);
+      setRefreshTrigger((prev) => prev + 1);
     };
-    window.addEventListener('progress_updated', handleProgressUpdate);
-    return () => window.removeEventListener('progress_updated', handleProgressUpdate);
+    window.addEventListener("progress_updated", handleProgressUpdate);
+    return () =>
+      window.removeEventListener("progress_updated", handleProgressUpdate);
   }, []);
 
   useEffect(() => {
     async function initUser() {
       await loadUserProgress();
       await checkDailyLogin();
-      setRefreshTrigger(prev => prev + 1); // trigger initial data formatting
+      setRefreshTrigger((prev) => prev + 1); // trigger initial data formatting
     }
     initUser();
   }, []);
@@ -354,39 +486,56 @@ function StudentPortal({ session }: { session: any }) {
           sub.units?.forEach((u: any) => {
             u.lessons?.forEach((l: any) => {
               totalItems++;
-              if (getProgressSync('completed_lesson', l.id) === 1) completedItems++;
+              if (getProgressSync("completed_lesson", l.id) === 1)
+                completedItems++;
             });
             u.exercises?.forEach((e: any) => {
               totalItems++;
-              if (getProgressSync('completed_exercise', e.id) === 1) completedItems++;
+              if (getProgressSync("completed_exercise", e.id) === 1)
+                completedItems++;
             });
           });
-          const p = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-          const qp = getProgressSync('quiz_progress', sub.id) || 0;
+          const p =
+            totalItems > 0
+              ? Math.round((completedItems / totalItems) * 100)
+              : 0;
+          const qp = getProgressSync("quiz_progress", sub.id) || 0;
           return { ...sub, progress: p, quiz_progress: qp };
         });
         if (JSON.stringify(computedSubjects) !== JSON.stringify(subjects)) {
-            setSubjects(computedSubjects);
+          setSubjects(computedSubjects);
         }
         setDbLoading(false);
         return;
       }
-      
+
       try {
         if (subjects === SUBJECTS_DATA) {
           setDbLoading(true);
         }
         // Fetch all data separately to ensure everything is caught regardless of PostgREST join constraints
         const [subRes, unitRes, lessRes, exRes, adminRes] = await Promise.all([
-          supabase.from('subjects').select('*').order('created_at', { ascending: true }),
-          supabase.from('units').select('*').order('created_at', { ascending: true }),
-          supabase.from('lessons').select('*').order('created_at', { ascending: true }),
-          supabase.from('exercises').select('*').order('created_at', { ascending: true }),
-          supabase.from('admin_settings').select('*').limit(1).single()
+          supabase
+            .from("subjects")
+            .select("*")
+            .order("created_at", { ascending: true }),
+          supabase
+            .from("units")
+            .select("*")
+            .order("created_at", { ascending: true }),
+          supabase
+            .from("lessons")
+            .select("*")
+            .order("created_at", { ascending: true }),
+          supabase
+            .from("exercises")
+            .select("*")
+            .order("created_at", { ascending: true }),
+          supabase.from("admin_settings").select("*").limit(1).single(),
         ]);
-        
+
         if (subRes.error) throw subRes.error;
-        
+
         const subjectsData = subRes.data || [];
         const unitsData = unitRes.data || [];
         const lessonsData = lessRes.data || [];
@@ -394,95 +543,131 @@ function StudentPortal({ session }: { session: any }) {
 
         let globalSubjectCookies: any = {};
         if (adminRes.data && adminRes.data.subject_cookies) {
-            try {
-                globalSubjectCookies = JSON.parse(adminRes.data.subject_cookies);
-            } catch(e) {}
+          try {
+            globalSubjectCookies = JSON.parse(adminRes.data.subject_cookies);
+          } catch (e) {}
         }
-        
+
         if (adminRes.data && adminRes.data.bac_date) {
-            setBacDate(adminRes.data.bac_date);
+          setBacDate(adminRes.data.bac_date);
         }
 
         const specializations = [
-          'علوم تجريبية',
-          'رياضيات',
-          'تقني رياضي',
-          'تسيير واقتصاد',
-          'آداب وفلسفة',
-          'لغات أجنبية'
+          "علوم تجريبية",
+          "رياضيات",
+          "تقني رياضي",
+          "تسيير واقتصاد",
+          "آداب وفلسفة",
+          "لغات أجنبية",
         ];
         const userSpecialization = session?.user?.user_metadata?.specialization;
 
         if (subjectsData.length > 0) {
           // Filter subjects by user specialization and format the data
-          const formattedSubjects = subjectsData.filter((sub: any) => {
-            if (!userSpecialization) return true;
-            let isForAnotherSpec = false;
-            for (const spec of specializations) {
-               if (spec !== userSpecialization && sub.name.includes(`(${spec})`)) {
-                 isForAnotherSpec = true;
-                 break;
-               }
-            }
-            return !isForAnotherSpec;
-          }).map((sub: any) => {
-            let displayName = sub.name;
-            for (const spec of specializations) {
-               if (displayName.includes(`(${spec})`)) {
-                 displayName = displayName.replace(`(${spec})`, '').trim();
-                 break;
-               }
-            }
+          const formattedSubjects = subjectsData
+            .filter((sub: any) => {
+              if (!userSpecialization) return true;
+              let isForAnotherSpec = false;
+              for (const spec of specializations) {
+                if (
+                  spec !== userSpecialization &&
+                  sub.name.includes(`(${spec})`)
+                ) {
+                  isForAnotherSpec = true;
+                  break;
+                }
+              }
+              return !isForAnotherSpec;
+            })
+            .map((sub: any) => {
+              let displayName = sub.name;
+              for (const spec of specializations) {
+                if (displayName.includes(`(${spec})`)) {
+                  displayName = displayName.replace(`(${spec})`, "").trim();
+                  break;
+                }
+              }
 
-            const subUnits = unitsData.filter((u: any) => u.subject_id === sub.id).sort((a: any, b: any) => a.unit_order - b.unit_order);
-            const formattedUnits = subUnits.map((u: any) => ({
+              const subUnits = unitsData
+                .filter((u: any) => u.subject_id === sub.id)
+                .sort((a: any, b: any) => a.unit_order - b.unit_order);
+              const formattedUnits = subUnits.map((u: any) => ({
                 ...u,
-                lessons: lessonsData.filter((l: any) => l.unit_id === u.id).sort((a: any, b: any) => a.lesson_order - b.lesson_order),
-                exercises: exercisesData.filter((e: any) => e.unit_id === u.id).sort((a: any, b: any) => a.exercise_order - b.exercise_order),
-            }));
+                lessons: lessonsData
+                  .filter((l: any) => l.unit_id === u.id)
+                  .sort((a: any, b: any) => a.lesson_order - b.lesson_order),
+                exercises: exercisesData
+                  .filter((e: any) => e.unit_id === u.id)
+                  .sort(
+                    (a: any, b: any) => a.exercise_order - b.exercise_order,
+                  ),
+              }));
 
-            let totalItems = 0;
-            let completedItems = 0;
-            formattedUnits.forEach((u: any) => {
-              u.lessons?.forEach((l: any) => {
-                totalItems++;
-                if (getProgressSync('completed_lesson', l.id) === 1) completedItems++;
+              let totalItems = 0;
+              let completedItems = 0;
+              formattedUnits.forEach((u: any) => {
+                u.lessons?.forEach((l: any) => {
+                  totalItems++;
+                  if (getProgressSync("completed_lesson", l.id) === 1)
+                    completedItems++;
+                });
+                u.exercises?.forEach((e: any) => {
+                  totalItems++;
+                  if (getProgressSync("completed_exercise", e.id) === 1)
+                    completedItems++;
+                });
               });
-              u.exercises?.forEach((e: any) => {
-                totalItems++;
-                if (getProgressSync('completed_exercise', e.id) === 1) completedItems++;
-              });
+
+              const p =
+                totalItems > 0
+                  ? Math.round((completedItems / totalItems) * 100)
+                  : 0;
+
+              let qp = 0;
+              const subjectCookie = globalSubjectCookies[sub.id];
+              if (
+                subjectCookie &&
+                subjectCookie.levels &&
+                subjectCookie.levels.length > 0
+              ) {
+                const totalLevelsCount = subjectCookie.levels.length;
+                const currentUnlocked =
+                  getProgressSync("cookie_level", sub.id) || 0;
+                if (currentUnlocked >= totalLevelsCount) {
+                  qp = 100;
+                } else {
+                  const activeLevelData = subjectCookie.levels[currentUnlocked];
+                  const totalQuestionsInActive =
+                    activeLevelData?.questions?.length || 1;
+                  const savedQidx =
+                    getProgressSync(
+                      "cookie_qidx",
+                      `${sub.id}_${currentUnlocked}`,
+                    ) || 0;
+                  const levelFraction = Math.min(
+                    savedQidx / totalQuestionsInActive,
+                    1,
+                  );
+                  qp = Math.min(
+                    Math.round(
+                      ((currentUnlocked + levelFraction) / totalLevelsCount) *
+                        100,
+                    ),
+                    100,
+                  );
+                }
+              }
+
+              return {
+                ...sub,
+                name: displayName,
+                barColor: sub.bar_color || "bg-blue-500",
+                progress: p,
+                quiz_progress: qp,
+                icon: Calculator, // In a real app, map icon_name to actual Lucide component
+                units: formattedUnits,
+              };
             });
-
-            const p = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
-            
-            let qp = 0;
-            const subjectCookie = globalSubjectCookies[sub.id];
-            if (subjectCookie && subjectCookie.levels && subjectCookie.levels.length > 0) {
-               const totalLevelsCount = subjectCookie.levels.length;
-               const currentUnlocked = getProgressSync('cookie_level', sub.id) || 0;
-               if (currentUnlocked >= totalLevelsCount) {
-                   qp = 100;
-               } else {
-                   const activeLevelData = subjectCookie.levels[currentUnlocked];
-                   const totalQuestionsInActive = activeLevelData?.questions?.length || 1;
-                   const savedQidx = getProgressSync('cookie_qidx', `${sub.id}_${currentUnlocked}`) || 0;
-                   const levelFraction = Math.min(savedQidx / totalQuestionsInActive, 1);
-                   qp = Math.min(Math.round(((currentUnlocked + levelFraction) / totalLevelsCount) * 100), 100);
-               }
-            }
-            
-            
-            return {
-              ...sub,
-              name: displayName,
-              barColor: sub.bar_color || 'bg-blue-500',
-              progress: p,
-              quiz_progress: qp,
-              icon: Calculator, // In a real app, map icon_name to actual Lucide component
-              units: formattedUnits
-            };
-          });
           setSubjects(formattedSubjects);
         }
       } catch (err) {
@@ -503,8 +688,8 @@ function StudentPortal({ session }: { session: any }) {
           <div className="col-span-2 md:col-span-3 glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 min-h-[120px] md:min-h-[160px] flex flex-col justify-center gap-3 relative overflow-hidden border border-slate-200/40">
             <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[shimmer_1.5s_infinite]" />
             <div className="flex items-center gap-3">
-               <div className="w-6 h-6 rounded-md bg-orange-100/50 animate-pulse" />
-               <div className="h-6 md:h-8 bg-slate-200/50 rounded-xl w-1/3 animate-pulse" />
+              <div className="w-6 h-6 rounded-md bg-orange-100/50 animate-pulse" />
+              <div className="h-6 md:h-8 bg-slate-200/50 rounded-xl w-1/3 animate-pulse" />
             </div>
             <div className="h-12 md:h-14 bg-slate-100/80 rounded-xl md:rounded-2xl w-full border border-slate-200/50 mt-1" />
           </div>
@@ -515,7 +700,7 @@ function StudentPortal({ session }: { session: any }) {
             <div className="h-3 bg-slate-200/50 rounded-md w-1/2 animate-pulse mt-1" />
             <div className="h-4 bg-slate-200/80 rounded-md w-2/3 animate-pulse" />
           </div>
-          
+
           <div className="col-span-1 md:col-span-2 flex flex-col md:flex-row gap-3 md:gap-6 min-h-[120px] md:min-h-[160px]">
             <div className="flex-1 glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 flex flex-row md:flex-col items-center justify-center md:gap-2 relative overflow-hidden border border-slate-200/40 gap-3">
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[shimmer_1.5s_infinite] delay-150" />
@@ -525,7 +710,7 @@ function StudentPortal({ session }: { session: any }) {
                 <div className="h-3 bg-slate-200/50 rounded-md w-2/3 animate-pulse" />
               </div>
             </div>
-            
+
             <div className="flex-1 glass rounded-3xl md:rounded-[2rem] p-3 md:p-6 flex flex-row md:flex-col items-center justify-center md:gap-2 relative overflow-hidden border border-slate-200/40 gap-3">
               <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[shimmer_1.5s_infinite] delay-300" />
               <div className="w-8 h-8 md:w-16 md:h-16 rounded-full bg-amber-50 animate-pulse" />
@@ -540,35 +725,41 @@ function StudentPortal({ session }: { session: any }) {
         <div>
           {/* Section title skeleton */}
           <div className="flex justify-between items-center mb-4 md:mb-5 px-1">
-             <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-md bg-indigo-100/50 animate-pulse" />
-                <div className="h-6 md:h-7 bg-slate-200/60 rounded-lg w-24 animate-pulse" />
-             </div>
-             <div className="h-6 md:h-7 bg-slate-100 rounded-lg w-20 md:w-24 border border-slate-200/50" />
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-md bg-indigo-100/50 animate-pulse" />
+              <div className="h-6 md:h-7 bg-slate-200/60 rounded-lg w-24 animate-pulse" />
+            </div>
+            <div className="h-6 md:h-7 bg-slate-100 rounded-lg w-20 md:w-24 border border-slate-200/50" />
           </div>
 
           {/* Subjects grid skeleton */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
             {[1, 2, 3].map((i) => (
-               <div key={i} className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 min-h-[140px] md:min-h-[180px] flex flex-col justify-between relative overflow-hidden border border-slate-200/50 shadow-sm">
-                  <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[shimmer_1.5s_infinite]" style={{ animationDelay: `${i * 150}ms` }} />
-                  <div className="flex justify-between items-start mb-4 md:mb-6">
-                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-slate-100/80 ring-4 ring-white animate-pulse" />
-                    <div className="w-12 h-5 md:w-14 md:h-6 bg-slate-100 rounded-md md:rounded-lg animate-pulse" />
-                  </div>
-                  <div className="space-y-3 md:space-y-4 w-full mt-auto">
-                    <div className="h-4 md:h-5 bg-slate-200/80 rounded-md w-2/3 animate-pulse" />
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                         <div className="h-2.5 md:h-3 bg-slate-200/50 rounded-md w-1/4 animate-pulse" />
-                         <div className="h-2.5 md:h-3 bg-slate-200/50 rounded-md w-1/6 animate-pulse" />
-                      </div>
-                      <div className="h-1.5 md:h-2 bg-slate-100 rounded-full w-full overflow-hidden">
-                        <div className="h-full bg-slate-200/50 w-1/3 rounded-full animate-pulse" />
-                      </div>
+              <div
+                key={i}
+                className="glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 min-h-[140px] md:min-h-[180px] flex flex-col justify-between relative overflow-hidden border border-slate-200/50 shadow-sm"
+              >
+                <div
+                  className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/80 to-transparent animate-[shimmer_1.5s_infinite]"
+                  style={{ animationDelay: `${i * 150}ms` }}
+                />
+                <div className="flex justify-between items-start mb-4 md:mb-6">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-slate-100/80 ring-4 ring-white animate-pulse" />
+                  <div className="w-12 h-5 md:w-14 md:h-6 bg-slate-100 rounded-md md:rounded-lg animate-pulse" />
+                </div>
+                <div className="space-y-3 md:space-y-4 w-full mt-auto">
+                  <div className="h-4 md:h-5 bg-slate-200/80 rounded-md w-2/3 animate-pulse" />
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <div className="h-2.5 md:h-3 bg-slate-200/50 rounded-md w-1/4 animate-pulse" />
+                      <div className="h-2.5 md:h-3 bg-slate-200/50 rounded-md w-1/6 animate-pulse" />
+                    </div>
+                    <div className="h-1.5 md:h-2 bg-slate-100 rounded-full w-full overflow-hidden">
+                      <div className="h-full bg-slate-200/50 w-1/3 rounded-full animate-pulse" />
                     </div>
                   </div>
-               </div>
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -576,42 +767,180 @@ function StudentPortal({ session }: { session: any }) {
     );
   }
 
-  const currentSubject = subjects.find(s => s.id === view.subject?.id) || view.subject;
-  const currentUnit = currentSubject?.units?.find((u: any) => u.id === view.unit?.id) || view.unit;
+  const currentSubject =
+    subjects.find((s) => s.id === view.subject?.id) || view.subject;
+  const currentUnit =
+    currentSubject?.units?.find((u: any) => u.id === view.unit?.id) ||
+    view.unit;
 
   return (
     <>
-      <div key={view.type + (currentSubject?.id || '') + (currentUnit?.id || '') + (view.listType || '')} className={view.type === 'dashboard' ? 'pb-28' : ''}>
-        {view.type === 'dashboard' && mainTab === 'home' && <DashboardHomeView subjects={subjects} bacDate={bacDate} onStartQuiz={() => setView({ type: 'quiz' })} onOpenFlashcards={(type) => setView({ type: 'flashcards', listType: type })} />}
-        {view.type === 'dashboard' && mainTab === 'subjects' && <DashboardSubjectsView subjects={subjects} listType={mainTab} onSubjectClick={(s) => setView({ type: 'subject_units', subject: s })} />}
-        {view.type === 'dashboard' && mainTab === 'topics' && <TopicsView subjects={subjects} />}
-        {view.type === 'dashboard' && mainTab === 'leaderboard' && <LeaderboardView session={session} />}
-        {view.type === 'dashboard' && mainTab === 'settings' && <SettingsView />}
-        
-        {view.type === 'subject_units' && <SubjectUnitsView subject={currentSubject} onBack={() => setView({ type: 'dashboard' })} onUnitClick={(u) => setView({ type: 'unit_details', subject: currentSubject, unit: u })} />}
-        {view.type === 'unit_details' && <UnitDetailsView subject={currentSubject} unit={currentUnit} onBack={() => setView({ type: 'subject_units', subject: currentSubject })} onSelectItem={(type, item) => {
-          if (type === 'exercises') {
-            setView({ type: 'solve_exercise', subject: currentSubject, unit: currentUnit, exercise: item });
-          } else {
-            setView({ type: 'view_lesson', subject: currentSubject, unit: currentUnit, lesson: item });
-          }
-        }} />}
+      <div
+        key={
+          view.type +
+          (currentSubject?.id || "") +
+          (currentUnit?.id || "") +
+          (view.listType || "")
+        }
+        className={view.type === "dashboard" ? "pb-28" : ""}
+      >
+        {view.type === "dashboard" && mainTab === "home" && (
+          <DashboardHomeView
+            subjects={subjects}
+            bacDate={bacDate}
+            onStartQuiz={() => setView({ type: "quiz" })}
+            onOpenFlashcards={(type) =>
+              setView({ type: "flashcards", listType: type })
+            }
+          />
+        )}
+        {view.type === "dashboard" && mainTab === "subjects" && (
+          <DashboardSubjectsView
+            subjects={subjects}
+            listType={mainTab}
+            onSubjectClick={(s) =>
+              setView({ type: "subject_units", subject: s })
+            }
+          />
+        )}
+        {view.type === "dashboard" && mainTab === "topics" && (
+          <TopicsView subjects={subjects} />
+        )}
+        {view.type === "dashboard" && mainTab === "leaderboard" && (
+          <LeaderboardView session={session} />
+        )}
+        {view.type === "dashboard" && mainTab === "settings" && (
+          <SettingsView />
+        )}
+
+        {view.type === "subject_units" && (
+          <SubjectUnitsView
+            subject={currentSubject}
+            onBack={() => setView({ type: "dashboard" })}
+            onUnitClick={(u) =>
+              setView({
+                type: "unit_details",
+                subject: currentSubject,
+                unit: u,
+              })
+            }
+          />
+        )}
+        {view.type === "unit_details" && (
+          <UnitDetailsView
+            subject={currentSubject}
+            unit={currentUnit}
+            onBack={() =>
+              setView({ type: "subject_units", subject: currentSubject })
+            }
+            onSelectItem={(type, item) => {
+              if (type === "exercises") {
+                setView({
+                  type: "solve_exercise",
+                  subject: currentSubject,
+                  unit: currentUnit,
+                  exercise: item,
+                });
+              } else {
+                setView({
+                  type: "view_lesson",
+                  subject: currentSubject,
+                  unit: currentUnit,
+                  lesson: item,
+                });
+              }
+            }}
+          />
+        )}
         {/* We can remove or ignore ContentListView since UnitDetailsView handles it now, I'll just change list to unreachable or leave it */}
-        {view.type === 'view_lesson' && <LessonDetailsView subject={currentSubject} unit={currentUnit} lesson={view.lesson} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} />}
-        {view.type === 'solve_exercise' && <InteractiveExerciseView subject={currentSubject} unit={currentUnit} exercise={view.exercise} onBack={() => setView({ type: 'unit_details', subject: currentSubject, unit: currentUnit })} onPay={() => setView({ type: 'payment' })} />}
-        {view.type === 'quiz' && <QuizView subjects={subjects} onBack={() => setView({ type: 'dashboard' })} />}
-        {view.type === 'payment' && <VIP onBack={() => setView({ type: 'dashboard' })} session={session} />}
-        {view.type === 'flashcards' && view.listType && <FlashcardsView type={view.listType as any} onBack={() => setView({ type: 'dashboard' })} />}
+        {view.type === "view_lesson" && (
+          <LessonDetailsView
+            subject={currentSubject}
+            unit={currentUnit}
+            lesson={view.lesson}
+            onBack={() =>
+              setView({
+                type: "unit_details",
+                subject: currentSubject,
+                unit: currentUnit,
+              })
+            }
+          />
+        )}
+        {view.type === "solve_exercise" && (
+          <InteractiveExerciseView
+            subject={currentSubject}
+            unit={currentUnit}
+            exercise={view.exercise}
+            onBack={() =>
+              setView({
+                type: "unit_details",
+                subject: currentSubject,
+                unit: currentUnit,
+              })
+            }
+            onPay={() => setView({ type: "payment" })}
+          />
+        )}
+        {view.type === "quiz" && (
+          <QuizView
+            subjects={subjects}
+            onBack={() => setView({ type: "dashboard" })}
+          />
+        )}
+        {view.type === "payment" && (
+          <VIP
+            onBack={() => setView({ type: "dashboard" })}
+            session={session}
+          />
+        )}
+        {view.type === "flashcards" && view.listType && (
+          <FlashcardsView
+            type={view.listType as any}
+            onBack={() => setView({ type: "dashboard" })}
+          />
+        )}
       </div>
 
-      {view.type === 'dashboard' && (
+      {view.type === "dashboard" && (
         <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[400px] h-20 bg-white/10 dark:bg-slate-900/10 backdrop-blur-md border border-white/20 dark:border-slate-700/30 shadow-lg z-40 rounded-[2rem] overflow-hidden">
-          
           <div className="relative z-10 w-full h-full flex items-center justify-around sm:justify-evenly px-2 sm:px-6">
-            <BottomNavItem icon={<Home size={22} />} label="الرئيسية" active={mainTab === 'home'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('home'); }} />
-            <BottomNavItem icon={<BookOpen size={22} />} label="المواد" active={mainTab === 'subjects'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('subjects'); }} />
-            <BottomNavItem icon={<Trophy size={22} />} label="الصدارة" active={mainTab === 'leaderboard'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('leaderboard'); }} />
-            <BottomNavItem icon={<FileText size={22} />} label="مواضيع" active={mainTab === 'topics'} onClick={() => { setView({ type: 'dashboard' }); setMainTab('topics'); }} />
+            <BottomNavItem
+              icon={<Home size={22} />}
+              label="الرئيسية"
+              active={mainTab === "home"}
+              onClick={() => {
+                setView({ type: "dashboard" });
+                setMainTab("home");
+              }}
+            />
+            <BottomNavItem
+              icon={<BookOpen size={22} />}
+              label="المواد"
+              active={mainTab === "subjects"}
+              onClick={() => {
+                setView({ type: "dashboard" });
+                setMainTab("subjects");
+              }}
+            />
+            <BottomNavItem
+              icon={<Trophy size={22} />}
+              label="الصدارة"
+              active={mainTab === "leaderboard"}
+              onClick={() => {
+                setView({ type: "dashboard" });
+                setMainTab("leaderboard");
+              }}
+            />
+            <BottomNavItem
+              icon={<FileText size={22} />}
+              label="مواضيع"
+              active={mainTab === "topics"}
+              onClick={() => {
+                setView({ type: "dashboard" });
+                setMainTab("topics");
+              }}
+            />
           </div>
         </div>
       )}
@@ -619,31 +948,61 @@ function StudentPortal({ session }: { session: any }) {
   );
 }
 
-function BottomNavItem({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void }) {
+function BottomNavItem({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
-    <button 
+    <button
       onClick={onClick}
-      className={`no-global-loader flex flex-col items-center justify-center gap-1.5 w-16 h-16 rounded-2xl transition-all ${active ? 'text-blue-600 scale-110' : 'text-slate-400 hover:text-slate-600'}`}
+      className={`no-global-loader flex flex-col items-center justify-center gap-1.5 w-16 h-16 rounded-2xl transition-all ${active ? "text-blue-600 scale-110" : "text-slate-400 hover:text-slate-600"}`}
     >
-      <div className={`relative flex items-center justify-center ${active ? 'bg-blue-50 text-blue-600 rounded-xl w-12 h-10 shadow-sm' : ''}`}>
+      <div
+        className={`relative flex items-center justify-center ${active ? "bg-blue-50 text-blue-600 rounded-xl w-12 h-10 shadow-sm" : ""}`}
+      >
         {icon}
       </div>
-      <span className={`text-[10px] font-bold ${active ? 'text-blue-600' : 'text-slate-500'}`}>{label}</span>
+      <span
+        className={`text-[10px] font-bold ${active ? "text-blue-600" : "text-slate-500"}`}
+      >
+        {label}
+      </span>
     </button>
   );
 }
 
-function BacPdfView({ year, subject, onBack }: { year: string, subject: any, onBack: () => void }) {
+function BacPdfView({
+  year,
+  subject,
+  onBack,
+}: {
+  year: string;
+  subject: any;
+  onBack: () => void;
+}) {
   const [exam, setExam] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'exam' | 'solution'>('exam');
+  const [activeTab, setActiveTab] = useState<"exam" | "solution">("exam");
 
   useEffect(() => {
     async function loadExam() {
       if (!supabase) return;
       try {
         setLoading(true);
-        const { data, error } = await supabase.from('bac_exams').select('*').eq('year', year).eq('subject_id', subject.id).limit(1).single();
+        const { data, error } = await supabase
+          .from("bac_exams")
+          .select("*")
+          .eq("year", year)
+          .eq("subject_id", subject.id)
+          .limit(1)
+          .single();
         if (data) setExam(data);
       } catch (e) {
         console.error(e);
@@ -657,61 +1016,78 @@ function BacPdfView({ year, subject, onBack }: { year: string, subject: any, onB
   return (
     <div className="animate-in fade-in duration-300 relative z-10 flex flex-col h-[calc(100vh-120px)] md:h-[calc(100vh-80px)] -mx-4 md:mx-0">
       <div className="flex items-center gap-4 mb-4 px-4 md:px-0 shrink-0">
-        <button onClick={onBack} className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0 relative z-20">
+        <button
+          onClick={onBack}
+          className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 transition-all font-bold shadow-sm shrink-0 relative z-20"
+        >
           <ChevronRight size={24} />
         </button>
-        <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${subject.bg} ${subject.color} flex items-center justify-center shadow-sm shrink-0`}>
-           <subject.icon size={28} />
+        <div
+          className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${subject.bg} ${subject.color} flex items-center justify-center shadow-sm shrink-0`}
+        >
+          <subject.icon size={28} />
         </div>
         <div>
-          <h2 className="font-bold text-xl md:text-3xl text-slate-800">{subject.name}</h2>
-          <p className="text-xs md:text-sm text-slate-500 font-medium">بكالوريا {year}</p>
+          <h2 className="font-bold text-xl md:text-3xl text-slate-800">
+            {subject.name}
+          </h2>
+          <p className="text-xs md:text-sm text-slate-500 font-medium">
+            بكالوريا {year}
+          </p>
         </div>
       </div>
 
       {loading ? (
         <div className="flex flex-col items-center justify-center flex-1">
-           <div className="flex gap-1.5 mb-4">
-             <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce"></div>
-             <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-             <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-           </div>
+          <div className="flex gap-1.5 mb-4">
+            <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce"></div>
+            <div
+              className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce"
+              style={{ animationDelay: "0.1s" }}
+            ></div>
+            <div
+              className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce"
+              style={{ animationDelay: "0.2s" }}
+            ></div>
+          </div>
           <p className="text-sm font-bold text-slate-500">جاري التحميل...</p>
         </div>
       ) : !exam ? (
         <div className="bg-slate-50 mx-4 md:mx-0 p-8 rounded-3xl text-center border border-slate-100 mt-10">
-           <FileText size={40} className="text-slate-300 mx-auto mb-4" />
-           <p className="text-slate-500 font-bold mb-1">الموضوع غير متوفر</p>
-           <p className="text-slate-400 text-sm">لم يتم رفع مواضيع لهذه المادة في هذه السنة.</p>
+          <FileText size={40} className="text-slate-300 mx-auto mb-4" />
+          <p className="text-slate-500 font-bold mb-1">الموضوع غير متوفر</p>
+          <p className="text-slate-400 text-sm">
+            لم يتم رفع مواضيع لهذه المادة في هذه السنة.
+          </p>
         </div>
       ) : (
         <div className="flex flex-col flex-1 bg-white md:rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.05)] border-y md:border border-slate-200 overflow-hidden min-w-0">
-           {exam.solution_file && (
-             <div className="flex border-b border-slate-100 bg-slate-50/80 p-2 gap-2 shrink-0">
-                <button
-                   onClick={() => setActiveTab('exam')}
-                   className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all text-sm flex items-center justify-center gap-2 ${activeTab === 'exam' ? 'bg-white text-blue-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-slate-200/50'}`}
-                >
-                   <FileText size={18} />
-                   الموضوع
-                </button>
-                <button
-                   onClick={() => setActiveTab('solution')}
-                   className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all text-sm flex items-center justify-center gap-2 ${activeTab === 'solution' ? 'bg-white text-emerald-600 shadow-sm border border-slate-200' : 'text-slate-500 hover:bg-slate-200/50'}`}
-                >
-                   <ClipboardList size={18} />
-                   التصحيح النموذجي
-                </button>
-             </div>
-           )}
-           
-           <div className="flex-1 relative w-full h-full overflow-hidden">
-              {activeTab === 'exam' ? (
-                 <PdfViewer url={exam.exam_file} />
-              ) : (
-                 <PdfViewer url={exam.solution_file} />
-              )}
-           </div>
+          {exam.solution_file && (
+            <div className="flex border-b border-slate-100 bg-slate-50/80 p-2 gap-2 shrink-0">
+              <button
+                onClick={() => setActiveTab("exam")}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all text-sm flex items-center justify-center gap-2 ${activeTab === "exam" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:bg-slate-200/50"}`}
+              >
+                <FileText size={18} />
+                الموضوع
+              </button>
+              <button
+                onClick={() => setActiveTab("solution")}
+                className={`flex-1 py-3 px-4 rounded-xl font-bold transition-all text-sm flex items-center justify-center gap-2 ${activeTab === "solution" ? "bg-white text-emerald-600 shadow-sm border border-slate-200" : "text-slate-500 hover:bg-slate-200/50"}`}
+              >
+                <ClipboardList size={18} />
+                التصحيح النموذجي
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1 relative w-full h-full overflow-hidden">
+            {activeTab === "exam" ? (
+              <PdfViewer url={exam.exam_file} />
+            ) : (
+              <PdfViewer url={exam.solution_file} />
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -721,122 +1097,164 @@ function BacPdfView({ year, subject, onBack }: { year: string, subject: any, onB
 function TopicsView({ subjects }: { subjects: any[] }) {
   const [selectedYear, setSelectedYear] = useState<string | null>(null);
   const [selectedSubject, setSelectedSubject] = useState<any | null>(null);
-  const [bacExamsList, setBacExamsList] = useState<{id: string, year: string, subject_id: string}[]>([]);
+  const [bacExamsList, setBacExamsList] = useState<
+    { id: string; year: string; subject_id: string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const years = ["2025", "2024", "2023", "2022", "2021", "2020", "2019"];
 
   useEffect(() => {
-     async function fetchList() {
-       if (!supabase) return;
-       try {
-         setLoading(true);
-         const { data, error } = await supabase.from('bac_exams').select('id, year, subject_id');
-         if (data) setBacExamsList(data);
-       } catch (e) {
-         console.error(e);
-       } finally {
-         setLoading(false);
-       }
-     }
-     fetchList();
+    async function fetchList() {
+      if (!supabase) return;
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("bac_exams")
+          .select("id, year, subject_id");
+        if (data) setBacExamsList(data);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchList();
   }, []);
 
   if (selectedSubject && selectedYear) {
-      return <BacPdfView year={selectedYear} subject={selectedSubject} onBack={() => setSelectedSubject(null)} />
+    return (
+      <BacPdfView
+        year={selectedYear}
+        subject={selectedSubject}
+        onBack={() => setSelectedSubject(null)}
+      />
+    );
   }
 
   if (selectedYear) {
-      const examsForYear = bacExamsList.filter(e => e.year === selectedYear);
-      const subjectsWithExams = subjects.filter(s => examsForYear.some(e => e.subject_id === s.id));
-      
-      return (
-         <div className="animate-in fade-in slide-in-from-right-4 relative z-10 space-y-6">
-             <div className="flex items-center gap-4 mb-4 md:mb-8">
-                 <button onClick={() => setSelectedYear(null)} className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 shadow-sm relative z-20 transition-all font-bold">
-                     <ChevronRight size={24} />
-                 </button>
-                 <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-sm">
-                    <FileText size={28} />
-                 </div>
-                 <div>
-                    <h2 className="font-bold text-xl md:text-3xl text-slate-800">مواضيع بكالوريا {selectedYear}</h2>
-                    <p className="text-xs md:text-sm text-slate-500 font-medium">عرض حسب التخصص والمادة</p>
-                 </div>
-             </div>
-             {subjectsWithExams.length === 0 ? (
-                 <div className="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100">
-                    <FileText size={40} className="text-slate-300 mx-auto mb-4" />
-                    <p className="text-slate-500 font-bold mb-1">لا يوجد مواضيع متاحة</p>
-                    <p className="text-slate-400 text-sm">سيتم إضافة مواضيع لهذه السنة قريباً.</p>
-                 </div>
-             ) : (
-                 <DashboardSubjectsView 
-                    subjects={subjectsWithExams} 
-                    listType="topics" 
-                    onSubjectClick={(s) => setSelectedSubject(s)} 
-                 />
-             )}
-         </div>
-      );
+    const examsForYear = bacExamsList.filter((e) => e.year === selectedYear);
+    const subjectsWithExams = subjects.filter((s) =>
+      examsForYear.some((e) => e.subject_id === s.id),
+    );
+
+    return (
+      <div className="animate-in fade-in slide-in-from-right-4 relative z-10 space-y-6">
+        <div className="flex items-center gap-4 mb-4 md:mb-8">
+          <button
+            onClick={() => setSelectedYear(null)}
+            className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-white hover:bg-slate-50 flex items-center justify-center text-slate-600 shadow-sm relative z-20 transition-all font-bold"
+          >
+            <ChevronRight size={24} />
+          </button>
+          <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-sm">
+            <FileText size={28} />
+          </div>
+          <div>
+            <h2 className="font-bold text-xl md:text-3xl text-slate-800">
+              مواضيع بكالوريا {selectedYear}
+            </h2>
+            <p className="text-xs md:text-sm text-slate-500 font-medium">
+              عرض حسب التخصص والمادة
+            </p>
+          </div>
+        </div>
+        {subjectsWithExams.length === 0 ? (
+          <div className="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100">
+            <FileText size={40} className="text-slate-300 mx-auto mb-4" />
+            <p className="text-slate-500 font-bold mb-1">
+              لا يوجد مواضيع متاحة
+            </p>
+            <p className="text-slate-400 text-sm">
+              سيتم إضافة مواضيع لهذه السنة قريباً.
+            </p>
+          </div>
+        ) : (
+          <DashboardSubjectsView
+            subjects={subjectsWithExams}
+            listType="topics"
+            onSubjectClick={(s) => setSelectedSubject(s)}
+          />
+        )}
+      </div>
+    );
   }
 
   return (
     <div className="animate-in fade-in">
-       <div className="mb-6">
-         <h2 className="font-bold text-xl md:text-3xl text-slate-800 flex items-center gap-3">
-           <FileText className="text-blue-500 font-black" size={32} />
-           مواضيع بكالوريا سابقة
-         </h2>
-         <p className="text-sm md:text-base text-slate-500 font-medium pr-11 mt-1">اختر سنة البكالوريا لعرض المواضيع</p>
-       </div>
+      <div className="mb-6">
+        <h2 className="font-bold text-xl md:text-3xl text-slate-800 flex items-center gap-3">
+          <FileText className="text-blue-500 font-black" size={32} />
+          مواضيع بكالوريا سابقة
+        </h2>
+        <p className="text-sm md:text-base text-slate-500 font-medium pr-11 mt-1">
+          اختر سنة البكالوريا لعرض المواضيع
+        </p>
+      </div>
 
-       <div className="grid gap-2.5 md:gap-4 max-w-3xl w-full">
-         {loading ? (
-             <div className="space-y-4">
-                 <div className="flex justify-center mb-6">
-                    <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-white border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-full">
-                       <div className="relative flex h-3 w-3">
-                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                         <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
-                       </div>
-                       <span className="text-sm font-bold text-slate-600">جاري جلب المعلومات...</span>
-                    </div>
-                 </div>
-                 {[1,2,3,4].map(i => (
-                    <div key={i} className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-slate-50 flex items-center justify-between overflow-hidden relative">
-                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/80 to-transparent z-10"></div>
-                        <div className="flex items-center gap-3 md:gap-4 w-full">
-                           <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl bg-slate-100/80 animate-pulse shrink-0"></div>
-                           <div className="h-5 w-32 bg-slate-100/80 rounded-lg animate-pulse"></div>
-                        </div>
-                        <div className="h-8 w-20 bg-slate-100/80 rounded-xl animate-pulse shrink-0"></div>
-                    </div>
-                 ))}
-             </div>
-         ) : years.map(y => {
-            const count = bacExamsList.filter(e => e.year === y && subjects.some(s => s.id === e.subject_id)).length;
+      <div className="grid gap-2.5 md:gap-4 max-w-3xl w-full">
+        {loading ? (
+          <div className="space-y-4">
+            <div className="flex justify-center mb-6">
+              <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-white border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-full">
+                <div className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                </div>
+                <span className="text-sm font-bold text-slate-600">
+                  جاري جلب المعلومات...
+                </span>
+              </div>
+            </div>
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-slate-50 flex items-center justify-between overflow-hidden relative"
+              >
+                <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/80 to-transparent z-10"></div>
+                <div className="flex items-center gap-3 md:gap-4 w-full">
+                  <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl bg-slate-100/80 animate-pulse shrink-0"></div>
+                  <div className="h-5 w-32 bg-slate-100/80 rounded-lg animate-pulse"></div>
+                </div>
+                <div className="h-8 w-20 bg-slate-100/80 rounded-xl animate-pulse shrink-0"></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          years.map((y) => {
+            const count = bacExamsList.filter(
+              (e) =>
+                e.year === y && subjects.some((s) => s.id === e.subject_id),
+            ).length;
             return (
-              <button 
-                  key={y} 
-                  onClick={() => setSelectedYear(y)}
-                  className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between hover:bg-slate-50 active:scale-[0.99] transition-all group cursor-pointer w-full"
-               >
-                 <div className="flex items-center gap-3 md:gap-4">
-                    <div className="bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors w-10 h-10 md:w-14 md:h-14 rounded-xl flex items-center justify-center font-black text-base md:text-xl shadow-[0_4px_12px_-4px_rgba(37,99,235,0.2)] shrink-0">
-                       {y}
-                    </div>
-                    <span className="font-bold text-slate-700 text-sm md:text-lg whitespace-nowrap">بكالوريا {y}</span>
-                 </div>
-                 <div className="flex items-center gap-2 md:gap-4">
-                    <span className="text-[10px] md:text-sm bg-slate-100 text-slate-500 px-2 md:px-3 py-1 md:py-1.5 rounded-xl font-bold group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors whitespace-nowrap">{count} مواد</span>
-                    <ChevronRight size={18} className="text-slate-400 rotate-180 group-hover:-translate-x-1 group-hover:text-blue-600 transition-all font-black shrink-0" />
-                 </div>
+              <button
+                key={y}
+                onClick={() => setSelectedYear(y)}
+                className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between hover:bg-slate-50 active:scale-[0.99] transition-all group cursor-pointer w-full"
+              >
+                <div className="flex items-center gap-3 md:gap-4">
+                  <div className="bg-blue-50 text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors w-10 h-10 md:w-14 md:h-14 rounded-xl flex items-center justify-center font-black text-base md:text-xl shadow-[0_4px_12px_-4px_rgba(37,99,235,0.2)] shrink-0">
+                    {y}
+                  </div>
+                  <span className="font-bold text-slate-700 text-sm md:text-lg whitespace-nowrap">
+                    بكالوريا {y}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 md:gap-4">
+                  <span className="text-[10px] md:text-sm bg-slate-100 text-slate-500 px-2 md:px-3 py-1 md:py-1.5 rounded-xl font-bold group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors whitespace-nowrap">
+                    {count} مواد
+                  </span>
+                  <ChevronRight
+                    size={18}
+                    className="text-slate-400 rotate-180 group-hover:-translate-x-1 group-hover:text-blue-600 transition-all font-black shrink-0"
+                  />
+                </div>
               </button>
-            )
-         })}
-       </div>
+            );
+          })
+        )}
+      </div>
     </div>
-  )
+  );
 }
 
 function SettingsView() {
@@ -847,20 +1265,42 @@ function SettingsView() {
         <h2 className="font-bold text-2xl text-slate-800">الإعدادات</h2>
       </div>
       <div className="bg-white rounded-[2rem] p-3 md:p-6 border border-slate-100 shadow-sm space-y-4">
-         <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50">
-            <h4 className="font-bold text-slate-800 text-lg">لا توجد إعدادات إضافية حالياً</h4>
-         </div>
+        <div className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50">
+          <h4 className="font-bold text-slate-800 text-lg">
+            لا توجد إعدادات إضافية حالياً
+          </h4>
+        </div>
       </div>
     </div>
-  )
+  );
 }
 
-function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }: { subjects: any[], bacDate?: string | null, onStartQuiz: () => void, onOpenFlashcards: (type: 'dates_history' | 'terms_history' | 'terms_geography' | 'characters') => void }) {
-  const [activeTab, setActiveTab] = useState<'lessons' | 'exercises'>(() => {
-    return (localStorage.getItem('dashboard_active_tab') as 'lessons' | 'exercises') || 'lessons';
+function DashboardHomeView({
+  subjects,
+  bacDate,
+  onStartQuiz,
+  onOpenFlashcards,
+}: {
+  subjects: any[];
+  bacDate?: string | null;
+  onStartQuiz: () => void;
+  onOpenFlashcards: (
+    type: "dates_history" | "terms_history" | "terms_geography" | "characters",
+  ) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"lessons" | "exercises">(() => {
+    return (
+      (localStorage.getItem("dashboard_active_tab") as
+        | "lessons"
+        | "exercises") || "lessons"
+    );
   });
 
-  const [timeLeft, setTimeLeft] = useState<{days: number, hours: number, minutes: number} | null>(null);
+  const [timeLeft, setTimeLeft] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+  } | null>(null);
   const [xp, setXP] = useState(0);
   const [streak, setStreak] = useState(0);
 
@@ -874,12 +1314,13 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
       setStreak(getStreak());
     };
     handleGamification();
-    window.addEventListener('progress_updated', handleGamification);
-    return () => window.removeEventListener('progress_updated', handleGamification);
+    window.addEventListener("progress_updated", handleGamification);
+    return () =>
+      window.removeEventListener("progress_updated", handleGamification);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('dashboard_active_tab', activeTab);
+    localStorage.setItem("dashboard_active_tab", activeTab);
   }, [activeTab]);
 
   useEffect(() => {
@@ -887,21 +1328,23 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
       setTimeLeft(null);
       return;
     }
-    
+
     const calculateTimeLeft = () => {
       const target = new Date(bacDate);
       const now = new Date();
-      
+
       const diff = target.getTime() - now.getTime();
       if (diff <= 0) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0 });
         return;
       }
-      
+
       const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const hours = Math.floor(
+        (diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+      );
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      
+
       setTimeLeft({ days, hours, minutes });
     };
 
@@ -910,13 +1353,16 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
     return () => clearInterval(interval);
   }, [bacDate]);
 
-  const totalQuizProgress = Math.round(subjects.reduce((sum, s) => {
-    return sum + getProgressSync('quiz_progress', s.id);
-  }, 0) / (subjects.length || 1));
+  const totalQuizProgress = Math.round(
+    subjects.reduce((sum, s) => {
+      return sum + getProgressSync("quiz_progress", s.id);
+    }, 0) / (subjects.length || 1),
+  );
 
   const radius = 22;
   const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (totalQuizProgress / 100) * circumference;
+  const strokeDashoffset =
+    circumference - (totalQuizProgress / 100) * circumference;
 
   return (
     <div className="space-y-4 md:space-y-8">
@@ -933,7 +1379,10 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
                 البكالوريا
               </h2>
               {timeLeft ? (
-                <div className="text-sm md:text-base text-slate-600 font-bold flex flex-wrap items-center gap-2 mt-3" dir="rtl">
+                <div
+                  className="text-sm md:text-base text-slate-600 font-bold flex flex-wrap items-center gap-2 mt-3"
+                  dir="rtl"
+                >
                   <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-orange-200 text-orange-600 shadow-sm">
                     <span className="text-lg">{timeLeft.days}</span>
                     <span className="text-xs">يوم</span>
@@ -957,7 +1406,7 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
           </div>
         </div>
 
-        <button 
+        <button
           onClick={onStartQuiz}
           className="col-span-1 md:col-span-1 min-h-[120px] md:min-h-[160px] relative w-full h-full glass rounded-3xl md:rounded-[2rem] p-4 md:p-6 flex flex-col items-center justify-center bg-gradient-to-br from-white to-indigo-50/50 group hover:shadow-lg transition-all overflow-hidden border border-indigo-100/50 text-center"
         >
@@ -988,12 +1437,16 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
                 />
               </svg>
               <div className="absolute inset-0 flex items-center justify-center text-indigo-700 font-bold text-xs">
-                  {totalQuizProgress}%
+                {totalQuizProgress}%
               </div>
             </div>
             <div>
-              <p className="text-[10px] md:text-sm font-bold text-indigo-500 mb-0.5">اختبار سريع</p>
-              <h4 className="font-bold text-slate-800 text-sm md:text-lg leading-tight">تدرب الآن</h4>
+              <p className="text-[10px] md:text-sm font-bold text-indigo-500 mb-0.5">
+                اختبار سريع
+              </p>
+              <h4 className="font-bold text-slate-800 text-sm md:text-lg leading-tight">
+                تدرب الآن
+              </h4>
             </div>
           </div>
         </button>
@@ -1003,12 +1456,20 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
             <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-amber-400/20 rounded-full blur-2xl transition-all pointer-events-none" />
             <div className="flex items-center md:flex-col gap-2 md:gap-1 relative z-10 text-center">
               <div className="w-8 h-8 md:w-16 md:h-16 rounded-full glass border border-amber-100 flex items-center justify-center text-lg md:text-3xl shadow-sm bg-white/60 text-amber-500 shrink-0 relative overflow-hidden">
-                <Star size={24} fill="currentColor" className="text-amber-500 drop-shadow-sm z-10 w-5 h-5 md:w-8 md:h-8" />
+                <Star
+                  size={24}
+                  fill="currentColor"
+                  className="text-amber-500 drop-shadow-sm z-10 w-5 h-5 md:w-8 md:h-8"
+                />
                 <div className="absolute inset-0 bg-amber-400/20 w-full h-full blur-xl" />
               </div>
               <div className="flex flex-col md:items-center items-start">
-                <span className="font-black text-slate-800 text-base md:text-xl line-clamp-1 leading-none mb-0.5">{xp}</span>
-                <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">نقطة خبرة</span>
+                <span className="font-black text-slate-800 text-base md:text-xl line-clamp-1 leading-none mb-0.5">
+                  {xp}
+                </span>
+                <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">
+                  نقطة خبرة
+                </span>
               </div>
             </div>
           </div>
@@ -1017,23 +1478,38 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
             <div className="absolute -right-5 -top-5 w-24 h-24 bg-orange-400/20 rounded-full blur-2xl transition-all pointer-events-none" />
             <div className="flex items-center md:flex-col gap-2 md:gap-1 relative z-10 text-center">
               <div className="w-8 h-8 md:w-16 md:h-16 rounded-full glass border border-orange-100 flex items-center justify-center text-lg md:text-3xl shadow-sm bg-white/60 text-orange-500 shrink-0 relative overflow-hidden">
-                <Flame size={24} fill="currentColor" className="text-orange-500 drop-shadow-sm z-10 w-5 h-5 md:w-8 md:h-8" />
+                <Flame
+                  size={24}
+                  fill="currentColor"
+                  className="text-orange-500 drop-shadow-sm z-10 w-5 h-5 md:w-8 md:h-8"
+                />
                 <div className="absolute inset-0 bg-orange-400/20 w-full h-full blur-xl" />
               </div>
               <div className="flex flex-col md:items-center items-start">
-                <span className="font-black text-slate-800 text-base md:text-xl line-clamp-1 leading-none mb-0.5">{streak}</span>
-                <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">يوم متتالي</span>
+                <span className="font-black text-slate-800 text-base md:text-xl line-clamp-1 leading-none mb-0.5">
+                  {streak}
+                </span>
+                <span className="text-[10px] md:text-xs font-bold text-slate-500 leading-none">
+                  يوم متتالي
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="col-span-2 md:col-span-3 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 fill-mode-both" dir="rtl">
-          <h3 className="font-bold text-lg md:text-xl text-slate-800 mb-4 px-1">استكشف المراجعة السريعة</h3>
-          <div className="flex gap-3 md:gap-5 overflow-x-auto pb-4 -mx-4 px-4 sm:-mx-1 sm:px-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-            
-            <button 
-              onClick={() => onOpenFlashcards('dates_history')} 
+        <div
+          className="col-span-2 md:col-span-3 mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 fill-mode-both"
+          dir="rtl"
+        >
+          <h3 className="font-bold text-lg md:text-xl text-slate-800 mb-4 px-1">
+            استكشف المراجعة السريعة
+          </h3>
+          <div
+            className="flex gap-3 md:gap-5 overflow-x-auto pb-4 -mx-4 px-4 sm:-mx-1 sm:px-1 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            <button
+              onClick={() => onOpenFlashcards("dates_history")}
               className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-purple-50/50 group hover:shadow-lg transition-all overflow-hidden border border-purple-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-purple-400/20 rounded-full blur-2xl group-hover:bg-purple-400/30 transition-all pointer-events-none" />
@@ -1042,16 +1518,20 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
                   <Calendar size={12} />
                   تاريخ
                 </div>
-                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">تواريخ التاريخ</h4>
-                <p className="text-xs md:text-sm text-slate-500 max-w-md">مرجع لجميع تواريخ التاريخ.</p>
+                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">
+                  تواريخ التاريخ
+                </h4>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">
+                  مرجع لجميع تواريخ التاريخ.
+                </p>
               </div>
               <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-purple-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-purple-100">
                 <Calendar className="w-6 h-6 md:w-8 md:h-8" />
               </div>
             </button>
 
-            <button 
-              onClick={() => onOpenFlashcards('terms_history')} 
+            <button
+              onClick={() => onOpenFlashcards("terms_history")}
               className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-emerald-50/50 group hover:shadow-lg transition-all overflow-hidden border border-emerald-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-emerald-400/20 rounded-full blur-2xl group-hover:bg-emerald-400/30 transition-all pointer-events-none" />
@@ -1060,16 +1540,20 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
                   <BookOpen size={12} />
                   تاريخ
                 </div>
-                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">مصطلحات التاريخ</h4>
-                <p className="text-xs md:text-sm text-slate-500 max-w-md">قاموس المصطلحات المقررة بالتاريخ.</p>
+                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">
+                  مصطلحات التاريخ
+                </h4>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">
+                  قاموس المصطلحات المقررة بالتاريخ.
+                </p>
               </div>
               <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-emerald-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-emerald-100">
                 <BookOpen className="w-6 h-6 md:w-8 md:h-8" />
               </div>
             </button>
 
-            <button 
-              onClick={() => onOpenFlashcards('terms_geography')} 
+            <button
+              onClick={() => onOpenFlashcards("terms_geography")}
               className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-teal-50/50 group hover:shadow-lg transition-all overflow-hidden border border-teal-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-teal-400/20 rounded-full blur-2xl group-hover:bg-teal-400/30 transition-all pointer-events-none" />
@@ -1078,16 +1562,20 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
                   <BookOpen size={12} />
                   جغرافيا
                 </div>
-                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">مصطلحات الجغرافيا</h4>
-                <p className="text-xs md:text-sm text-slate-500 max-w-md">قاموس المصطلحات المقررة بالجغرافيا.</p>
+                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">
+                  مصطلحات الجغرافيا
+                </h4>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">
+                  قاموس المصطلحات المقررة بالجغرافيا.
+                </p>
               </div>
               <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-teal-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-teal-100">
                 <BookOpen className="w-6 h-6 md:w-8 md:h-8" />
               </div>
             </button>
 
-            <button 
-              onClick={() => onOpenFlashcards('characters')} 
+            <button
+              onClick={() => onOpenFlashcards("characters")}
               className="w-[88vw] sm:w-[400px] shrink-0 snap-center relative glass rounded-3xl md:rounded-[2rem] p-5 md:p-6 flex flex-row items-center justify-between gap-4 bg-gradient-to-br from-white to-rose-50/50 group hover:shadow-lg transition-all overflow-hidden border border-rose-100/50 text-right min-h-[120px] md:min-h-[140px]"
             >
               <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-rose-400/20 rounded-full blur-2xl group-hover:bg-rose-400/30 transition-all pointer-events-none" />
@@ -1096,64 +1584,97 @@ function DashboardHomeView({ subjects, bacDate, onStartQuiz, onOpenFlashcards }:
                   <Users size={12} />
                   مراجعة سريعة
                 </div>
-                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">شخصيات التاريخ</h4>
-                <p className="text-xs md:text-sm text-slate-500 max-w-md">تعريف بأبرز الشخصيات التاريخية ودورها في الأحداث.</p>
+                <h4 className="font-black text-slate-800 text-lg md:text-2xl mb-1 mt-1">
+                  شخصيات التاريخ
+                </h4>
+                <p className="text-xs md:text-sm text-slate-500 max-w-md">
+                  تعريف بأبرز الشخصيات التاريخية ودورها في الأحداث.
+                </p>
               </div>
               <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl md:rounded-[1.2rem] bg-white text-rose-600 flex items-center justify-center shrink-0 relative z-10 shadow-sm border border-rose-100">
                 <Users className="w-6 h-6 md:w-8 md:h-8" />
               </div>
             </button>
-
           </div>
         </div>
-
       </div>
     </div>
-  )
+  );
 }
 
-function DashboardSubjectsView({ subjects, listType, onSubjectClick }: { subjects: any[], listType: 'lessons' | 'exercises' | 'topics' | 'subjects', onSubjectClick: (s: any) => void }) {
+function DashboardSubjectsView({
+  subjects,
+  listType,
+  onSubjectClick,
+}: {
+  subjects: any[];
+  listType: "lessons" | "exercises" | "topics" | "subjects";
+  onSubjectClick: (s: any) => void;
+}) {
   return (
     <div className="animate-in fade-in duration-300">
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-6 md:mb-8 gap-3">
         <h3 className="font-bold text-2xl text-slate-800 flex items-center gap-2">
-          {listType === 'lessons' ? <PlayCircle size={24} className="text-blue-500" /> : listType === 'exercises' ? <ClipboardList size={24} className="text-blue-500" /> : listType === 'topics' ? <FileText size={24} className="text-blue-500" /> : <BookOpen size={24} className="text-blue-500" />}
-          {listType === 'lessons' ? 'الدروس' : listType === 'exercises' ? 'التمارين' : listType === 'topics' ? 'مواضيع البكالوريا' : 'المواد'}
+          {listType === "lessons" ? (
+            <PlayCircle size={24} className="text-blue-500" />
+          ) : listType === "exercises" ? (
+            <ClipboardList size={24} className="text-blue-500" />
+          ) : listType === "topics" ? (
+            <FileText size={24} className="text-blue-500" />
+          ) : (
+            <BookOpen size={24} className="text-blue-500" />
+          )}
+          {listType === "lessons"
+            ? "الدروس"
+            : listType === "exercises"
+              ? "التمارين"
+              : listType === "topics"
+                ? "مواضيع البكالوريا"
+                : "المواد"}
         </h3>
       </div>
-      
+
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 active-tab-transition">
-          {subjects.map((sub, index) => (
-            <div 
-              key={`${sub.id}`}
-              onClick={() => onSubjectClick(sub)}
-              className="glass rounded-3xl md:rounded-[2rem] p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover relative overflow-hidden transition-transform hover:scale-[1.02] active:scale-[0.98]"
-            >
-              <div className={`absolute -left-10 -top-10 w-24 h-24 rounded-full blur-2xl opacity-10 group-hover:opacity-20 transition-all pointer-events-none ${sub.barColor}`} />
-              <div className="flex justify-between items-start mb-4 md:mb-6 relative">
-                 <div className={`w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl ${sub.bg} ${sub.color} flex items-center justify-center shadow-sm`}>
-                   <sub.icon size={20} className="md:w-7 md:h-7" />
-                 </div>
-              </div>
-              <div>
-                 <h4 className="font-bold text-sm md:text-lg text-slate-800 mb-2 md:mb-4 truncate">{sub.name}</h4>
-                 {listType !== 'topics' && (
-                   <>
-                     <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500 mb-1.5 md:mb-2">
-                        <span>التقدم</span>
-                        <span>{sub.progress}%</span>
-                     </div>
-                     <div className="w-full bg-slate-100 rounded-full h-1.5 md:h-2 overflow-hidden">
-                       <div className={`h-full rounded-full ${sub.barColor}`} style={{ width: `${sub.progress}%` }} />
-                     </div>
-                   </>
-                 )}
+        {subjects.map((sub, index) => (
+          <div
+            key={`${sub.id}`}
+            onClick={() => onSubjectClick(sub)}
+            className="glass rounded-3xl md:rounded-[2rem] p-4 lg:p-6 flex flex-col justify-between cursor-pointer group glass-hover relative overflow-hidden transition-transform hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <div
+              className={`absolute -left-10 -top-10 w-24 h-24 rounded-full blur-2xl opacity-10 group-hover:opacity-20 transition-all pointer-events-none ${sub.barColor}`}
+            />
+            <div className="flex justify-between items-start mb-4 md:mb-6 relative">
+              <div
+                className={`w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl ${sub.bg} ${sub.color} flex items-center justify-center shadow-sm`}
+              >
+                <sub.icon size={20} className="md:w-7 md:h-7" />
               </div>
             </div>
-          ))}
+            <div>
+              <h4 className="font-bold text-sm md:text-lg text-slate-800 mb-2 md:mb-4 truncate">
+                {sub.name}
+              </h4>
+              {listType !== "topics" && (
+                <>
+                  <div className="flex justify-between text-[10px] md:text-xs font-bold text-slate-500 mb-1.5 md:mb-2">
+                    <span>التقدم</span>
+                    <span>{sub.progress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 md:h-2 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${sub.barColor}`}
+                      style={{ width: `${sub.progress}%` }}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
-  )
+  );
 }
 
 // PaymentView removed in favor of VIP component
@@ -1162,229 +1683,318 @@ function LeaderboardView({ session }: { session: any }) {
   const [xp, setXp] = useState(0);
   const [leaders, setLeaders] = useState<any[]>([]);
   const [userRank, setUserRank] = useState<number | null>(null);
-  
-  const userName = session?.user?.user_metadata?.full_name || 'أنت';
+
+  const userName = session?.user?.user_metadata?.full_name || "أنت";
   const currentUserId = session?.user?.id;
 
-  const getStyleForUser = (userId: string, isCurrentUser: boolean, realName?: string) => {
-    if (!userId) return { name: 'مجهول', Icon: UserCircle, color: 'text-slate-400' };
-    
+  const getStyleForUser = (
+    userId: string,
+    isCurrentUser: boolean,
+    realName?: string,
+  ) => {
+    if (!userId)
+      return { name: "مجهول", Icon: UserCircle, color: "text-slate-400" };
+
     // Generate consistent visual styles based on user ID
     const seed = parseInt(userId.substring(0, 4), 16) || 0;
-    const icons = [Rocket, Sparkles, Zap, Star, Target, Crown, Flame, Lightbulb, Trophy, Dumbbell, Shield, Activity, Heart];
-    const colors = ['text-blue-500', 'text-amber-500', 'text-emerald-500', 'text-purple-500', 'text-orange-500', 'text-rose-500'];
-    
-    const names = ['أحمد', 'ياسر', 'أمين', 'لينا', 'سارة', 'فارس', 'كريم', 'ريان', 'يوسف', 'مريم', 'عمر', 'إسلام'];
-    let finalName = isCurrentUser ? (userName !== 'أنت' ? `أنت (${userName})` : 'أنت') : realName;
+    const icons = [
+      Rocket,
+      Sparkles,
+      Zap,
+      Star,
+      Target,
+      Crown,
+      Flame,
+      Lightbulb,
+      Trophy,
+      Dumbbell,
+      Shield,
+      Activity,
+      Heart,
+    ];
+    const colors = [
+      "text-blue-500",
+      "text-amber-500",
+      "text-emerald-500",
+      "text-purple-500",
+      "text-orange-500",
+      "text-rose-500",
+    ];
+
+    const names = [
+      "أحمد",
+      "ياسر",
+      "أمين",
+      "لينا",
+      "سارة",
+      "فارس",
+      "كريم",
+      "ريان",
+      "يوسف",
+      "مريم",
+      "عمر",
+      "إسلام",
+    ];
+    let finalName = isCurrentUser
+      ? userName !== "أنت"
+        ? `أنت (${userName})`
+        : "أنت"
+      : realName;
     if (!finalName) {
-         finalName = `${names[seed % names.length]} ${userId.substring(0, 3)}`;
+      finalName = `${names[seed % names.length]} ${userId.substring(0, 3)}`;
     }
 
     return {
       name: finalName,
       Icon: icons[seed % icons.length],
-      color: colors[seed % colors.length]
+      color: colors[seed % colors.length],
     };
   };
 
   useEffect(() => {
-    setXp(getXP() || 0); 
+    setXp(getXP() || 0);
     const handleProgress = () => {
       setXp(getXP() || 0);
     };
-    window.addEventListener('progress_updated', handleProgress);
-    
+    window.addEventListener("progress_updated", handleProgress);
+
     // Fetch real leaderboard
-    getLeaderboard().then(data => {
-        let rank = null;
-        let formattedData = data.map((item: any, index: number) => {
-            const isCurrent = item.user_id === currentUserId;
-            if (isCurrent) rank = index + 1;
-            
-            const realName = item.user_meta?.full_name;
-            const style = getStyleForUser(item.user_id, isCurrent, realName);
-            
-            return {
-                id: index + 1,
-                userId: item.user_id,
-                name: style.name,
-                xp: item.progress_value,
-                Icon: isCurrent ? UserCircle : style.Icon,
-                color: isCurrent ? 'text-teal-500' : style.color,
-                isCurrentUser: isCurrent
-            };
-        });
-        
-        setLeaders(formattedData);
-        setUserRank(rank);
+    getLeaderboard().then((data) => {
+      let rank = null;
+      let formattedData = data.map((item: any, index: number) => {
+        const isCurrent = item.user_id === currentUserId;
+        if (isCurrent) rank = index + 1;
+
+        const realName = item.user_meta?.full_name;
+        const style = getStyleForUser(item.user_id, isCurrent, realName);
+
+        return {
+          id: index + 1,
+          userId: item.user_id,
+          name: style.name,
+          xp: item.progress_value,
+          Icon: isCurrent ? UserCircle : style.Icon,
+          color: isCurrent ? "text-teal-500" : style.color,
+          isCurrentUser: isCurrent,
+        };
+      });
+
+      setLeaders(formattedData);
+      setUserRank(rank);
     });
 
-    return () => window.removeEventListener('progress_updated', handleProgress);
+    return () => window.removeEventListener("progress_updated", handleProgress);
   }, [currentUserId, userName, xp]);
 
   // Top 3
   const first = leaders.length > 0 ? leaders[0] : null;
   const second = leaders.length > 1 ? leaders[1] : null;
   const third = leaders.length > 2 ? leaders[2] : null;
-  
+
   // Rest
   const competitors = leaders.slice(3);
 
   return (
     <div className="w-full pb-24" dir="rtl">
       <div className="max-w-xl mx-auto px-4 pt-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        
         {/* Header */}
         <div className="flex items-center justify-start mb-12">
-           <div className="flex items-center gap-2">
-             <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">لوحة المتصدرين</h1>
-           </div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">
+              لوحة المتصدرين
+            </h1>
+          </div>
         </div>
 
         {/* Podium Area */}
         {leaders.length >= 3 && (
-        <div className="flex items-end justify-center gap-2 md:gap-4 mb-20 px-2 pt-6">
-          
-          {/* 2nd Place */}
-          {second && (
-          <div className="flex-1 flex flex-col items-center animate-in zoom-in duration-500 delay-100 group relative">
-             <div className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-purple-400 to-purple-500 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-lg mb-3 shadow-purple-500/30 border-4 border-white dark:border-slate-800 z-10 relative`}>
-               {second.name.charAt(0)}
-               <div className="absolute -bottom-2 -right-2 w-6 h-6 md:w-8 md:h-8 rounded-full bg-white dark:bg-slate-800 shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-purple-500">
-                 <span className="font-bold text-xs md:text-sm">2</span>
-               </div>
-             </div>
-             
-             <div className="flex flex-col items-center relative z-10 text-center w-full">
-               <span className="font-bold text-slate-800 dark:text-white text-xs md:text-base mb-1 drop-shadow-sm max-w-[80px] break-words md:max-w-full leading-tight">{second.name}</span>
-               <div className="bg-purple-50 dark:bg-purple-900/30 rounded-full px-2 py-1 md:px-3 flex items-center gap-1 border border-purple-100 dark:border-purple-800/50 text-purple-600 dark:text-purple-400 shadow-sm mt-1">
-                 <span className="text-xs md:text-sm font-bold leading-none">{second.xp.toLocaleString('en-US').replace(',', '.')}</span>
-                 <Star size={10} fill="currentColor" />
-               </div>
-             </div>
-          </div>
-          )}
+          <div className="flex items-end justify-center gap-2 md:gap-4 mb-20 px-2 pt-6">
+            {/* 2nd Place */}
+            {second && (
+              <div className="flex-1 flex flex-col items-center animate-in zoom-in duration-500 delay-100 group relative">
+                <div
+                  className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-purple-400 to-purple-500 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-lg mb-3 shadow-purple-500/30 border-4 border-white dark:border-slate-800 z-10 relative`}
+                >
+                  {second.name.charAt(0)}
+                  <div className="absolute -bottom-2 -right-2 w-6 h-6 md:w-8 md:h-8 rounded-full bg-white dark:bg-slate-800 shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-purple-500">
+                    <span className="font-bold text-xs md:text-sm">2</span>
+                  </div>
+                </div>
 
-          {/* 1st Place */}
-          {first && (
-          <div className="flex-[1.2] flex flex-col items-center animate-in zoom-in duration-500 group relative z-20">
-             <div className="absolute -top-12 text-amber-500 animate-bounce drop-shadow-lg z-20">
-                <Crown size={48} fill="currentColor" strokeWidth={1.5} />
-             </div>
-             
-             <div className={`w-20 h-20 md:w-28 md:h-28 bg-gradient-to-tr from-amber-400 to-yellow-500 rounded-full flex items-center justify-center text-4xl md:text-5xl font-black text-white shadow-xl shadow-amber-500/40 mb-3 border-[5px] border-white dark:border-slate-800 relative z-10`}>
-               {first.name.charAt(0)}
-               <div className="absolute -bottom-2 -left-2 md:-bottom-3 md:-left-3 bg-white dark:bg-slate-800 w-8 h-8 md:w-10 md:h-10 rounded-full shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-amber-500">
-                 <span className="font-black text-lg md:text-xl">1</span>
-               </div>
-             </div>
-             
-             <div className="flex flex-col items-center relative z-10 w-full text-center">
-               <span className="font-bold text-slate-800 dark:text-white text-sm md:text-lg mb-1 drop-shadow-sm max-w-full break-words leading-tight">{first.name}</span>
-               <div className="bg-amber-50 dark:bg-amber-900/30 rounded-full px-3 py-1 md:px-4 md:py-1.5 flex items-center gap-1.5 border border-amber-200 dark:border-amber-800/50 text-amber-600 dark:text-amber-400 shadow-sm mt-1 ring-2 ring-amber-500/10 dark:ring-amber-500/20">
-                 <span className="text-sm md:text-base font-bold leading-none">{first.xp.toLocaleString('en-US').replace(',', '.')}</span>
-                 <Star size={12} fill="currentColor" />
-               </div>
-             </div>
-          </div>
-          )}
+                <div className="flex flex-col items-center relative z-10 text-center w-full">
+                  <span className="font-bold text-slate-800 dark:text-white text-xs md:text-base mb-1 drop-shadow-sm max-w-[80px] break-words md:max-w-full leading-tight">
+                    {second.name}
+                  </span>
+                  <div className="bg-purple-50 dark:bg-purple-900/30 rounded-full px-2 py-1 md:px-3 flex items-center gap-1 border border-purple-100 dark:border-purple-800/50 text-purple-600 dark:text-purple-400 shadow-sm mt-1">
+                    <span className="text-xs md:text-sm font-bold leading-none">
+                      {second.xp.toLocaleString("en-US").replace(",", ".")}
+                    </span>
+                    <Star size={10} fill="currentColor" />
+                  </div>
+                </div>
+              </div>
+            )}
 
-          {/* 3rd Place */}
-          {third && (
-          <div className="flex-1 flex flex-col items-center animate-in zoom-in duration-500 delay-200 group relative">
-             <div className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-slate-400 to-slate-500 dark:from-slate-600 dark:to-slate-700 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-md mb-3 shadow-slate-400/20 border-4 border-white dark:border-slate-800 z-10 relative`}>
-               {third.name.charAt(0)}
-               <div className="absolute -bottom-2 -left-2 w-6 h-6 md:w-8 md:h-8 rounded-full bg-white dark:bg-slate-800 shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-500">
-                 <span className="font-bold text-xs md:text-sm">3</span>
-               </div>
-             </div>
-             
-             <div className="flex flex-col items-center relative z-10 text-center w-full">
-               <span className="font-bold text-slate-800 dark:text-white text-xs md:text-base mb-1 drop-shadow-sm max-w-[80px] break-words md:max-w-full leading-tight">{third.name}</span>
-               <div className="bg-slate-50 dark:bg-slate-800 rounded-full px-2 py-1 md:px-3 flex items-center gap-1 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 shadow-sm mt-1">
-                 <span className="text-xs md:text-sm font-bold leading-none">{third.xp.toLocaleString('en-US').replace(',', '.')}</span>
-                 <Star size={10} fill="currentColor" />
-               </div>
-             </div>
+            {/* 1st Place */}
+            {first && (
+              <div className="flex-[1.2] flex flex-col items-center animate-in zoom-in duration-500 group relative z-20">
+                <div className="absolute -top-12 text-amber-500 animate-bounce drop-shadow-lg z-20">
+                  <Crown size={48} fill="currentColor" strokeWidth={1.5} />
+                </div>
+
+                <div
+                  className={`w-20 h-20 md:w-28 md:h-28 bg-gradient-to-tr from-amber-400 to-yellow-500 rounded-full flex items-center justify-center text-4xl md:text-5xl font-black text-white shadow-xl shadow-amber-500/40 mb-3 border-[5px] border-white dark:border-slate-800 relative z-10`}
+                >
+                  {first.name.charAt(0)}
+                  <div className="absolute -bottom-2 -left-2 md:-bottom-3 md:-left-3 bg-white dark:bg-slate-800 w-8 h-8 md:w-10 md:h-10 rounded-full shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-amber-500">
+                    <span className="font-black text-lg md:text-xl">1</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center relative z-10 w-full text-center">
+                  <span className="font-bold text-slate-800 dark:text-white text-sm md:text-lg mb-1 drop-shadow-sm max-w-full break-words leading-tight">
+                    {first.name}
+                  </span>
+                  <div className="bg-amber-50 dark:bg-amber-900/30 rounded-full px-3 py-1 md:px-4 md:py-1.5 flex items-center gap-1.5 border border-amber-200 dark:border-amber-800/50 text-amber-600 dark:text-amber-400 shadow-sm mt-1 ring-2 ring-amber-500/10 dark:ring-amber-500/20">
+                    <span className="text-sm md:text-base font-bold leading-none">
+                      {first.xp.toLocaleString("en-US").replace(",", ".")}
+                    </span>
+                    <Star size={12} fill="currentColor" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 3rd Place */}
+            {third && (
+              <div className="flex-1 flex flex-col items-center animate-in zoom-in duration-500 delay-200 group relative">
+                <div
+                  className={`w-14 h-14 md:w-20 md:h-20 bg-gradient-to-tr from-slate-400 to-slate-500 dark:from-slate-600 dark:to-slate-700 rounded-full flex items-center justify-center text-2xl md:text-4xl font-black text-white shadow-md mb-3 shadow-slate-400/20 border-4 border-white dark:border-slate-800 z-10 relative`}
+                >
+                  {third.name.charAt(0)}
+                  <div className="absolute -bottom-2 -left-2 w-6 h-6 md:w-8 md:h-8 rounded-full bg-white dark:bg-slate-800 shadow-md border-2 border-slate-100 dark:border-slate-700 flex items-center justify-center text-slate-500">
+                    <span className="font-bold text-xs md:text-sm">3</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center relative z-10 text-center w-full">
+                  <span className="font-bold text-slate-800 dark:text-white text-xs md:text-base mb-1 drop-shadow-sm max-w-[80px] break-words md:max-w-full leading-tight">
+                    {third.name}
+                  </span>
+                  <div className="bg-slate-50 dark:bg-slate-800 rounded-full px-2 py-1 md:px-3 flex items-center gap-1 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 shadow-sm mt-1">
+                    <span className="text-xs md:text-sm font-bold leading-none">
+                      {third.xp.toLocaleString("en-US").replace(",", ".")}
+                    </span>
+                    <Star size={10} fill="currentColor" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          )}
-        </div>
         )}
-        
+
         {/* Loading / Less than 3 visual */}
         {leaders.length > 0 && leaders.length < 3 && (
-            <div className="mb-10 text-center text-slate-500 p-8 glass rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[250px]">
-                <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center mb-4">
-                   <Crown className="text-amber-500" size={36} />
-                </div>
-                <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-2">لوحة الشرف قيد التكوين!</h3>
-                <p className="text-sm">كن أنت من الأوائل وانطلق في تجميع النقاط...</p>
+          <div className="mb-10 text-center text-slate-500 p-8 glass rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center min-h-[250px]">
+            <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center mb-4">
+              <Crown className="text-amber-500" size={36} />
             </div>
+            <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-2">
+              لوحة الشرف قيد التكوين!
+            </h3>
+            <p className="text-sm">
+              كن أنت من الأوائل وانطلق في تجميع النقاط...
+            </p>
+          </div>
         )}
 
         {/* Current User Stats Card */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-400 rounded-3xl p-6 mb-10 shadow-lg shadow-blue-500/20 flex items-center justify-between border border-white/20 relative overflow-hidden text-white">
-           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10" />
-           <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-900/10 rounded-full blur-2xl -ml-10 -mb-10" />
-           
-           <div className="flex flex-col items-center relative z-10 w-1/2 border-l border-blue-300/30 pl-2">
-              <div className="bg-blue-400/30 rounded-xl p-2 mb-2 backdrop-blur-md">
-                 <Star size={20} fill="currentColor" className="opacity-90" />
-              </div>
-              <span className="text-blue-50 text-xs md:text-sm font-medium mb-1">نقاطك الإجمالية</span>
-              <span className="font-black text-3xl drop-shadow-sm">{xp.toLocaleString('en-US').replace(',', '.')}</span>
-           </div>
-           
-           <div className="flex flex-col items-center relative z-10 w-1/2 pr-2">
-              <div className="bg-blue-400/30 rounded-xl p-2 mb-2 backdrop-blur-md">
-                 <Trophy size={20} fill="currentColor" className="opacity-90" />
-              </div>
-              <span className="text-blue-50 text-xs md:text-sm font-medium mb-1">مرتبتك الحالية</span>
-              <span className="font-black text-3xl drop-shadow-sm">{userRank ? `#${userRank}` : '--'}</span>
-           </div>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10" />
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-900/10 rounded-full blur-2xl -ml-10 -mb-10" />
+
+          <div className="flex flex-col items-center relative z-10 w-1/2 border-l border-blue-300/30 pl-2">
+            <div className="bg-blue-400/30 rounded-xl p-2 mb-2 backdrop-blur-md">
+              <Star size={20} fill="currentColor" className="opacity-90" />
+            </div>
+            <span className="text-blue-50 text-xs md:text-sm font-medium mb-1">
+              نقاطك الإجمالية
+            </span>
+            <span className="font-black text-3xl drop-shadow-sm">
+              {xp.toLocaleString("en-US").replace(",", ".")}
+            </span>
+          </div>
+
+          <div className="flex flex-col items-center relative z-10 w-1/2 pr-2">
+            <div className="bg-blue-400/30 rounded-xl p-2 mb-2 backdrop-blur-md">
+              <Trophy size={20} fill="currentColor" className="opacity-90" />
+            </div>
+            <span className="text-blue-50 text-xs md:text-sm font-medium mb-1">
+              مرتبتك الحالية
+            </span>
+            <span className="font-black text-3xl drop-shadow-sm">
+              {userRank ? `#${userRank}` : "--"}
+            </span>
+          </div>
         </div>
 
         {/* Divider */}
         {competitors.length > 0 && (
-            <div className="flex items-center gap-4 mb-6">
-               <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
-               <span className="text-xs font-bold text-slate-400 dark:text-slate-500 px-2 flex items-center gap-2">
-                 <Users size={14} /> التصنيف الكامل
-               </span>
-               <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
-            </div>
+          <div className="flex items-center gap-4 mb-6">
+            <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
+            <span className="text-xs font-bold text-slate-400 dark:text-slate-500 px-2 flex items-center gap-2">
+              <Users size={14} /> التصنيف الكامل
+            </span>
+            <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800"></div>
+          </div>
         )}
 
         {/* Competitor List */}
         <div className="space-y-3">
           {competitors.map((user) => (
-             <div key={user.id} className={`flex items-center p-3 md:p-4 rounded-[1.5rem] shadow-sm border transition-colors relative overflow-hidden group ${user.isCurrentUser ? 'border-blue-400 bg-gradient-to-r from-blue-50 to-white dark:from-blue-900/30 dark:to-slate-900 ring-2 ring-blue-400/30' : 'glass border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700'}`}>
-                {user.isCurrentUser && <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />}
-                {user.isCurrentUser && <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-300/20 rounded-full blur-xl -ml-10 -mb-10 pointer-events-none" />}
-                
-                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center font-bold shrink-0 relative z-10 ${user.isCurrentUser ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/60 dark:text-blue-400 border-blue-200 dark:border-blue-800' : 'bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border-white dark:border-slate-800 shadow-inner'} text-base border group-hover:scale-105 transition-transform`}>
-                  {user.id}
+            <div
+              key={user.id}
+              className={`flex items-center p-3 md:p-4 rounded-[1.5rem] shadow-sm border transition-colors relative overflow-hidden group ${user.isCurrentUser ? "border-blue-400 bg-gradient-to-r from-blue-50 to-white dark:from-blue-900/30 dark:to-slate-900 ring-2 ring-blue-400/30" : "glass border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700"}`}
+            >
+              {user.isCurrentUser && (
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
+              )}
+              {user.isCurrentUser && (
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-300/20 rounded-full blur-xl -ml-10 -mb-10 pointer-events-none" />
+              )}
+
+              <div
+                className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center font-bold shrink-0 relative z-10 ${user.isCurrentUser ? "bg-blue-100 text-blue-600 dark:bg-blue-900/60 dark:text-blue-400 border-blue-200 dark:border-blue-800" : "bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border-white dark:border-slate-800 shadow-inner"} text-base border group-hover:scale-105 transition-transform`}
+              >
+                {user.id}
+              </div>
+
+              <div className="flex-1 flex flex-row items-center justify-between pr-4 relative z-10">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`font-bold md:text-lg ${user.isCurrentUser ? "text-blue-700 dark:text-blue-300" : "text-slate-800 dark:text-white"}`}
+                  >
+                    {user.name}
+                  </span>
                 </div>
-                
-                <div className="flex-1 flex flex-row items-center justify-between pr-4 relative z-10">
-                  <div className="flex items-center gap-2">
-                     <span className={`font-bold md:text-lg ${user.isCurrentUser ? 'text-blue-700 dark:text-blue-300' : 'text-slate-800 dark:text-white'}`}>{user.name}</span>
-                  </div>
-                  <div className={`flex items-center gap-1.5 font-bold px-3 py-1 rounded-full border ${user.isCurrentUser ? 'text-amber-600 bg-amber-100/50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/30 dark:border-amber-800' : 'text-amber-500 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/50'}`}>
-                     <span>{user.xp.toLocaleString('en-US').replace(',', '.')}</span>
-                     <Star size={14} fill="currentColor" />
-                  </div>
+                <div
+                  className={`flex items-center gap-1.5 font-bold px-3 py-1 rounded-full border ${user.isCurrentUser ? "text-amber-600 bg-amber-100/50 border-amber-200 dark:text-amber-400 dark:bg-amber-900/30 dark:border-amber-800" : "text-amber-500 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900/50"}`}
+                >
+                  <span>
+                    {user.xp.toLocaleString("en-US").replace(",", ".")}
+                  </span>
+                  <Star size={14} fill="currentColor" />
                 </div>
-             </div>
+              </div>
+            </div>
           ))}
           {leaders.length === 0 && (
-              <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-4">
-                 <div className="w-12 h-12 border-4 border-slate-200 border-t-teal-500 rounded-full animate-spin"></div>
-                 <p className="font-medium text-sm">جاري تحميل التصنيف...</p>
-              </div>
+            <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-4">
+              <div className="w-12 h-12 border-4 border-slate-200 border-t-teal-500 rounded-full animate-spin"></div>
+              <p className="font-medium text-sm">جاري تحميل التصنيف...</p>
+            </div>
           )}
         </div>
-
       </div>
     </div>
   );
